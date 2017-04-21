@@ -1,6 +1,8 @@
 build/
+build_debug/
 build_with_allscalecc/
 third_party/
+Amdados_api_codeblocks/
 
 # Editor Specific
 *.swp
