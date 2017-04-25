@@ -6,13 +6,25 @@
 #include "amdados/app/parameters.h"
 #include "amdados/app/solver.h"
 #include "amdados/app/filter.h"
+
 #include "allscale/api/user/data/grid.h"
+
+
+#include "amdados/app/matrix.h"
+//#include "amdados/app/cholesky.h"
+//#include "amdados/app/kalman_filter.h"
+
+
+
 
 
 
 using namespace amdados::app;
 
-int main() {
+int main()
+{
+    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y,observint);
+
 	std::cout << "The answer is " << answer() << std::endl;
 	return EXIT_SUCCESS;
 
@@ -46,10 +58,6 @@ int main() {
     // Switch to appropriate grid resolution
     // Data assimilation solver
     // File output at periodic intervals
-
-
-
-
 
 
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "allscale/api/user/data/grid.h"
-#include "amdados/app/solver.h"
+
+//using namespace allscale::api::user::data;
 
 namespace amdados {
 namespace app {
@@ -23,11 +24,13 @@ namespace app {
     int spot_y = 0;
     double spot_density = 10000;
 
-    const std::string filename = "..//Observation.txt";
+    const std::string filename = "..//..//Observation.txt";
     int observint = 1; // number of timesteps between observation availability
 
 
-    double ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const std::string filename, int nobspts_x ,int nobspts_y, int observint)
+
+
+double ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const std::string filename, int nobspts_x ,int nobspts_y, int observint)
 {
     /// Get points of observations and real values
     // Need to be cognizant of timestep availability
@@ -60,6 +63,10 @@ namespace app {
         throw std::exception();
     }
 }
+
+    // Come back to this % Read observations utilities and replacs Size & Grid
+    allscale::api::user::data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
+    allscale::api::user::data::Grid<double,3> obsv_glob(size_grd);
 
 
    // ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y,observint);
