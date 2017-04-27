@@ -15,17 +15,15 @@
 //#include "amdados/app/kalman_filter.h"
 
 
-
-
-
-
 using namespace amdados::app;
 
 int main()
 {
-    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y,observint);
+    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
 
 	std::cout << "The answer is " << answer() << std::endl;
+	std::cout << " observation data = " << obsv_glob[{1,1,1}] << std::endl;
+
 	return EXIT_SUCCESS;
 
 	// Components to be included

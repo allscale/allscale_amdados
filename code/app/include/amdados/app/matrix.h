@@ -13,6 +13,8 @@
 #include "allscale/api/user/data/grid.h"
 #include "amdados/app/static_grid.h"
 
+
+
 template<size_t NROWS, size_t MSIZE, size_t NCOLS>
 void MatMult(allscale::utils::grid<double, NROWS, NCOLS> & result,
        const allscale::utils::grid<double, NROWS, MSIZE> & A,
