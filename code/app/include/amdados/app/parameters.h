@@ -3,7 +3,10 @@
 #include <iostream>
 
 #include "allscale/api/user/data/grid.h"
+#include "allscale/api/user/operator/pfor.h"
+
 #include "amdados/app/amdados_grid.h"
+
 
 
 //using namespace allscale::api::user::data;
@@ -65,7 +68,6 @@ namespace app {
     // data structures for observation data
     allscale::api::user::data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
     allscale::api::user::data::Grid<double,3> obsv_glob(size_grd);
-
 
            // initialize all cell on the 100m resolution
 
