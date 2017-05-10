@@ -1,4 +1,3 @@
-#include <cstdlib>
 #include <iostream>
 
 #include "amdados/app/answer.h"
@@ -19,10 +18,24 @@ using namespace amdados::app;
 
 int main()
 {
-    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
+    Compute(zero, size_global);
 
 	std::cout << "The answer is " << answer() << std::endl;
 	std::cout << " observation data = " << obsv_glob[{1,1,1}] << std::endl;
+	std::cout << "size=  " << zero << std::endl;
+	std::cout << "active layer=  " << A[{1,1}].getActiveLayer() << std::endl;
+
+
+    std::vector<int> nums{3, 4, 2, 8, 15, 267};
+
+    auto print = [](const int& n) { std::cout << " " << n; };
+
+    std::cout << "before:";
+    for_each(nums.begin(), nums.end(), print);
+    {
+    	std::cout << "numbeg =  " << 4 << std::endl;
+    }
+    std::cout << '\n';
 
 	return EXIT_SUCCESS;
 

@@ -9,7 +9,7 @@
 
 
 
-//using namespace allscale::api::user::data;
+using namespace allscale::api::user::data;
 
 namespace amdados {
 namespace app {
@@ -58,8 +58,6 @@ namespace app {
     // create the overall grid
     allscale::api::user::data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
     allscale::api::user::data::Grid<sub_domain,2> B(size_global);
-
-
     const std::string filename = "..//..//Observation.txt";
     int observint = 1; // number of timesteps between observation availability
 // all initialization parameters - move to input file
@@ -77,7 +75,7 @@ void ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const s
     /// Get points of observations and real values
     // Need to be cognizant of timestep availability
     std::ifstream in;
-    in.open(filename);
+    in.open(filename);   // Need to remove exception here
     if(in.is_open())
     {
         int t;

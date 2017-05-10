@@ -1,10 +1,13 @@
 #pragma once
 
+
 #include "allscale/api/user/data/grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
-#include "amdados/app/amdados_grid.h"
 #include "amdados/app/parameters.h"
+#include "amdados/app/amdados_grid.h"
+
+using namespace allscale::api::user::data;
 
 namespace amdados {
 namespace app {
@@ -21,15 +24,37 @@ namespace app {
 //      always happens on the 100m grid and we resolve at higher resolution only for data assimilation
 
 // --- Initialize ---
-  // pfor(zero, size, [&](const  allscale::api::user::data::GridPoint<2>& pos) {
+
+void Compute(allscale::api::user::data::GridPoint<2>& zero, allscale::api::user::data::GridPoint<2> size_global)
+{
+    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
+
+allscale::api::user::pfor(zero, size_global, [&](const allscale::api::user::data::GridPoint<2>& pos) {
+    // initialize all cells on the 100m resolution
+          A[pos].setActiveLayer(L_100m);
+       //   A[pos].DiscretizeElements();
+          // here we compute quadrature for each grid
+          // initialize the concentration
+     //     A[pos].forAllActiveNodes([](const allscale::api::user::data::GridPoint<2>& pos, double& value) {
+          A[pos].forAllActiveNodes([](const allscale::api::user::data::GridPoint<2>& pos, double& value) {
+             value = 0.0;        // initialize rho with 0
+          });
+    //  });
+
+      });
+}
+
+//allscale::api::user::pfor(zero, size, [&](const  allscale::api::user::data::GridPoint<2>& pos)
+
+//  allscale::api::user::pfor(zero, size, [&](const  allscale::api::user::data::GridPoint<2>& pos) {
 
        // initialize all cells on the 100m resolution
     //   A[pos].setActiveLayer(L_100m);
     //   A[pos].DiscretizeElements();
        // here we compute quadrature for each grid
 
-  // });
-//    allscale::api::user::data::GridPoint<3> size_grd = {10, 10,2};
+ //  });
+     allscale::api::user::data::GridPoint<3> tempvar = {10, 10,2};
 //    allscale::api::user::data::Grid<double,3> obsv_glob(size_grd);
 
 } // end namespace app

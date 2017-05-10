@@ -79,10 +79,9 @@ namespace app {
         template<typename Op>
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == getLayerNumber()) {
-			int Coordinate;
                 // apply it to this value
-                for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
-                    op(pos,data[pos]);
+                std::for_each(allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
+                   op(pos,data[pos]);
                 });
             } else {
                 nested.forAllOnLayer(layer,op);
@@ -157,6 +156,84 @@ namespace app {
     };
 
 
+
+
+
+    template<typename T, typename CellConfig>
+    struct Cell;
+
+
+    template<typename T, typename Layers>
+    struct Cell<T,CellConfig<Layers>> {
+
+        // determines the active layer of this grid cell
+        unsigned active_layer = 0;
+
+        // the data stored in
+        GridLayerData<T,size<1,1>,Layers> data;
+
+        Cell& operator=(const Cell& other) {
+            if(this == &other) return *this;
+            active_layer = other.active_layer;
+            switch(active_layer) {
+            case 0: getLayer<0>() = other.getLayer<0>(); return *this;
+            case 1: getLayer<1>() = other.getLayer<1>(); return *this;
+            case 2: getLayer<2>() = other.getLayer<2>(); return *this;
+            case 3: getLayer<3>() = other.getLayer<3>(); return *this;
+            default: assert(false && "Unsupported number of levels!");
+            }
+            return *this;
+        }
+
+        void setActiveLayer(unsigned level) {
+            active_layer = level;
+        }
+
+
+
+        unsigned getActiveLayer() const {
+            return active_layer;
+        }
+
+        template<unsigned Layer>
+        auto getLayer() -> decltype(data.template getLayer<Layer>())& {
+            return data.template getLayer<Layer>();
+        }
+
+        template<unsigned Layer>
+        auto getLayer() const -> const decltype(data.template getLayer<Layer>())& {
+            return data.template getLayer<Layer>();
+        }
+
+        template<typename Op>
+        void forAllActiveNodes(const Op& op) {
+        //    data.forAllOnLayer(active_layer, op);
+            //data.DiscretizeElements(active_layer);
+        }
+
+
+        std::vector<T> getBoundary(Direction dir) const {
+            return data.getBoundary(active_layer,dir);
+        }
+
+        void setBoundary(Direction dir, const std::vector<T>& boundary) {
+            data.setBoundary(active_layer,dir,boundary);
+        }
+
+
+
+//      template<unsigned Layer>
+//      std::enable_if<Layers::num_layers -
+//      T& get(const utils::Coordinate<3>& pos) {
+//
+//      }
+
+    };
+
+
+    template<typename T, typename Size, typename Layers>
+    struct GridLayerData;
+
     template<typename T,unsigned ... Sizes>
     struct GridLayerData<T,size<Sizes...>,layers<>> {
 
@@ -185,7 +262,7 @@ namespace app {
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == 0) {
                 // apply function to all elements
-                for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
+                std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
                     op(pos,data[pos]);
                 });
             } else {
@@ -259,82 +336,6 @@ namespace app {
             }
             assert(false && "No such layer!");
         }
-    };
-
-
-
-
-
-
-    template<typename T, typename CellConfig>
-    struct Cell;
-
-
-    template<typename T, typename Layers>
-    struct Cell<T,CellConfig<Layers>> {
-
-        // determines the active layer of this grid cell
-        unsigned active_layer = 0;
-
-        // the data stored in
-        GridLayerData<T,size<1,1>,Layers> data;
-
-        Cell& operator=(const Cell& other) {
-            if(this == &other) return *this;
-            active_layer = other.active_layer;
-            switch(active_layer) {
-            case 0: getLayer<0>() = other.getLayer<0>(); return *this;
-            case 1: getLayer<1>() = other.getLayer<1>(); return *this;
-            case 2: getLayer<2>() = other.getLayer<2>(); return *this;
-            case 3: getLayer<3>() = other.getLayer<3>(); return *this;
-            default: assert(false && "Unsupported number of levels!");
-            }
-            return *this;
-        }
-
-        void setActiveLayer(unsigned level) {
-            active_layer = level;
-        }
-
-
-
-        unsigned getActiveLayer() const {
-            return active_layer;
-        }
-
-        template<unsigned Layer>
-        auto getLayer() -> decltype(data.template getLayer<Layer>())& {
-            return data.template getLayer<Layer>();
-        }
-
-        template<unsigned Layer>
-        auto getLayer() const -> const decltype(data.template getLayer<Layer>())& {
-            return data.template getLayer<Layer>();
-        }
-
-        template<typename Op>
-        void forAllActiveNodes(const Op& op) {
-            data.forAllOnLayer(active_layer, op);
-            //data.DiscretizeElements(active_layer);
-        }
-
-
-        std::vector<T> getBoundary(Direction dir) const {
-            return data.getBoundary(active_layer,dir);
-        }
-
-        void setBoundary(Direction dir, const std::vector<T>& boundary) {
-            data.setBoundary(active_layer,dir,boundary);
-        }
-
-
-
-//      template<unsigned Layer>
-//      std::enable_if<Layers::num_layers -
-//      T& get(const utils::Coordinate<3>& pos) {
-//
-//      }
-
     };
 
 } // end namespace app
