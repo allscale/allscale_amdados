@@ -1,4 +1,9 @@
 #pragma once
+#include "amdados/app/static_grid.h"
+#include "amdados/app/matrix.h"
+#include "amdados/app/cholesky.h"
+
+
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017

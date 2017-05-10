@@ -3,10 +3,11 @@
 #include <iostream>
 
 #include "allscale/api/user/data/grid.h"
-#include "amdados/app/static_grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
 #include "amdados/app/amdados_grid.h"
+#include "amdados/app/kalman_filter.h"
+#include "amdados/app/static_grid.h"
 
 
 using namespace allscale::api::user;
@@ -79,6 +80,13 @@ namespace app {
      data::Grid<DA_matrix,2> H(size_global);       // Projection from observation to model grid
      // create data structure for storing data assimilation matrices
      using DA_vector = allscale::utils::grid<double, SUB_PROBLEM_SIZE>;
+     data::Grid<DA_vector,2> Obvs(size_global);   // Projection from observation to model grid
+     data::Grid<DA_vector,2> forecast(size_global);   // Projection from observation to model grid
+     data::Grid<DA_vector,2> BLUE(size_global);   // Projection from observation to model grid
+
+     using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+  //   using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
+//     data::Grid<Kalman_ptr_t,2> kalman_filters(size);
 
 
 // Call to read observation data
