@@ -3,13 +3,13 @@
 #include <iostream>
 
 #include "allscale/api/user/data/grid.h"
+#include "amdados/app/static_grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
 #include "amdados/app/amdados_grid.h"
 
 
-
-using namespace allscale::api::user::data;
+using namespace allscale::api::user;
 
 namespace amdados {
 namespace app {
@@ -21,6 +21,8 @@ namespace app {
 
     const int nelems_x = 10;
     const int nelems_y = 10;
+    const size_t SUB_PROBLEM_SIZE = nelems_x * nelems_y;
+    const size_t NUM_MEASUREMENTS = nelems_x * nelems_y;
     const int nelems_glob_x = nelems_x * num_domains_x;
     const int nelems_glob_y = nelems_y * num_domains_y;
 
@@ -50,24 +52,34 @@ namespace app {
         L_4m = 0,
     };
 
-    allscale::api::user::data::GridPoint<2> zero = 0;
-    allscale::api::user::data::GridPoint<2> size_global = {num_domains_x, num_domains_y };
+    data::GridPoint<2> zero = 0;
+    data::GridPoint<2> size_global = {num_domains_x, num_domains_y };
 
     // create the type of a grid cell
     using sub_domain = Cell<double,sub_domain_config>;
     // create the overall grid
-    allscale::api::user::data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
-    allscale::api::user::data::Grid<sub_domain,2> B(size_global);
+    data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
+    data::Grid<sub_domain,2> B(size_global);
     const std::string filename = "..//..//Observation.txt";
     int observint = 1; // number of timesteps between observation availability
 // all initialization parameters - move to input file
 
 
     // data structures for observation data
-    allscale::api::user::data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
-    allscale::api::user::data::Grid<double,3> obsv_glob(size_grd);
+    data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
+    data::Grid<double,3> obsv_glob(size_grd);
 
            // initialize all cell on the 100m resolution
+
+    // create data structure for storing data assimilation matrices
+     using DA_matrix = allscale::utils::grid<double, SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
+     data::Grid<DA_matrix,2> P(size_global);       // Forecast covariance matrix
+     data::Grid<DA_matrix,2> R(size_global);       // observation noise covariance matrix
+     data::Grid<DA_matrix,2> Q(size_global);       // process noise covariance matrix
+     data::Grid<DA_matrix,2> H(size_global);       // Projection from observation to model grid
+     // create data structure for storing data assimilation matrices
+     using DA_vector = allscale::utils::grid<double, SUB_PROBLEM_SIZE>;
+
 
 // Call to read observation data
 void ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const std::string filename, int nobspts_x ,int nobspts_y)

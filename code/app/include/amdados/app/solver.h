@@ -7,7 +7,7 @@
 #include "amdados/app/parameters.h"
 #include "amdados/app/amdados_grid.h"
 
-using namespace allscale::api::user::data;
+using namespace allscale::api::user;
 
 namespace amdados {
 namespace app {
@@ -25,18 +25,19 @@ namespace app {
 
 // --- Initialize ---
 
-void Compute(allscale::api::user::data::GridPoint<2>& zero, allscale::api::user::data::GridPoint<2> size_global)
+void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 {
     ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
+    A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
 
-allscale::api::user::pfor(zero, size_global, [&](const allscale::api::user::data::GridPoint<2>& pos) {
+pfor(zero, size_global, [&](const data::GridPoint<2>& pos) {
     // initialize all cells on the 100m resolution
           A[pos].setActiveLayer(L_100m);
        //   A[pos].DiscretizeElements();
           // here we compute quadrature for each grid
           // initialize the concentration
      //     A[pos].forAllActiveNodes([](const allscale::api::user::data::GridPoint<2>& pos, double& value) {
-          A[pos].forAllActiveNodes([](const allscale::api::user::data::GridPoint<2>& pos, double& value) {
+          A[pos].forAllActiveNodes([](const data::GridPoint<2>& pos, double& value) {
              value = 0.0;        // initialize rho with 0
           });
     //  });

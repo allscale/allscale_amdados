@@ -2,6 +2,7 @@
 #include "allscale/api/user/data/grid.h"
 #include "amdados/app/static_grid.h"
 
+using namespace allscale::api::user;
 
 namespace amdados {
 namespace app {
@@ -31,6 +32,7 @@ namespace app {
     enum Direction {
         Up, Down, Left, Right
     };
+
 
     template<typename T, typename Size, typename Layers>
     struct GridLayerData;
@@ -79,10 +81,18 @@ namespace app {
         template<typename Op>
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == getLayerNumber()) {
-                // apply it to this value
-                std::for_each(allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
-                   op(pos,data[pos]);
-                });
+                // apply it to this value)
+
+
+
+            	//std::for_each(const allscale::api::user::data::GridPoint<2>& pos
+                //		[&](const allscale::api::user::data::GridPoint<2>& pos)
+                //	{
+               	//		op(pos,data[pos]);
+               //		}
+              //  );
+                //         std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
+                //             op(pos,data[pos]);
             } else {
                 nested.forAllOnLayer(layer,op);
             }
@@ -207,7 +217,7 @@ namespace app {
 
         template<typename Op>
         void forAllActiveNodes(const Op& op) {
-        //    data.forAllOnLayer(active_layer, op);
+            data.forAllOnLayer(active_layer, op);
             //data.DiscretizeElements(active_layer);
         }
 
@@ -262,9 +272,9 @@ namespace app {
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == 0) {
                 // apply function to all elements
-                std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
-                    op(pos,data[pos]);
-                });
+       //         std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
+       //             op(pos,data[pos]);
+       //         });
             } else {
                 std::cout << "Error: trying to access layer " << layer << " -- no such layer!\n";
                 assert(false && "No such layer!");

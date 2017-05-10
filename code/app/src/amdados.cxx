@@ -33,7 +33,7 @@ int main()
     std::cout << "before:";
     for_each(nums.begin(), nums.end(), print);
     {
-    	std::cout << "numbeg =  " << 4 << std::endl;
+
     }
     std::cout << '\n';
 
