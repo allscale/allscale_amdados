@@ -20,7 +20,7 @@ int main()
 {
     Compute(zero, size_global);
 
-	std::cout << "The answer is " << answer() << std::endl;
+	std::cout << "The answer is " << num_domains_x << std::endl;
 	std::cout << " observation data = " << obsv_glob[{1,1,1}] << std::endl;
 	std::cout << "size=  " << zero << std::endl;
 	std::cout << "active layer=  " << A[{1,1}].getActiveLayer() << std::endl;

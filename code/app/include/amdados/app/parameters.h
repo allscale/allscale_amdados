@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+
 
 #include "allscale/api/user/data/grid.h"
 #include "allscale/api/user/operator/pfor.h"
@@ -8,6 +10,7 @@
 #include "amdados/app/amdados_grid.h"
 #include "amdados/app/kalman_filter.h"
 #include "amdados/app/static_grid.h"
+#include "amdados/app/amdados_utils.h"
 
 
 using namespace allscale::api::user;
@@ -16,124 +19,147 @@ namespace amdados {
 namespace app {
 
 
-// need to update this section to read these parameters from input file
-    const int num_domains_x = 10;
-    const int num_domains_y = 10;
+	// need to update this section to read these parameters from input file
+		const int num_domains_x = 10;
+		const int num_domains_y = 10;
 
-    const int nelems_x = 10;
-    const int nelems_y = 10;
-    const size_t SUB_PROBLEM_SIZE = nelems_x * nelems_y;
-    const size_t NUM_MEASUREMENTS = nelems_x * nelems_y;
-    const int nelems_glob_x = nelems_x * num_domains_x;
-    const int nelems_glob_y = nelems_y * num_domains_y;
+		const int nelems_x = 10;
+		const int nelems_y = 10;
+		const size_t SUB_PROBLEM_SIZE = nelems_x * nelems_y;
+		const size_t NUM_MEASUREMENTS = nelems_x * nelems_y;
+		const int nelems_glob_x = nelems_x * num_domains_x;
+		const int nelems_glob_y = nelems_y * num_domains_y;
 
-    int T = 2;
-    const int timestep = T;
-    int output_every_nth_time_step = 5;
-    double delta = 0.1; // not used yet
+		int T = 2;
+		const int timestep = T;
+		int output_every_nth_time_step = 5;
+		double delta = 0.1; // not used yet
 
-    // initial spot
-    int spot_x = 0;   // start at bottom left point and then obtain analytical expression of evolution
-    int spot_y = 0;
-    double spot_density = 10000;
+		// initial spot
+		int spot_x = 0;   // start at bottom left point and then obtain analytical expression of evolution
+		int spot_y = 0;
+		double spot_density = 10000;
 
-    // set up the configuration of a grid cell (static)
-    using sub_domain_config = CellConfig<
-            layers<                 //  1000m x 1000m  each sub-domain covers
-                layer<nelems_x,nelems_y>,       //  10 x 10  100m nodes each consisting of
-                layer<5,5>,         //   5 x  5   20m nodes each consisting of
-                layer<5,5>          //   5 x  5    4m nodes
-            >
-    >;
+		// set up the configuration of a grid cell (static)
+		using sub_domain_config = CellConfig<
+				layers<                 //  1000m x 1000m  each sub-domain covers
+					layer<nelems_x,nelems_y>,       //  10 x 10  100m nodes each consisting of
+					layer<5,5>,         //   5 x  5   20m nodes each consisting of
+					layer<5,5>          //   5 x  5    4m nodes
+				>
+		>;
 
-    //assign each layer a level corresponding to coarsest to finest
-    enum {
-        L_100m = 2,
-        L_20m = 1,
-        L_4m = 0,
-    };
+		//assign each layer a level corresponding to coarsest to finest
+		enum {
+			L_100m = 2,
+			L_20m = 1,
+			L_4m = 0,
+		};
 
-    data::GridPoint<2> zero = 0;
-    data::GridPoint<2> size_global = {num_domains_x, num_domains_y };
+		data::GridPoint<2> zero = 0;
+		data::GridPoint<2> size_global = {num_domains_x, num_domains_y };
 
-    // create the type of a grid cell
-    using sub_domain = Cell<double,sub_domain_config>;
-    // create the overall grid
-    data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
-    data::Grid<sub_domain,2> B(size_global);
-    const std::string filename = "..//..//Observation.txt";
-    int observint = 1; // number of timesteps between observation availability
-// all initialization parameters - move to input file
-
-
-    // data structures for observation data
-    data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
-    data::Grid<double,3> obsv_glob(size_grd);
-
-           // initialize all cell on the 100m resolution
-
-    // create data structure for storing data assimilation matrices
-     using DA_matrix = allscale::utils::grid<double, SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
-     data::Grid<DA_matrix,2> P(size_global);       // Forecast covariance matrix
-     data::Grid<DA_matrix,2> R(size_global);       // observation noise covariance matrix
-     data::Grid<DA_matrix,2> Q(size_global);       // process noise covariance matrix
-     data::Grid<DA_matrix,2> H(size_global);       // Projection from observation to model grid
-     // create data structure for storing data assimilation matrices
-     using DA_vector = allscale::utils::grid<double, SUB_PROBLEM_SIZE>;
-     data::Grid<DA_vector,2> Obvs(size_global);   // Projection from observation to model grid
-     data::Grid<DA_vector,2> forecast(size_global);   // Projection from observation to model grid
-     data::Grid<DA_vector,2> BLUE(size_global);   // Projection from observation to model grid
-
-     using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
-  //   using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
-//     data::Grid<Kalman_ptr_t,2> kalman_filters(size);
+		// create the type of a grid cell
+		using sub_domain = Cell<double,sub_domain_config>;
+		// create the overall grid
+		data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
+		data::Grid<sub_domain,2> B(size_global);
+		const std::string filename = "..//..//Observation.txt";
+		int observint = 1; // number of timesteps between observation availability
+	// all initialization parameters - move to input file
 
 
-// Call to read observation data
-void ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const std::string filename, int nobspts_x ,int nobspts_y)
-{
-    /// Get points of observations and real values
-    // Need to be cognizant of timestep availability
-    std::ifstream in;
-    in.open(filename);   // Need to remove exception here
-    if(in.is_open())
-    {
-        int t;
-        while(in >> t)   // header time stamp
-        {
-            for(int i = 0; i < nobspts_x; i++)
-            {
-                for(int j = 0; j < nobspts_y; j++)
-                {
-                    int i1, j1;
-                    double val;
-                    in >> i1 >> j1 >> val;
-                    obsver[{i1,j1,t}] = val;   //store in 3D array; extract 1D slice from appropriate location fo DA in 1D vector with mapping
-                }
-            }
-            if(t  == 0)
-            {// right now assume data available every timestep; need to update
-            }
-        }
-        in.close();
-    }
-    else
-    {
-        std::cout << "ERROR: observation file: " << filename << "  was not found;" << std::endl;
-        throw std::exception();
-    }
-}
+		// data structures for observation data
+		data::GridPoint<3> size_grd = {nelems_glob_x, nelems_glob_y,timestep + 1};
+		data::Grid<double,3> obsv_glob(size_grd);
 
-// introduce a function to read flowfield data
-// Read of form I,J,U,V and map to grid of amdados application
-void ReadFlows(allscale::api::user::data::Grid<double,3>& flowfield, const std::string filename_flow, int nflopts_x ,int nflopts_y)
-{
+			   // initialize all cell on the 100m resolution
+
+		// create data structure for storing data assimilation matrices
+		 using DA_matrix = allscale::utils::grid<double, SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
+		 data::Grid<DA_matrix,2> P(size_global);       // Forecast covariance matrix
+		 data::Grid<DA_matrix,2> R(size_global);       // observation noise covariance matrix
+		 data::Grid<DA_matrix,2> Q(size_global);       // process noise covariance matrix
+		 data::Grid<DA_matrix,2> H(size_global);       // Projection from observation to model grid
+		 // create data structure for storing data assimilation matrices
+		 using DA_vector = allscale::utils::grid<double, SUB_PROBLEM_SIZE>;
+		 data::Grid<DA_vector,2> Obvs(size_global);   // Projection from observation to model grid
+		 data::Grid<DA_vector,2> forecast(size_global);   // Projection from observation to model grid
+		 data::Grid<DA_vector,2> BLUE(size_global);   // Projection from observation to model grid
+
+		 using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+		 using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
+		 data::Grid<Kalman_ptr_t,2> kalman_filters(size_global);
 
 
-}
+		// Call to read observation data
+		void ReadObservations(allscale::api::user::data::Grid<double,3>& obsver, const std::string filename, int nobspts_x ,int nobspts_y)
+		{
+			/// Get points of observations and real values
+			// Need to be cognizant of timestep availability
+			std::ifstream in;
+			in.open(filename);   // Need to remove exception here
+			if(in.is_open())
+			{
+				int t;
+				while(in >> t)   // header time stamp
+				{
+					for(int i = 0; i < nobspts_x; i++)
+					{
+						for(int j = 0; j < nobspts_y; j++)
+						{
+							int i1, j1;
+							double val;
+							in >> i1 >> j1 >> val;
+							obsver[{i1,j1,t}] = val;   //store in 3D array; extract 1D slice from appropriate location fo DA in 1D vector with mapping
+						}
+					}
+					if(t  == 0)
+					{// right now assume data available every timestep; need to update
+					}
+				}
+				in.close();
+			}
+			else
+			{
+				std::cout << "ERROR: observation file: " << filename << "  was not found;" << std::endl;
+				throw std::exception();
+			}
+		}
+
+		// introduce a function to read flowfield data
+		// Read of form I,J,U,V and map to grid of amdados application
+		void ReadFlows(allscale::api::user::data::Grid<double,3>& flowfield, const std::string filename_flow, int nflopts_x ,int nflopts_y)
+		{
 
 
-   // ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y,observint);
+		}
+
+
+
+		// a utility function to print the current state
+		auto printState = [num_domains_x,num_domains_y](const data::Grid<sub_domain,2>& A, int t) {
+				std::ofstream myfile;
+				// TODO: AlScale mutex for writing in the file
+				myfile.open("DumpAllScale.txt", std::ios::out);
+			static const std::vector<char> chars({' ','.',':','o','X'});
+
+			std::cout << "T=" << t << "\n";
+			for(int i = 0; i<num_domains_x * 10; i+=1) {
+				for(int j = 0; j<num_domains_y * 10; j+=1) {
+
+					double value = A[{i/10,j/10}].getLayer<L_100m>()[{i%10,j%10}];
+		//          std::cout << chars[std::max(std::min<int>(((std::log(value) / std::log(100.0)) * chars.size()),chars.size()-1),0)];
+										myfile << i/10 << "  " << j/10 << "  " << " " << num_domains_x << " " << num_domains_y << "  "  << value << std::endl;
+				}
+			//  std::cout << "\n";
+			}
+		//  std::cout << "\n";
+						myfile.close();
+		};
+
+
+
 
 
 } // end namespace app

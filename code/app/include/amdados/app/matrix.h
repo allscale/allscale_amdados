@@ -3,6 +3,26 @@
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
+#include "allscale/api/user/data/grid.h"
+#include "amdados/app/static_grid.h"
+
+using namespace allscale::api::user;
+
+template<size_t LENGTH>
+using VECTOR = allscale::utils::grid<double, LENGTH>;
+
+template<size_t NROWS, size_t NCOLS>
+using MATRIX = allscale::utils::grid<double, NROWS, NCOLS>;
+
+//-------------------------------------------------------------------------------------------------
+// Function checks that specified objects are two distinct intances of some class or type.
+//-------------------------------------------------------------------------------------------------
+template<typename A, typename B>
+inline bool CheckDistinctObjects(const A & a, const B & b)
+{
+    return (static_cast<const void*>(&a) != static_cast<const void*>(&b));
+}
+
 
 //-------------------------------------------------------------------------------------------------
 // Matrix multiplication: result = A * B.
@@ -10,10 +30,6 @@
 // \param  A       NROWS-x-MSIZE matrix.
 // \param  B       MSIZE-x-NCOLS matrix.
 //-------------------------------------------------------------------------------------------------
-#include "allscale/api/user/data/grid.h"
-#include "amdados/app/static_grid.h"
-
-
 
 template<size_t NROWS, size_t MSIZE, size_t NCOLS>
 void MatMult(allscale::utils::grid<double, NROWS, NCOLS> & result,
