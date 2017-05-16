@@ -17,8 +17,8 @@
 
 #include "amdados/app/parameters.h"
 #include "amdados/app/amdados_grid.h"
-#include "amdados/app/filter.h"
-#include "amdados/app/amdados_utils.h"
+#include "amdados/app/utils/filter.h"
+#include "amdados/app/utils/amdados_utils.h"
 
 
 using namespace allscale::api::user;
@@ -78,7 +78,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 
     pfor(zero, size_global, [&](const data::GridPoint<2>& idx) {
         auto& tempvar = P[idx];
-        getModelCovar(tempvar);
+        utils::getModelCovar(tempvar);
     });
 
     std::cout << num_domains_x << std::endl;
@@ -110,15 +110,15 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
                  // init result with current state
                  res = cur;
 
-                 assert(CheckNoNan(A[idx].getLayer<L_100m>()));
-                 assert(CheckNoNan(B[idx].getLayer<L_100m>()));
-                 assert(CheckNoNan(res.getLayer<L_100m>()));
+                 assert(utils::CheckNoNan(A[idx].getLayer<L_100m>()));
+                 assert(utils::CheckNoNan(B[idx].getLayer<L_100m>()));
+                 assert(utils::CheckNoNan(res.getLayer<L_100m>()));
 
                  double timept = t*delta;
                  int nx = 1;
                  int ny = 1;
-                 double flowu = mu1(timept);
-                 double flowv = mu2(timept);
+                 double flowu = utils::mu1(timept);
+                 double flowv = utils::mu2(timept);
 
 
                  for (Direction dir : { Up, Down, Left, Right }) {
@@ -156,11 +156,11 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
                         }
 				//	std::cout << "DIRECTION: "
 				//	<< (dir == Up ? "Up" : (dir == Down ? "Down" : (dir == Left ? "Left" : "Right"))) << std::endl;
-					assert(CheckNoNan(res.getLayer<L_100m>()));
+					assert(utils::CheckNoNan(res.getLayer<L_100m>()));
 					// update boundary in result
 					res.setBoundary(dir,local_boundary);
 
-					assert(CheckNoNan(res.getLayer<L_100m>()));
+					assert(utils::CheckNoNan(res.getLayer<L_100m>()));
                     }
 
 

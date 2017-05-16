@@ -4,12 +4,12 @@
 #include "amdados/app/amdados_grid.h"
 #include "amdados/app/parameters.h"
 #include "amdados/app/solver.h"
-#include "amdados/app/filter.h"
+#include "amdados/app/utils/filter.h"
 
 #include "allscale/api/user/data/grid.h"
 
 
-#include "amdados/app/matrix.h"
+#include "amdados/app/utils/matrix.h"
 //#include "amdados/app/cholesky.h"
 //#include "amdados/app/kalman_filter.h"
 

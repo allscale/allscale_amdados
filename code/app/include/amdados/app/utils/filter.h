@@ -6,6 +6,7 @@ using namespace allscale::api::user;
 
 namespace amdados {
 namespace app {
+namespace utils {
 
 		// compute model covariance structure as function of exponential distance
 		// Follow same structure as that implemented for Runga Kutta solver
@@ -23,5 +24,6 @@ namespace app {
 			}
 		}
 
+} // end namespace utils
 } // end namespace app
 } // end namespace amdados

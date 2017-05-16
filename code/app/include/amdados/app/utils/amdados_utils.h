@@ -1,11 +1,12 @@
 #pragma once
-#include "amdados/app/matrix.h"
+#include "amdados/app/utils/matrix.h"
 
 
 using namespace allscale::api::user;
 
 namespace amdados {
 namespace app {
+namespace utils {
 
 template<size_t NELEMS_X, size_t NELEMS_Y>
 bool CheckNoNan(const MATRIX<NELEMS_X,NELEMS_Y> & grid)
@@ -28,5 +29,6 @@ double mu2(double timestep){
     return  -1.2 * sin(timestep/5 - M_PI) * 0.2;
 }
 
-} // end utils
+} // end namespace utils
+} // end namespace app
 } // end namespace allscale

@@ -8,9 +8,9 @@
 #include "allscale/api/user/operator/pfor.h"
 
 #include "amdados/app/amdados_grid.h"
-#include "amdados/app/kalman_filter.h"
+#include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/static_grid.h"
-#include "amdados/app/amdados_utils.h"
+#include "amdados/app/utils/amdados_utils.h"
 
 
 using namespace allscale::api::user;
@@ -87,7 +87,7 @@ namespace app {
 		 data::Grid<DA_vector,2> forecast(size_global);   // Projection from observation to model grid
 		 data::Grid<DA_vector,2> BLUE(size_global);   // Projection from observation to model grid
 
-		 using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+		 using Kalman_t = amdados::app::utils::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
 		 using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
 		 data::Grid<Kalman_ptr_t,2> kalman_filters(size_global);
 
