@@ -89,7 +89,8 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 
       // --- Run Simulation ---
 
-      std::system("mkdir -p output");     // make the output directory
+	  // TODO: assert return value
+      (void)std::system("mkdir -p output");     // make the output directory
       for (int t = 0; t <= T; t++) {
           std::cout << "Time = " << t << std::endl;
           SaveGrid2D("output", "state", t, A);
