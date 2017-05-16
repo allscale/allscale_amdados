@@ -1,6 +1,5 @@
 #include <iostream>
 
-#include "amdados/app/answer.h"
 #include "amdados/app/amdados_grid.h"
 #include "amdados/app/parameters.h"
 #include "amdados/app/solver.h"
