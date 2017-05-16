@@ -82,17 +82,7 @@ namespace app {
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == getLayerNumber()) {
                 // apply it to this value)
-
-
-
-            	//std::for_each(const allscale::api::user::data::GridPoint<2>& pos
-                //		[&](const allscale::api::user::data::GridPoint<2>& pos)
-                //	{
-               	//		op(pos,data[pos]);
-               //		}
-              //  );
-                //         std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
-                //             op(pos,data[pos]);
+				data.for_each(op);
             } else {
                 nested.forAllOnLayer(layer,op);
             }
@@ -269,16 +259,9 @@ namespace app {
         }
 
         template<typename Op>
-        void forAllOnLayer(unsigned layer, const Op& /*op*/) {
-            if (layer == 0) {
-                // apply function to all elements
-       //         std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
-       //             op(pos,data[pos]);
-       //         });
-            } else {
-                std::cout << "Error: trying to access layer " << layer << " -- no such layer!\n";
-                assert(false && "No such layer!");
-            }
+        void forAllOnLayer(unsigned layer, const Op& op) {
+			assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
+            data.for_each(op);
         }
 
         std::vector<T> getBoundary(unsigned layer, Direction dir) const {
