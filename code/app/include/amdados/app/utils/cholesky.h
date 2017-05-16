@@ -11,6 +11,9 @@
 // The implementation closely follows "Numerical Recipes" book, 3rd edition, chapter 2.9.
 // The matrices and vector are assumed to be the instances of AllScale API grid.
 //=================================================================================================
+
+#include "allscale/utils/assert.h"
+
 #include "amdados/app/utils/matrix.h"
 
 namespace amdados {
@@ -50,9 +53,7 @@ namespace utils {
 		m_L = A;
 		for (int i = 0; i < N; i++) {
 			for (int j = i; j < N; j++) {
-				if (m_L[{j,i}] != m_L[{i,j}]) {
-					throw std::runtime_error("Cholesky expects a symmetric matrix");
-				}
+				assert_eq((m_L[{j, i}]), (m_L[{i, j}])) << "Cholesky expects a symmetric matrix";
 
 				double sum = m_L[{i,j}];
 				for (int k = i - 1; k >= 0; k--) {
@@ -60,10 +61,7 @@ namespace utils {
 				}
 
 				if (i == j) {
-					if (sum <= TINY) {
-						std::cout << "sum: " << sum << std::endl;
-						throw std::runtime_error("Cholesky failed");
-					}
+					assert_gt(sum, TINY) << "Cholesky failed, sum: " << sum;
 					m_L[{i,i}] = std::sqrt(sum);
 				} else {
 					m_L[{j,i}] = sum / m_L[{i,i}];

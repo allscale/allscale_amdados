@@ -7,6 +7,8 @@
 #include "allscale/api/user/data/grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
+#include "allscale/utils/assert.h"
+
 #include "amdados/app/amdados_grid.h"
 #include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/static_grid.h"
@@ -98,32 +100,24 @@ namespace app {
 			/// Get points of observations and real values
 			// Need to be cognizant of timestep availability
 			std::ifstream in;
-			in.open(filename);   // Need to remove exception here
-			if(in.is_open())
+			in.open(filename);
+			assert_true(in.is_open()) << "ERROR: observation file: " << filename << "  was not found";
+			int t;
+			while(in >> t)   // header time stamp
 			{
-				int t;
-				while(in >> t)   // header time stamp
+				for(int i = 0; i < nobspts_x; i++)
 				{
-					for(int i = 0; i < nobspts_x; i++)
+					for(int j = 0; j < nobspts_y; j++)
 					{
-						for(int j = 0; j < nobspts_y; j++)
-						{
-							int i1, j1;
-							double val;
-							in >> i1 >> j1 >> val;
-							obsver[{i1,j1,t}] = val;   //store in 3D array; extract 1D slice from appropriate location fo DA in 1D vector with mapping
-						}
-					}
-					if(t  == 0)
-					{// right now assume data available every timestep; need to update
+						int i1, j1;
+						double val;
+						in >> i1 >> j1 >> val;
+						obsver[{i1,j1,t}] = val;   //store in 3D array; extract 1D slice from appropriate location fo DA in 1D vector with mapping
 					}
 				}
-				in.close();
-			}
-			else
-			{
-				std::cout << "ERROR: observation file: " << filename << "  was not found;" << std::endl;
-				throw std::exception();
+				if(t  == 0)
+				{// right now assume data available every timestep; need to update
+				}
 			}
 		}
 

@@ -15,6 +15,8 @@
 #include "allscale/api/user/data/grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
+#include "allscale/utils/assert.h"
+
 #include "amdados/app/parameters.h"
 #include "amdados/app/amdados_grid.h"
 #include "amdados/app/utils/filter.h"
@@ -45,9 +47,8 @@ namespace app {
 		std::stringstream ss;
         ss << path << "/" << title << std::setfill('0') << std::setw(5) << t << ".txt";
         std::fstream stateFile(ss.str(), std::ios::out | std::ios::trunc);
-        if (!stateFile.good()) {
-            throw std::runtime_error("failed to open the file for writing: " + ss.str());
-        }
+		assert_true(stateFile.good()) << "failed to open the file for writing: " + ss.str();
+
         stateFile << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values"
                   << std::endl;
         size_t dim = 2;
