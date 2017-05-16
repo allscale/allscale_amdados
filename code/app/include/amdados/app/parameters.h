@@ -129,7 +129,7 @@ namespace app {
 
 		// introduce a function to read flowfield data
 		// Read of form I,J,U,V and map to grid of amdados application
-		void ReadFlows(allscale::api::user::data::Grid<double,3>& flowfield, const std::string filename_flow, int nflopts_x ,int nflopts_y)
+		void ReadFlows(allscale::api::user::data::Grid<double,3>& /*flowfield*/, const std::string /*filename_flow*/, int /*nflopts_x*/ ,int /*nflopts_y*/)
 		{
 
 
@@ -138,7 +138,7 @@ namespace app {
 
 
 		// a utility function to print the current state
-		auto printState = [num_domains_x,num_domains_y](const data::Grid<sub_domain,2>& A, int t) {
+		auto printState = [](const data::Grid<sub_domain,2>& A, int t) {
 				std::ofstream myfile;
 				// TODO: AlScale mutex for writing in the file
 				myfile.open("DumpAllScale.txt", std::ios::out);

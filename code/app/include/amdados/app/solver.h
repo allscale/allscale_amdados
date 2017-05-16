@@ -71,7 +71,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 		// initialize all cells on the 100m resolution
 		  A[pos].setActiveLayer(L_100m);
 		  // initialize the concentration
-		  A[pos].forAllActiveNodes([](const data::GridPoint<2>& pos, double& value) {
+		  A[pos].forAllActiveNodes([](const data::GridPoint<2>& /*pos*/, double& value) {
 			 value = 0.0;        // initialize rho with 0
 		  });
 	  });

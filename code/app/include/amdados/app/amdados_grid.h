@@ -269,7 +269,7 @@ namespace app {
         }
 
         template<typename Op>
-        void forAllOnLayer(unsigned layer, const Op& op) {
+        void forAllOnLayer(unsigned layer, const Op& /*op*/) {
             if (layer == 0) {
                 // apply function to all elements
        //         std::for_each( allscale::api::user::data::GridPoint<2>{Sizes...},[&](const  allscale::api::user::data::GridPoint<2>& pos) {
