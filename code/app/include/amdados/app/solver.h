@@ -42,7 +42,7 @@ namespace app {
 // --- Initialize ---
 
 	// A utility function to save the current state.
-	auto SaveGrid2D = [=](const std::string & path, const std::string & title, int t,
+	auto SaveGrid2D = [](const std::string & path, const std::string & title, int t,
 						  const data::Grid<sub_domain,2> & grid) {
 		std::stringstream ss;
         ss << path << "/" << title << std::setfill('0') << std::setw(5) << t << ".txt";
