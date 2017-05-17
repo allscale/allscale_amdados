@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "amdados/app/utils/kalman_filter.h"
+#include "amdados/app/utils/matrix.h"
+
 
 using namespace amdados::app::utils;
 
@@ -39,8 +41,9 @@ TEST(KalmanFilter, Basic) {
 	double       total_mean_dev = 0.0;  // mean estimated deviation over the whole time period
 	double       mean_step = 0.0;       // mean step in space made by the particle
 
-										// Initialize the Kalman filter.
-	KalmanFilter<DIM, DIM> kf(x0, P0);
+    // Initialize the Kalman filter.
+    KalmanFilter<DIM,DIM> kf;
+    kf.Init(x0, P0);
 
 	// Open a file for storing the results of particle path tracking by the Kalman filter.
 	std::cout.flush();

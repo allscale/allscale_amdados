@@ -22,6 +22,7 @@
 #include "amdados/app/ibm_apply_runge_kutta.h"
 #include "amdados/app/utils/filter.h"
 #include "amdados/app/utils/amdados_utils.h"
+#include "amdados/app/utils/kalman_filter.h"
 
 
 using namespace allscale::api::user;
@@ -66,8 +67,7 @@ namespace app {
 
 void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 {
-    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
-    A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
+
 
 	pfor(zero, size_global, [&](const data::GridPoint<2>& pos) {
 		// initialize all cells on the 100m resolution
@@ -78,6 +78,16 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 			 value = 0.0;        // initialize rho with 0
 		  });
 	  });
+
+    ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
+    A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
+
+    // Initialize the sub-domain filters.
+    utils::pfor(zero, size_global, [&](const data::GridPoint<2>& idx) {
+        kalman_filters[idx].reset(new Kalman_t());
+        utils::Reshape2Dto1D<nelems_x, nelems_y>(forecast[idx], A[idx].getLayer<L_100m>());
+        kalman_filters[idx]->Init(forecast[idx], P[idx]);
+    });
 
     pfor(zero, size_global, [&](const data::GridPoint<2>& idx) {
         auto& tempvar = P[idx];
@@ -205,7 +215,21 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
                      assert(utils::CheckNoNan(Obvs[idx]));
                      assert(utils::CheckNoNan(forecast[idx]));
                      assert(utils::CheckNoNan(BLUE[idx]));
+
+
+
+#if 1
+                Kalman_t * kf = kalman_filters[idx].get();
+                Q[idx] = R[idx];    // TODO: this is stub: same noise covariances
+                kf->Iterate(forecast[idx], Q[idx], H[idx], R[idx], Obvs[idx]);
+                BLUE[idx] = kf->GetStateVector();
+                P[idx] = kf->GetCovariance();
+#else
+                ComputeBlue(H[idx],P[idx],R[idx],Obvs[idx],forecast[idx],BLUE[idx],t);
+#endif
                  }
+
+
 
              });
 
@@ -213,18 +237,6 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 
 }
 
-//allscale::api::user::pfor(zero, size, [&](const  allscale::api::user::data::GridPoint<2>& pos)
-
-//  allscale::api::user::pfor(zero, size, [&](const  allscale::api::user::data::GridPoint<2>& pos) {
-
-       // initialize all cells on the 100m resolution
-    //   A[pos].setActiveLayer(L_100m);
-    //   A[pos].DiscretizeElements();
-       // here we compute quadrature for each grid
-
- //  });
-     allscale::api::user::data::GridPoint<3> tempvar = {10, 10,2};
-//    allscale::api::user::data::Grid<double,3> obsv_glob(size_grd);
 
 } // end namespace app
 } // end namespace amdados
