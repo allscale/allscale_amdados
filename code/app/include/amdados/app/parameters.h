@@ -20,7 +20,6 @@ using namespace allscale::api::user;
 namespace amdados {
 namespace app {
 
-
 	// need to update this section to read these parameters from input file
 		const int num_domains_x = 10;
 		const int num_domains_y = 10;
@@ -36,6 +35,8 @@ namespace app {
 		const int timestep = T;
 		int output_every_nth_time_step = 5;
 		double delta = 0.1; // not used yet
+	    double stepsize = 100;
+
 
 		// initial spot
 		int spot_x = 0;   // start at bottom left point and then obtain analytical expression of evolution

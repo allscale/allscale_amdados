@@ -19,6 +19,7 @@
 
 #include "amdados/app/parameters.h"
 #include "amdados/app/amdados_grid.h"
+#include "amdados/app/ibm_apply_runge_kutta.h"
 #include "amdados/app/utils/filter.h"
 #include "amdados/app/utils/amdados_utils.h"
 
@@ -83,13 +84,15 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
         utils::getModelCovar(tempvar);
     });
 
-    std::cout << num_domains_x << std::endl;
-
     // bring in a high concentration at some spot
       A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
 
       // --- Run Simulation ---
-
+      data::Grid<sub_domain,2> tmp_before_RK(size_global);  // debugging
+      data::Grid<sub_domain,2> tmp_after_RK(size_global);   // debugging
+      data::Grid<sub_domain,2> tmp_before_KF(size_global);  // debugging
+      data::Grid<sub_domain,2> tmp_after_KF(size_global);   // debugging
+      data::Grid<sub_domain,2> tmp_obvs(size_global);       // debugging
 	  // TODO: assert return value
       (void)std::system("mkdir -p output");     // make the output directory
       for (int t = 0; t <= T; t++) {
@@ -164,8 +167,45 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 					res.setBoundary(dir,local_boundary);
 
 					assert(utils::CheckNoNan(res.getLayer<L_100m>()));
-                    }
+				}
+                assert(utils::CheckNoNan(res.getLayer<L_100m>()));
 
+                // 2) run iterations of runge-kutta
+				double error = 1000;
+				while (error > 0.1) {           // runge kutta iteration on sub-domain
+					error = applyRungeKutta(res,flowu,flowv,delta,stepsize);
+				}
+                 assert(utils::CheckNoNan(res.getLayer<L_100m>()));
+
+
+                 if (t % 1 == 0) // For now assimilation at periodic timesteps
+                 {
+                     // Compute Mapping matrix H to project from observation to model grid [nelems_tot,nelems_tot]
+                     utils::ComputeH(H[idx]);
+                     // Estimate noise/uncertainty metrics of observations [nelems_tot,nelems_tot]
+                     utils::ComputeR(R[idx]);
+                     // Extract appropriate observation data for subdomain and time [nelems_tot * nelems_tot]
+                     utils::getObservation(Obvs[idx],obsv_glob,nelems_x,nelems_y,t,idx);
+
+                  //   assert(utils::CheckNoNan(Obvs[idx]));
+
+                     tmp_before_KF[idx] = res;
+                     A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
+                     utils::Reshape1Dto2D<nelems_x, nelems_y>(tmp_obvs[idx].getLayer<L_100m>(), Obvs[idx]);
+					 utils::Reshape2Dto1D<nelems_x, nelems_y>(forecast[idx], res.getLayer<L_100m>());
+            //         std::cout << " this layer 3=  " <<   Obvs[{spot_x,spot_y}][{8}] <<  std::endl;
+
+
+                     utils::Reshape2Dto1D<nelems_x, nelems_y>(forecast[idx], res.getLayer<L_100m>());
+
+
+                     assert(utils::CheckNoNan(H[idx]));
+                     assert(utils::CheckNoNan(P[idx]));
+                     assert(utils::CheckNoNan(R[idx]));
+                     assert(utils::CheckNoNan(Obvs[idx]));
+                     assert(utils::CheckNoNan(forecast[idx]));
+                     assert(utils::CheckNoNan(BLUE[idx]));
+                 }
 
              });
 
