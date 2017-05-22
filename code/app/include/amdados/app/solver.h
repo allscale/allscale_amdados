@@ -80,7 +80,6 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 	  });
 
     ReadObservations(obsv_glob,filename,nelems_glob_x,nelems_glob_y);
-    A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
 
     // Initialize the sub-domain filters.
     utils::pfor(zero, size_global, [&](const data::GridPoint<2>& idx) {
@@ -89,13 +88,15 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
         kalman_filters[idx]->Init(forecast[idx], P[idx]);
     });
 
+
+
     pfor(zero, size_global, [&](const data::GridPoint<2>& idx) {
         auto& tempvar = P[idx];
         utils::getModelCovar(tempvar);
     });
 
-    // bring in a high concentration at some spot
-      A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
+      // bring in a high concentration at some spot
+      A[{spot_x,spot_y}].getLayer<L_100m>()[{3,5}] = spot_density;
 
       // --- Run Simulation ---
       data::Grid<sub_domain,2> tmp_before_RK(size_global);  // debugging
@@ -121,7 +122,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 
                  // compute next step
                  const auto& cur = A[idx];  //cur is defined as grid A[i,j] and distributed across shared memory
-                 auto& res = B[idx];         // hence cur is domain of size cur[xElCount,yElCount]
+                 auto& res = A[idx];         // hence cur is domain of size cur[xElCount,yElCount]
 
                  // init result with current state
                  res = cur;
@@ -179,14 +180,14 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 					assert(utils::CheckNoNan(res.getLayer<L_100m>()));
 				}
                 assert(utils::CheckNoNan(res.getLayer<L_100m>()));
-
+                tmp_before_RK[idx] = res;
                 // 2) run iterations of runge-kutta
 				double error = 1000;
 				while (error > 0.1) {           // runge kutta iteration on sub-domain
 					error = applyRungeKutta(res,flowu,flowv,delta,stepsize);
 				}
                  assert(utils::CheckNoNan(res.getLayer<L_100m>()));
-
+                 tmp_after_RK[idx] = res;
 
                  if (t % 1 == 0) // For now assimilation at periodic timesteps
                  {
@@ -200,14 +201,12 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
                   //   assert(utils::CheckNoNan(Obvs[idx]));
 
                      tmp_before_KF[idx] = res;
-                     A[{spot_x,spot_y}].getLayer<L_100m>()[{8,8}] = spot_density;
                      utils::Reshape1Dto2D<nelems_x, nelems_y>(tmp_obvs[idx].getLayer<L_100m>(), Obvs[idx]);
 					 utils::Reshape2Dto1D<nelems_x, nelems_y>(forecast[idx], res.getLayer<L_100m>());
             //         std::cout << " this layer 3=  " <<   Obvs[{spot_x,spot_y}][{8}] <<  std::endl;
 
 
                      utils::Reshape2Dto1D<nelems_x, nelems_y>(forecast[idx], res.getLayer<L_100m>());
-
 
                      assert(utils::CheckNoNan(H[idx]));
                      assert(utils::CheckNoNan(P[idx]));
@@ -227,8 +226,27 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 #else
                 ComputeBlue(H[idx],P[idx],R[idx],Obvs[idx],forecast[idx],BLUE[idx],t);
 #endif
+
+                utils::Reshape1Dto2D<nelems_x, nelems_y>(res.getLayer<L_100m>(), BLUE[idx]);
+				tmp_after_KF[idx] = res;
+
+				assert(utils::CheckNoNan(H[idx]));
+				assert(utils::CheckNoNan(P[idx]));
+				assert(utils::CheckNoNan(R[idx]));
+				assert(utils::CheckNoNan(Obvs[idx]));
+				assert(utils::CheckNoNan(forecast[idx]));
+				assert(utils::CheckNoNan(BLUE[idx]));
+
+				assert(utils::CheckNoNan(A[idx].getLayer<L_100m>()));
+				assert(utils::CheckNoNan(B[idx].getLayer<L_100m>()));
+
                  }
 
+				 SaveGrid2D("output", "beforeRK" , t, tmp_before_RK);
+				 SaveGrid2D("output", "afterRK",   t, tmp_after_RK);
+				 SaveGrid2D("output", "before_KF", t, tmp_before_KF);
+				 SaveGrid2D("output", "after_KF",  t, tmp_after_KF);
+				 SaveGrid2D("output", "obvs",      t, tmp_obvs);
 
 
              });

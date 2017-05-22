@@ -12,13 +12,18 @@ namespace amdados {
 namespace app {
 
 template<size_t SizeX, size_t SizeY>
-double applyRungeKutta(allscale::utils::grid<double,SizeX,SizeY>& y, double flowu, double flowv, double delta, double ds) {
+double applyRungeKutta(allscale::utils::grid<double,SizeX,SizeY>& y, double flowu, double flowv, double dt, double ds) {
 
 // TODO
 // 1) Add advection part to equations
 // 2) compute boundary errors to decide convergence
     using data_type = allscale::utils::grid<double,SizeX,SizeY>;
-    double c = (0.2 * delta) / ds;
+    flowu = 0; flowv = 0;
+    double c = 0.2;
+    double diffmult = (dt * c)/pow(ds,2);
+    double advmult_u = (flowu * dt)/(2*ds);
+    double advmult_v = (flowv * dt)/(2*ds);
+    //c = 0.2;
     // solving equation
     //      u_{t+dt}(s) = c * u_{t}(s) / ds^2
     // with linear elements an
@@ -26,12 +31,16 @@ double applyRungeKutta(allscale::utils::grid<double,SizeX,SizeY>& y, double flow
 
     // the resulting data field
     data_type res;
+
     // everything but the borders
-    for(int i=1; i<(int)SizeX-1; ++i) {      //SizeX and SizeY are number of elements in X and Y
+    for(int i=1; i<(int)SizeX-1; ++i) {      // SizeX and SizeY are number of elements in X and Y
         for(int j=1; j<(int)SizeY-1; ++j) {
             // for some linear element
-            res[{i,j}] = y[{i,j}] + c * (y[{i-1,j}] + y[{i+1,j}] + y[{i,j-1}] + y[{i,j+1}] - 4 * y[{i,j}]) -
-            (  (y[{i-1,j}] - y[{i+1,j}])*flowu*delta/(2*ds) + (y[{i,j-1}] - y[{i,j+1}])*flowv*delta/(2*ds));
+        	res[{i,j}] =  (y[{i+1,j}] * (diffmult - advmult_u)) +
+        			      (y[{i-1,j}] * (diffmult + advmult_u)) +
+        			      (y[{i,j+1}] * (diffmult - advmult_v)) +
+        			      (y[{i,j-1}] * (diffmult + advmult_v)) +
+        			      (y[{i,j  }] * (1 - (4*diffmult)) );
         }
     }
 

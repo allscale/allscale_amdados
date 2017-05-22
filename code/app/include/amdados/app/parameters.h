@@ -31,17 +31,17 @@ namespace app {
 		const int nelems_glob_x = nelems_x * num_domains_x;
 		const int nelems_glob_y = nelems_y * num_domains_y;
 
-		int T = 2;
+		int T = 200;
 		const int timestep = T;
 		int output_every_nth_time_step = 5;
-		double delta = 0.1; // not used yet
+		double delta = 10; // not used yet
 	    double stepsize = 100;
 
 
 		// initial spot
 		int spot_x = 0;   // start at bottom left point and then obtain analytical expression of evolution
-		int spot_y = 0;
-		double spot_density = 10000;
+		int spot_y = 1;
+		double spot_density = 1;
 
 		// set up the configuration of a grid cell (static)
 		using sub_domain_config = CellConfig<
@@ -67,7 +67,7 @@ namespace app {
 		// create the overall grid
 		data::Grid<sub_domain,2> A(size_global);  // A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
 		data::Grid<sub_domain,2> B(size_global);
-		const std::string filename = "..//..//Observation.txt";
+		const std::string filename = "..//..//Observation2.txt";
 		int observint = 1; // number of timesteps between observation availability
 	// all initialization parameters - move to input file
 

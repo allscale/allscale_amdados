@@ -75,6 +75,20 @@ namespace utils {
 				}
 			}
 
+			//-------------------------------------------------------------------------------------------------
+			// As temporary measure make explicit loop that sets all values to zero.
+			//-------------------------------------------------------------------------------------------------
+			template<size_t SizeX, size_t SizeY>
+			void SetAllValsToZero(allscale::utils::grid<double,SizeX,SizeY>& init)
+			{
+			    for(int i=0; i<(int)SizeX; ++i) {      //SizeX and SizeY are number of elements in X and Y
+				    for(int j=0; j<(int)SizeY; ++j) {      //SizeX and SizeY are number of elements in X and
+				    	init[{i,j}] = 1000.;   // Set all vals to zero
+				    }
+			    }
+
+			}
+
 } // end namespace utils
 } // end namespace app
 } // end namespace allscale
