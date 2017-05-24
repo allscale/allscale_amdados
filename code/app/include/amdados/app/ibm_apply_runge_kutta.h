@@ -31,7 +31,7 @@ double applyRungeKutta(allscale::utils::grid<double,SizeX,SizeY>& y, double flow
 
     // the resulting data field
     data_type res;
-
+    // TODO update this with the solver from the prototype
     // everything but the borders
     for(int i=1; i<(int)SizeX-1; ++i) {      // SizeX and SizeY are number of elements in X and Y
         for(int j=1; j<(int)SizeY-1; ++j) {
