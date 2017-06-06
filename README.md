@@ -111,3 +111,12 @@ It is preferred to use the operating system's package manager, if applicable.
 
 Make sure your build folder is located outside the source folder. Eclipse is
 not capable of dealing with such a setup correctly.
+
+### Armadillo Library
+
+The Armadillo matrix library is used only (!) for testing of matrix operations.
+It is not included in the repository (see .gitignore).
+In order to install a local copy just run on the Linux machine in the project's root directory:
+        bash ./armadillo.sh
+
+

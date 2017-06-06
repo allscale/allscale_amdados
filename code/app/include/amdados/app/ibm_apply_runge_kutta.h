@@ -107,7 +107,7 @@ double applyRungeKutta(allscale::utils::grid<double,SizeX,SizeY>& y, double flow
 //      // http://www.mate.tue.nl/~hulsen/cr/slides2.pdf
 //
 //      // compute k1
-    data_type k2;
+//    data_type k2;
 
 //      data_type k3;
 //      data_type k4;

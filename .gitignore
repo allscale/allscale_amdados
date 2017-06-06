@@ -7,4 +7,25 @@ Amdados_api_codeblocks/
 # Editor Specific
 *.swp
 *~
-.\#*
+build*
+*.res
+*.run
+Observation.txt
+DumpAllScale.txt
+doc
+.settings
+*~
+*.*~
+*\#
+.*.swp
+.*.swo
+tags
+*.zip
+*.gz
+verdandi
+verdandi*
+output
+3rd_party
+3rd-party
+
+

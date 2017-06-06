@@ -1,0 +1,34 @@
+#!/bin/bash
+#--------------------------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c)
+#--------------------------------------------------------------------------------------------------
+
+echo "Copying the project to the blade machine ..."
+
+CUDABLADE="albert@iribigd01.mul.ie.ibm.com"
+
+DESTIN="${CUDABLADE}:${HOME}/work/"
+
+rsync -arv \
+--exclude 'bin' --exclude 'output*' --exclude 'build_debug' --exclude 'build_release' \
+--exclude '*.jpg' --exclude '*.pdf' --exclude 'verdandi*' \
+--exclude '*.tgz' --exclude '*.zip' --exclude '*gdb.sh' --exclude '.git*' \
+--exclude 'Results' --exclude 'tags' --exclude "octave-workspace" \
+--exclude '*.*.swp' --exclude '*~' --exclude '*.swo' --exclude '*.log' \
+--exclude 'documentation'  --exclude 'doc' --exclude 'experimental' \
+../allscale_amdados ${DESTIN}
+
+# Overwrite some cmake files to enable compilation on the blade machines.
+# Namely, the googletest is not downloaded but read from "ext_libs" folder.
+
+#rsync -arv --ignore-times ./ext_libs/parec_add_unit_test.cmake \
+#        ${DESTIN}/allscale-api-protoype/code/parec/code/cmake/add_unit_test.cmake
+#
+#rsync -arv --ignore-times ./ext_libs/add_unit_test.cmake \
+#        ${DESTIN}/allscale-api-protoype/code/cmake/add_unit_test.cmake
+
+echo ""
+echo ""
+echo ""
+

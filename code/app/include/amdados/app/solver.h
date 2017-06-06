@@ -12,6 +12,7 @@
 #include <iomanip>
 
 
+#include "amdados/app/utils/common.h"
 #include "allscale/api/user/data/grid.h"
 #include "allscale/api/user/operator/pfor.h"
 
@@ -73,7 +74,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 		// initialize all cells on the 100m resolution
 		  A[pos].setActiveLayer(L_100m);
 		  // initialize the concentration
-		  
+
 		  A[pos].forAllActiveNodes([](double& value) {
 			 value = 0.0;        // initialize rho with 0
 		  });
@@ -105,7 +106,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
       data::Grid<sub_domain,2> tmp_after_KF(size_global);   // debugging
       data::Grid<sub_domain,2> tmp_obvs(size_global);       // debugging
 	  // TODO: assert return value
-      (void)std::system("mkdir -p output");     // make the output directory
+      int retval = std::system("mkdir -p output"); (void)retval;     // make the output directory
       for (int t = 0; t <= T; t++) {
           std::cout << "Time = " << t << std::endl;
           SaveGrid2D("output", "state", t, A);
@@ -220,6 +221,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 #if 1
                 Kalman_t * kf = kalman_filters[idx].get();
                 Q[idx] = R[idx];    // TODO: this is stub: same noise covariances
+
                 kf->Iterate(forecast[idx], Q[idx], H[idx], R[idx], Obvs[idx]);
                 BLUE[idx] = kf->GetStateVector();
                 P[idx] = kf->GetCovariance();
