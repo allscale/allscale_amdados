@@ -1,10 +1,292 @@
-#include "amdados/app/parameters.h"
+//-----------------------------------------------------------------------------
+// Author    : Fearghal O'Donncha, feardonn@ie.ibm.com
+//             Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017
+//-----------------------------------------------------------------------------
 
-using namespace allscale::api::user::data;
+#include "allscale/api/user/operator/pfor.h"
+#include "allscale/utils/assert.h"
+#include "amdados/app/amdados_grid.h"
+#include "amdados/app/utils/common.h"
+#include "amdados/app/geometry.h"
+#include "amdados/app/utils/amdados_utils.h"
+#include "amdados/app/utils/matrix.h"
+#include "amdados/app/utils/sparse_matrix.h"
+#include "amdados/app/utils/configuration.h"
+#include "amdados/app/utils/cholesky.h"
+#include "amdados/app/utils/kalman_filter.h"
+#include "amdados/app/model/i_model.h"
+#include "amdados/app/model/euler_finite_diff.h"
+
+using namespace amdados::app::utils;
 
 namespace amdados {
 namespace app {
 
+using ::allscale::api::user::pfor;
+using ::allscale::api::user::data::Grid;
+using ::allscale::api::user::data::GridPoint;
+
+// Global variables are declared here.
+// TODO: how does it fit into MPI framework???
+//namespace {
+
+// Total number of elements (or nodal points) in the entire domain in each dimension.
+const int GLOBAL_NELEMS_X = NELEMS_X * NUM_DOMAINS_X;
+const int GLOBAL_NELEMS_Y = NELEMS_Y * NUM_DOMAINS_Y;
+
+// Number of elements (or nodal points) in a sub-domain.
+const size_t SUB_PROBLEM_SIZE = NELEMS_X * NELEMS_Y;
+
+// Number of measurement locations in a sub-domain.
+const size_t NUM_MEASUREMENTS = NELEMS_X * NELEMS_Y;
+
+using subdomain_sub2ind_t = Sub2Ind<NELEMS_X, NELEMS_Y>;
+using subdomain_ind2sub_t = Ind2Sub<NELEMS_X, NELEMS_Y>;
+
+using point2d_t = GridPoint<2>;
+using size2d_t = point2d_t;
+
+using point3d_t = GridPoint<3>;
+using size3d_t = point3d_t;
+
+using cube_t = Grid<double,3>;
+using DA_vector_t = Vector<SUB_PROBLEM_SIZE>;
+using DA_matrix_t = Matrix<SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
+
+using sub_domain_t = Cell<double,sub_domain_config_t>;
+using vec_grid_t = Grid<DA_vector_t,2>;
+using mat_grid_t = Grid<DA_matrix_t,2>;
+
+// Zero-coordinate point and global grid size counted in sub-domains.
+const point2d_t Zero = 0;
+const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
+
+// Create the overall grid. Two similar grids (A and B) are created
+// for convenience to alternate between successive states.
+//XXX:???: A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
+Grid<sub_domain_t,2> gridA(SubDomGridSize);
+Grid<sub_domain_t,2> gridB(SubDomGridSize);
+
+// Data structures for observation data has enough room for all the nodal
+// points accross the whole domain at all timestamps.
+std::unique_ptr<cube_t> obsv_glob;
+
+// Create data structure for storing data assimilation matrices.
+mat_grid_t P(SubDomGridSize);    // state covariance matrix
+mat_grid_t R(SubDomGridSize);    // observation noise covariance matrix
+mat_grid_t Q(SubDomGridSize);    // process noise covariance matrix
+mat_grid_t H(SubDomGridSize);    // projector from model space to observation space
+
+// Create data structure for storing data assimilation vectors.
+vec_grid_t Obvs(SubDomGridSize);
+vec_grid_t forecast(SubDomGridSize);
+vec_grid_t BLUE(SubDomGridSize);
+
+// Create Kalman filters for each sub-domain.
+using Kalman_t = amdados::app::utils::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
+Grid<Kalman_ptr_t,2> kalman_filters(SubDomGridSize);
+
+//-------------------------------------------------------------------------------------------------
+// Function reads observations from a file.
+// TODO: right now assume data available every timestep; need to update
+//-------------------------------------------------------------------------------------------------
+void ReadObservations(cube_t & obsver, const std::string & filename, int observint)
+{
+    assert_true(observint == 1) << "so far, the observation interval must be equal to 1" << endl;
+    std::ifstream file(filename);
+    assert_true(file.good()) << "failed to open observation file: " << filename << endl;
+    int debug_t = 0;
+    for (int t = 0; file >> t;) {       // header line contains a time stamp
+        assert_true(debug_t == t) << "time step missed in observations: " << debug_t << endl;
+        ++debug_t;
+        for (int y = 0; y < GLOBAL_NELEMS_Y; ++y) {
+        for (int x = 0; x < GLOBAL_NELEMS_X; ++x) {   // XXX: x is the fastest
+            int i = 0, j = 0;
+            double val = 0;
+            file >> i >> j >> val;
+ //           assert_true((i == x) && (j == y));
+//                << "mismatch between the grid and observation layouts" << endl;
+            obsver[{i,j,t}] = val;
+        }}
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+// TODO: introduce a function to read flowfield data
+// Read of form I,J,U,V and map to grid of amdados application
+void ReadFlows(cube_t& /*flowfield*/,
+        const std::string /*filename_flow*/, int /*nflopts_x*/ ,int /*nflopts_y*/)
+{}
+
+//-------------------------------------------------------------------------------------------------
+// Utility function saves the current state.
+//-------------------------------------------------------------------------------------------------
+void SaveGrid2D(const Configuration & conf, const std::string & title, int t,
+                const Grid<sub_domain_t,2> & grid)
+{
+    std::stringstream ss;
+    ss << conf.asString("output_dir") << "/" << title
+       << std::setfill('0') << std::setw(5) << t << ".txt";
+    std::fstream f(ss.str(), std::ios::out | std::ios::trunc);
+    assert_true(f.good()) << "failed to open the file for writing: " << ss.str() << endl;
+    f << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values" << endl;
+    const size_t dim = 2;
+    f << dim << endl << GLOBAL_NELEMS_X << endl << GLOBAL_NELEMS_Y << endl;
+    for (int x = 0; x < GLOBAL_NELEMS_X; ++x) {
+    for (int y = 0; y < GLOBAL_NELEMS_Y; ++y) { // XXX: y the fastest
+        double value = grid[{x / NELEMS_X, y / NELEMS_Y}].getLayer<L_100m>()
+                           [{x % NELEMS_X, y % NELEMS_Y}];
+        f << value << endl;
+    }}
+    f.flush();
+};
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the model covariance matrix as function of exponential distance.
+// XXX: what does it mean: Follow same structure as that implemented for Runga Kutta solver
+//-------------------------------------------------------------------------------------------------
+void GetModelCovar(const Configuration & conf, DA_matrix_t & covar)
+{
+    // TODO: check matrix sizes.
+    const double var = conf.asDouble("model_covar_var");
+    const double Rx = conf.asDouble("model_covar_Rx");
+    const double Ry = conf.asDouble("model_covar_Ry");
+
+    subdomain_ind2sub_t ind2sub;
+    int                 x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+
+    for (int i = 0; i < static_cast<int>(SUB_PROBLEM_SIZE); ++i) {
+        ind2sub(i, x1, y1);
+        covar[{i,i}] = var;
+        for (int k = i + 1; k < static_cast<int>(SUB_PROBLEM_SIZE); ++k) {
+            ind2sub(k, x2, y2);
+            covar[{k,i}] = covar[{i,k}] = var * exp(- Square((x1 - x2)/Rx) - Square((y1 - y2)/Ry));
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the matrix of observations.
+//-------------------------------------------------------------------------------------------------
+template<size_t MSIZE>
+void ComputeH(Matrix<MSIZE,MSIZE> & H)
+{
+    MakeIdentityMatrix(H);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the observation noise covariance matrix.
+//-------------------------------------------------------------------------------------------------
+template<size_t MSIZE>
+void ComputeR(Matrix<MSIZE,MSIZE> & R)
+{
+    // Random values between 1 and 2, otherwise singular matrices can happen down the road.
+    std::mt19937                           gen(std::time(nullptr));
+    std::uniform_real_distribution<double> distrib(1.0, 2.0);
+
+    for (int i = 0; i < static_cast<int>(MSIZE); ++i) {
+        R[{i,i}] = distrib(gen);
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function gets the observations at certain time and returns them unrolled into a vector.
+//-------------------------------------------------------------------------------------------------
+void GetObservation(DA_vector_t & obsver_vec, const cube_t & obsver,
+                    int timestep, const point2d_t & domain)
+{
+    subdomain_sub2ind_t sub2ind;
+    for (int x = 0; x < NELEMS_X; ++x) {
+        int xg = x + domain[0] * NELEMS_X;                          // global abscissa
+        for (int y = 0; y < NELEMS_Y; ++y) {
+            int yg = y + domain[1] * NELEMS_Y;                      // global ordinate
+            obsver_vec[{sub2ind(x,y)}] = obsver[{xg,yg,timestep}];
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void InitSolver(const Configuration & conf)
+{
+    // Check the geometry.
+    assert_true(conf.asInt("num_domains_x") == NUM_DOMAINS_X) << "num_domains_x mismatch" << endl;
+    assert_true(conf.asInt("num_domains_y") == NUM_DOMAINS_Y) << "num_domains_y mismatch" << endl;
+    assert_true(conf.asInt("num_elems_x") == NELEMS_X) << "num_elems_x mismatch" << endl;
+    assert_true(conf.asInt("num_elems_y") == NELEMS_Y) << "num_elems_y mismatch" << endl;
+
+    // Get the rounded initial position of a spot of substance and check the bounds.
+    const int spot_x = static_cast<int>(std::floor(conf.asDouble("spot_x") + 0.5));
+    const int spot_y = static_cast<int>(std::floor(conf.asDouble("spot_y") + 0.5));
+    assert_true(IsInsideRange(spot_x, 0, GLOBAL_NELEMS_X) &&
+                IsInsideRange(spot_y, 0, GLOBAL_NELEMS_Y))
+                << "substance spot is not inside the domain" << endl;
+
+    // Set all the matrices and vectors to zero.
+    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+        FillMatrix(gridA[idx].getLayer<L_100m>(), 0.0);
+        FillMatrix(gridB[idx].getLayer<L_100m>(), 0.0);
+        FillMatrix(P[idx], 0.0);
+        FillMatrix(R[idx], 0.0);
+        FillMatrix(Q[idx], 0.0);
+        FillMatrix(H[idx], 0.0);
+        FillVector(Obvs[idx], 0.0);
+        FillVector(forecast[idx], 0.0);
+        FillVector(BLUE[idx], 0.0);
+    });
+
+    // TODO: comment.
+    pfor(Zero, SubDomGridSize, [&](const point2d_t & pos) {
+        // initialize all cells on the 100m resolution
+        gridA[pos].setActiveLayer(L_100m);
+     //   A[pos].DiscretizeElements();
+        // here we compute quadrature for each grid
+
+        // initialize the concentration
+        //gridA[pos].forAllActiveNodes([](const point2d_t & pos, double & value) {
+        //(void)pos;
+        //value = 0.0;        // initialize rho with 0
+        //});
+        gridA[pos].forAllActiveNodes([](double & value) { value = 0.0; });  // rho = 0
+    });
+
+    // Set initial covariance matrices in each sub-domain.
+    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+        GetModelCovar(conf, P[idx]);
+    });
+
+    // Bring in a high concentration of substance at some spot.
+    gridA[{spot_x / NELEMS_X, spot_y / NELEMS_Y}].getLayer<L_100m>()
+         [{spot_x % NELEMS_X, spot_y / NELEMS_Y}] = conf.asDouble("spot_density");
+
+//  TODO: load the flows computed previously
+//  utils::Grid<double,3> flows({ num_domains_x, num_domains_y, T });
+
+    // Initialize the sub-domain filters.
+    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+        kalman_filters[idx].reset(new Kalman_t());
+        Reshape2Dto1D<NELEMS_X,NELEMS_Y>(forecast[idx], gridA[idx].getLayer<L_100m>());
+        kalman_filters[idx]->Init(forecast[idx], P[idx]);
+    });
+
+    // Allocate a placeholder for the entire observation data.
+    const int T = conf.asInt("integration_T");
+    assert_true((0 < T) && (T < numeric_limits<int>::max()/10)) << "wrong T" << endl;
+    obsv_glob.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, T + 1}));
+}
+
+//} // anonymous namespace
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void AmdadosSolver(const Configuration & conf)
+{
+    InitSolver(conf);
+}
 
 } // end namespace app
 } // end namespace amdados
+

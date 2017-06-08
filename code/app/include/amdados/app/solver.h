@@ -44,27 +44,27 @@ namespace app {
 
 // --- Initialize ---
 
-	// A utility function to save the current state.
-	auto SaveGrid2D = [](const std::string & path, const std::string & title, int t,
-						  const data::Grid<sub_domain,2> & grid) {
-		std::stringstream ss;
-        ss << path << "/" << title << std::setfill('0') << std::setw(5) << t << ".txt";
-        std::fstream stateFile(ss.str(), std::ios::out | std::ios::trunc);
-		assert_true(stateFile.good()) << "failed to open the file for writing: " + ss.str();
+// A utility function to save the current state.
+auto SaveGrid2D = [](const std::string & path, const std::string & title, int t,
+                      const data::Grid<sub_domain,2> & grid) {
+    std::stringstream ss;
+    ss << path << "/" << title << std::setfill('0') << std::setw(5) << t << ".txt";
+    std::fstream stateFile(ss.str(), std::ios::out | std::ios::trunc);
+    assert_true(stateFile.good()) << "failed to open the file for writing: " + ss.str();
 
-        stateFile << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values"
-                  << std::endl;
-        size_t dim = 2;
-        stateFile << dim << std::endl << (nelems_x * num_domains_x) << std::endl
-                                      << (nelems_y * num_domains_y) << std::endl;
-        for (int k = 0; k < nelems_x * num_domains_x; ++k) {
-        for (int j = 0; j < nelems_y * num_domains_y; ++j) {
-            double value = grid[{k/nelems_x, j/nelems_y}].getLayer<L_100m>()
-                               [{k%nelems_x, j%nelems_y}];
-            stateFile << value << std::endl;
-        }}
-        stateFile.flush();
-	};
+    stateFile << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values"
+              << std::endl;
+    size_t dim = 2;
+    stateFile << dim << std::endl << (nelems_x * num_domains_x) << std::endl
+                                  << (nelems_y * num_domains_y) << std::endl;
+    for (int k = 0; k < nelems_x * num_domains_x; ++k) {
+    for (int j = 0; j < nelems_y * num_domains_y; ++j) {
+        double value = grid[{k/nelems_x, j/nelems_y}].getLayer<L_100m>()
+                           [{k%nelems_x, j%nelems_y}];
+        stateFile << value << std::endl;
+    }}
+    stateFile.flush();
+};
 
 void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
 {

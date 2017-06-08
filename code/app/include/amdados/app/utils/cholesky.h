@@ -1,11 +1,9 @@
-#pragma once
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
-#include "allscale/utils/assert.h"
-#include "amdados/app/utils/matrix.h"
+#pragma once
 
 namespace amdados {
 namespace app {

@@ -4,10 +4,11 @@
 //-----------------------------------------------------------------------------
 
 #include <gtest/gtest.h>
-
-#include "amdados/app/static_grid.h"
+#include "amdados/app/amdados_grid.h"
+#include "allscale/utils/assert.h"
 #include "amdados/app/utils/common.h"
 #include "amdados/app/utils/amdados_utils.h"
+#include "amdados/app/utils/matrix.h"
 #include "amdados/app/utils/cholesky.h"
 #include "amdados/app/utils/configuration.h"
 
@@ -24,13 +25,13 @@ const double TOL = std::sqrt(std::sqrt(std::numeric_limits<double>::epsilon()));
 template<int PROBLEM_SIZE>
 void TestCholeskyGivenProblemSize(double & max_rel_err)
 {
-	const int NCOLS = PROBLEM_SIZE % 37 + 7;
-	using matrix_t = allscale::utils::grid<double, PROBLEM_SIZE, PROBLEM_SIZE>;
-	using matrix_other_t = allscale::utils::grid<double, PROBLEM_SIZE, NCOLS>;
-	using vector_t = allscale::utils::grid<double, PROBLEM_SIZE>;
+    const int NCOLS = PROBLEM_SIZE % 37 + 7;
+    using matrix_t = allscale::utils::grid<double, PROBLEM_SIZE, PROBLEM_SIZE>;
+    using matrix_other_t = allscale::utils::grid<double, PROBLEM_SIZE, NCOLS>;
+    using vector_t = allscale::utils::grid<double, PROBLEM_SIZE>;
 
     // Create a random, square, symmetric, positive-definite matrix A: A = tmpA * tmpA^T.
-	matrix_t A;
+    matrix_t A;
     {
         matrix_t tmpA;
         MakeRandomMatrix(tmpA);

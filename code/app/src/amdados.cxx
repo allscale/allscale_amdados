@@ -1,33 +1,42 @@
-#include <iostream>
+//-----------------------------------------------------------------------------
+// Author    : Fearghal O'Donncha, feardonn@ie.ibm.com
+//             Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017
+//-----------------------------------------------------------------------------
 
 #include "amdados/app/amdados_grid.h"
-#include "amdados/app/parameters.h"
-#include "amdados/app/solver.h"
-#include "amdados/app/utils/filter.h"
-
-#include "allscale/api/user/data/grid.h"
-
-
+#include "amdados/app/utils/common.h"
+#include "amdados/app/utils/amdados_utils.h"
 #include "amdados/app/utils/matrix.h"
-//#include "amdados/app/cholesky.h"
-//#include "amdados/app/kalman_filter.h"
+#include "amdados/app/utils/sparse_matrix.h"
+#include "amdados/app/utils/configuration.h"
+#include "amdados/app/model/i_model.h"
+#include "amdados/app/model/euler_finite_diff.h"
 
+using namespace amdados::app::utils;
 
-using namespace amdados::app;
+namespace amdados {
+namespace app {
+
+void AmdadosSolver(const Configuration & conf);
+
+} // namespace app
+} // namespace amdados
 
 int main()
 {
-    Compute(zero, size_global);
+    Configuration conf;
+    conf.ReadConfigFile("../../amdados.conf");
+    conf.PrintParameters();
+    MakeDirectory(conf.asCString("output_dir"));
+    amdados::app::AmdadosSolver(conf);
+    return EXIT_SUCCESS;
 
+//Compute(zero, size_global);
+//std::cout << "active layer: " << A[{1,1}].getActiveLayer() << std::endl;  // XXX ???
 
-	std::cout << "active layer=  " << A[{1,1}].getActiveLayer() << std::endl;
-
-
-
-	return EXIT_SUCCESS;
-
-	// Components to be included
-	// 1) Grid structures specific to each subdomain
+    // Components to be included
+    // 1) Grid structures specific to each subdomain
     //    Each grid structure contains information
     //    a) structures for three different layers of resolution: (100m (1) ; 20m(2); 4m(3))
     //    b) Solution on each layer
@@ -56,7 +65,4 @@ int main()
     // Switch to appropriate grid resolution
     // Data assimilation solver
     // File output at periodic intervals
-
-
-
 }

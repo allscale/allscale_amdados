@@ -1,0 +1,56 @@
+1) Check indexing consistency: ReadObservations(), SaveGrid2D() and Sub2Ind
+
+2) Mistake in
+
+//                    for (size_t i1 = 0; i1 < nelems_x; i1++)
+//                    {
+//                        for(size_t j1 = 0; j1 < nelems_y; j1++)
+//                        {
+//                            forecast[idx][{i1 * nelems_x + j1}] = res.getLayer<L_100m>()[{i1,j1}];
+//                        }
+//                    }
+
+????
+
+3) Why stepsize is huge?
+
+4) Time step - how it was selected?
+
+5) Check logic of getModelCovar()
+
+6) Physically meaningfull values are needed.
+    a) getModelCovar() we take unit value, one unit of what?
+    b) but in Euler discrete model space step = 100? 100 of what?
+
+7) Comment in GetModelCovar():
+what does it mean: Follow same structure as that implemented for Runga Kutta solver
+
+8) In getObservations():
+ obsvloc[{i * nx + j}] = obsver[{igl,jgl,timestep}];
+ should be i*ny + j ???
+
+9) NELEMS means number of nodal points???
+
+10) InitSolver(), code around forAllActiveNodes(..) was adjusted, explanation?
+11) InitSolver(): TODO comment
+
+12) utils::pfor was wrong
+
+13) in "amdados_grid.h" using namespace allscale::api::user;  // Albert commented
+
+//////////////////////////////////////////////////////////////////////////////////////
+Questions:
+1) Rationale for design?
+2) How to access the grid data, how to traverse it? Can we get grid sizes?
+   Can we traverse rows, columns, all elements?
+   What is active element?
+3) Who is the fastest - x or y?
+4) How to get grid sizes?
+5) How to declare data in MPI-friendly way?
+(so far, we use initialization suitable for multi-threading only)
+6) Mutexes and other sync. objects of the allscale API.
+7) We need facilities to print text in the terminal, print warning,
+pront into file in some MPI/threading safe way.
+8) Memory management for the last matrices.
+9) Type consistency: int and size_t are mixed up.
+10)

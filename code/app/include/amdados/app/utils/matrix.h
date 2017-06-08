@@ -4,26 +4,21 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
-#include "allscale/api/user/data/grid.h"
-#include "amdados/app/static_grid.h"
-
 namespace amdados {
 namespace app {
 namespace utils {
 
-using namespace allscale::api::user;
-
 template<size_t LENGTH>
-	using Vector = allscale::utils::grid<double, LENGTH>;
+    using Vector = allscale::utils::grid<double, LENGTH>;
 
 template<size_t NROWS, size_t NCOLS>
-	using Matrix = allscale::utils::grid<double, NROWS, NCOLS>;
+    using Matrix = allscale::utils::grid<double, NROWS, NCOLS>;
 
 template<size_t LENGTH>
     using VecPtr = std::unique_ptr< allscale::utils::grid<double, LENGTH> >;
 
 template<size_t NROWS, size_t NCOLS>
-	using MatPtr = std::unique_ptr< allscale::utils::grid<double, NROWS, NCOLS> >;
+    using MatPtr = std::unique_ptr< allscale::utils::grid<double, NROWS, NCOLS> >;
 
 //-------------------------------------------------------------------------------------------------
 // Function checks that specified objects are two distinct intances of some class or type.
@@ -344,6 +339,36 @@ void MakeRandomMatrix(Matrix<NROWS,NCOLS> & A)
             A[{r,c}] = distrib(gen);
         }
     }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function checks there is no NAN values on the grid.
+//-------------------------------------------------------------------------------------------------
+template<size_t LENGTH>
+bool CheckNoNan(const Vector<LENGTH> & grid)
+{
+    // TODO: check size: must be LENGTH
+    for (int i = 0; i < static_cast<int>(LENGTH); i++) {
+        if (std::isnan(grid[{i}]))
+            return false;
+    }
+    return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function checks there is no NAN values on the grid.
+//-------------------------------------------------------------------------------------------------
+template<size_t NELEMS_X, size_t NELEMS_Y>
+bool CheckNoNan(const Matrix<NELEMS_X,NELEMS_Y> & grid)
+{
+    // TODO: check grid sizes: must be NELEMS_X by NELEMS_Y
+    for (int i = 0; i < static_cast<int>(NELEMS_X); i++) {
+        for (int j = 0; j < static_cast<int>(NELEMS_Y); j++) {
+            if (std::isnan(grid[{i,j}]))
+                return false;
+        }
+    }
+    return true;
 }
 
 } // end namespace utils

@@ -4,9 +4,6 @@
 //-----------------------------------------------------------------------------
 
 #pragma once
-#include "amdados/app/static_grid.h"
-#include "amdados/app/utils/matrix.h"
-#include "amdados/app/utils/cholesky.h"
 
 namespace amdados {
 namespace app {

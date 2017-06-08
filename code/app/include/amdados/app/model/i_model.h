@@ -1,8 +1,9 @@
-#pragma once
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
+
+#pragma once
 
 namespace amdados {
 namespace app {

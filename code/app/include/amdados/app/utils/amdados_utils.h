@@ -1,7 +1,9 @@
-#pragma once
-#include "amdados/app/utils/matrix.h"
+//-----------------------------------------------------------------------------
+// Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017
+//-----------------------------------------------------------------------------
 
-using namespace allscale::api::user;
+#pragma once
 
 namespace amdados {
 namespace app {
@@ -31,7 +33,7 @@ bool IsBounded(const T & v, const T & vmin, const T & vmax)
 template<typename T>
 bool IsInsideRange(const T & v, const T & vmin, const T & vmax)
 {
-    static_assert(std::numeric_limits<T>::is_integer, "integer type is expected");
+    static_assert(numeric_limits<T>::is_integer, "integer type is expected");
     return ((vmin <= v) && (v < vmax));
 }
 
@@ -46,18 +48,16 @@ T Bound(const T & v, const T & vmin, const T & vmax)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function checks there is no NAN values on the grid.
+// Function returns a squared value.
 //-------------------------------------------------------------------------------------------------
-template<size_t LENGTH>
-bool CheckNoNan(const Vector<LENGTH> & grid)
+template<typename T>
+T Square(const T & v)
 {
-    // TODO: check size: must be LENGTH
-    for (int i = 0; i < static_cast<int>(LENGTH); i++) {
-        if (std::isnan(grid[{i}]))
-            return false;
-    }
-    return true;
+    return (v * v);
 }
+
+
+
 
 double mu1(double timestep){
     return  -0.6 * sin(timestep/10 - M_PI) * 0.2;
@@ -68,50 +68,50 @@ double mu2(double timestep){
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function checks there is no NAN values on the grid.
-//-------------------------------------------------------------------------------------------------
-template<size_t NELEMS_X, size_t NELEMS_Y>
-bool CheckNoNan(const Matrix<NELEMS_X,NELEMS_Y> & grid)
-{
-    // TODO: check grid sizes: must be NELEMS_X by NELEMS_Y
-    for (int i = 0; i < static_cast<int>(NELEMS_X); i++) {
-        for (int j = 0; j < static_cast<int>(NELEMS_Y); j++) {
-            if (std::isnan(grid[{i,j}]))
-                return false;
-        }
-    }
-    return true;
-}
-
-//-------------------------------------------------------------------------------------------------
 // Functor converts 2D index (x,y) into a plain one.
 //-------------------------------------------------------------------------------------------------
 template<size_t SizeX, size_t SizeY>
 struct Sub2Ind {
     Sub2Ind() {
-        static_assert(SizeX * SizeY < static_cast<size_t>(std::numeric_limits<int>::max()),
-                      "overflow");
+        static_assert(SizeX * SizeY < static_cast<size_t>(numeric_limits<int>::max()), "overflow");
     }
 
     int operator()(int x, int y) const {
-        assert(static_cast<unsigned int>(x) < SizeX);
-        assert(static_cast<unsigned int>(y) < SizeY);
+        assert_true(static_cast<size_t>(x) < SizeX);
+        assert_true(static_cast<size_t>(y) < SizeY);
         //return (x + static_cast<int>(SizeX) * y);
         return (x * static_cast<int>(SizeY) + y);   // TODO: we already have observations based
     }                                               // on this indexing: y changes faster, swap?
 };
 
 //-------------------------------------------------------------------------------------------------
-// Function reshapes a vector into 2D grid structure,
-// in Matlab notation: grid = reshape(vec, [NELEMS_X, NELEMS_Y]).
+// Functor converts a plane index into 2D one (x,y).
 //-------------------------------------------------------------------------------------------------
-template<size_t NELEMS_X, size_t NELEMS_Y, typename GRID>
-void Reshape1Dto2D(GRID & grid, const Vector<NELEMS_X * NELEMS_Y> & vec)
+template<size_t SizeX, size_t SizeY>
+struct Ind2Sub {
+    Ind2Sub() {
+        static_assert(SizeX * SizeY < static_cast<size_t>(numeric_limits<int>::max()), "overflow");
+    }
+
+    void operator()(const int idx, int & x, int & y) const {
+        assert_true(static_cast<size_t>(idx) < SizeX * SizeY);
+        std::div_t divresult = std::div(idx, SizeY);    // if y is the fastest
+        x = divresult.quot;
+        y = divresult.rem;
+    }
+};
+
+//-------------------------------------------------------------------------------------------------
+// Function reshapes a vector into 2D grid structure,
+// in Matlab notation: grid = reshape(vec, [SizeX, SizeY]).
+//-------------------------------------------------------------------------------------------------
+template<size_t SizeX, size_t SizeY, typename GRID>
+void Reshape1Dto2D(GRID & grid, const allscale::utils::grid<double, SizeX * SizeY> & vec)
 {
-    // TODO: check grid sizes: must be NELEMS_X by NELEMS_Y
-    Sub2Ind<NELEMS_X, NELEMS_Y> sub2ind;
-    for (int i = 0; i < static_cast<int>(NELEMS_X); i++) {
-        for (int j = 0; j < static_cast<int>(NELEMS_Y); j++) {
+    // TODO: check grid sizes: must be SizeX by SizeY
+    Sub2Ind<SizeX, SizeY> sub2ind;
+    for (int i = 0; i < static_cast<int>(SizeX); i++) {
+        for (int j = 0; j < static_cast<int>(SizeY); j++) {
             grid[{i,j}] = vec[{sub2ind(i,j)}];
         }
     }
@@ -120,13 +120,13 @@ void Reshape1Dto2D(GRID & grid, const Vector<NELEMS_X * NELEMS_Y> & vec)
 //-------------------------------------------------------------------------------------------------
 // Function unrolls 2D grid structure into a vector, in Matlab notation: vec = grid(:).
 //-------------------------------------------------------------------------------------------------
-template<size_t NELEMS_X, size_t NELEMS_Y, typename GRID>
-void Reshape2Dto1D(Vector<NELEMS_X * NELEMS_Y> & vec, const GRID & grid)
+template<size_t SizeX, size_t SizeY, typename GRID>
+void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRID & grid)
 {
-    // TODO: check grid sizes: must be NELEMS_X by NELEMS_Y
-    Sub2Ind<NELEMS_X, NELEMS_Y> sub2ind;
-    for (int i = 0; i < static_cast<int>(NELEMS_X); i++) {
-        for (int j = 0; j < static_cast<int>(NELEMS_Y); j++) {
+    // TODO: check grid sizes: must be SizeX by SizeY
+    Sub2Ind<SizeX, SizeY> sub2ind;
+    for (int i = 0; i < static_cast<int>(SizeX); i++) {
+        for (int j = 0; j < static_cast<int>(SizeY); j++) {
             vec[{sub2ind(i,j)}] = grid[{i,j}];
         }
     }

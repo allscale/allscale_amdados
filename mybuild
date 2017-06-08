@@ -1,0 +1,77 @@
+#!/bin/bash
+#-----------------------------------------------------------------------------
+# Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+# Copyright : IBM Research Ireland, 2017
+#-----------------------------------------------------------------------------
+
+CONF=Release
+FULL=false
+TEST=false
+
+# Any subsequent(*) commands which fail will cause the shell script to exit immediately:
+set -e
+
+# Print a visual separator between script runs.
+echo
+echo
+echo
+echo
+echo
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo
+
+# Get the number of CPUs to run building and testing.
+NCPUs=$(grep -c ^processor /proc/cpuinfo)
+echo "Number of available CPUs: ${NCPUs}"
+ONE=1
+useNCPUs=$((NCPUs-ONE))
+echo "Number of CPUs used for building and testing: ${useNCPUs}"
+echo
+
+# Parse the command line arguments.
+# http://wiki.bash-hackers.org/howto/getopts_tutorial
+while getopts ":fdrt" opt; do
+    case $opt in
+        f)              # -f configuring and building
+        FULL=true
+        ;;
+        d)              # -d Debug mode
+        CONF=Debug
+        ;;
+        r)              # -r Release mode
+        CONF=Release
+        ;;
+        t)              # -t building and running the tests
+        TEST=true
+        ;;
+        \?)
+        echo "Invalid option: -$OPTARG" >&2; exit 1
+        ;;
+    esac
+done
+
+# Configure, if needed.
+if [ ! -d "build" ]; then
+    mkdir -p build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
+    cd ../
+elif ${FULL}; then
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
+    cd ../
+fi
+
+# Building and, possibly, testing.
+cd ./build
+if $TEST; then
+    (make -j ${useNCPUs}) && (ctest -j ${useNCPUs})
+else
+    make -j ${useNCPUs}
+fi
+cd ../
+echo
+echo
+
+

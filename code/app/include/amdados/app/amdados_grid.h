@@ -2,26 +2,26 @@
 #include "allscale/api/user/data/grid.h"
 #include "amdados/app/static_grid.h"
 
-using namespace allscale::api::user;
+//using namespace allscale::api::user;  // Albert commented
 
 namespace amdados {
 namespace app {
 
 
-	template<unsigned ... sizes>
-	struct layer;
+    template<unsigned ... sizes>
+    struct layer;
 
-	 template<typename ... Layers>
-	 struct layers {
-		 enum {
-			 num_layers = sizeof...(Layers)
-		 };
-	 };
+     template<typename ... Layers>
+     struct layers {
+         enum {
+             num_layers = sizeof...(Layers)
+         };
+     };
 
-	template<unsigned ... sizes>
-	struct size;
+    template<unsigned ... sizes>
+    struct size;
 
-	// structures for each Cell configuration and number of layers for nesting (limited to 3)
+    // structures for each Cell configuration and number of layers for nesting (limited to 3)
     template<typename Layers>
     struct CellConfig {
         enum {
@@ -82,7 +82,7 @@ namespace app {
         void forAllOnLayer(unsigned layer, const Op& op) {
             if (layer == getLayerNumber()) {
                 // apply it to this value)
-				data.for_each(op);
+                data.for_each(op);
             } else {
                 nested.forAllOnLayer(layer,op);
             }
@@ -95,12 +95,12 @@ namespace app {
                 int x = size[0];
                 int y = size[1];
                 switch(dir) {
-				case Up: {  //returns data from bottom strip of domain to neighbour
+                case Up: {  //returns data from bottom strip of domain to neighbour
                     std::vector<T> res(x);
                     for(int i=0; i<x; i++) res[i] = data[{0,i}];
                     return res;
                 }
-				case Down: { // returns data from top strip of domain to neighbour
+                case Down: { // returns data from top strip of domain to neighbour
                     std::vector<T> res(x);
                     for(int i=0; i<x; i++) res[i] = data[{y-1,i}];
                     return res;
@@ -260,7 +260,7 @@ namespace app {
 
         template<typename Op>
         void forAllOnLayer(unsigned layer, const Op& op) {
-			assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
+            assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
             data.for_each(op);
         }
 

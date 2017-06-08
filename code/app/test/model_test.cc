@@ -4,6 +4,8 @@
 //-----------------------------------------------------------------------------
 
 #include <gtest/gtest.h>
+#include "allscale/utils/assert.h"
+#include "amdados/app/amdados_grid.h"
 #include "amdados/app/utils/common.h"
 #include "amdados/app/utils/amdados_utils.h"
 #include "amdados/app/utils/matrix.h"

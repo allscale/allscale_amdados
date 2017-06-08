@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
-#include "allscale/api/user/data/grid.h"
-#include "amdados/app/static_grid.h"
+#include "amdados/app/amdados_grid.h"
 
 template<size_t SizeX, size_t SizeY>
 void Test1()
 {
     allscale::utils::grid<double, SizeX, SizeY> covar;
+    covar[{0,0}] = 0;
     std::cout << covar[{0,0}] << std::endl;
     std::cout << "Test1 succeeded" << std::endl;
 }

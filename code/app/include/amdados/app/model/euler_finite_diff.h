@@ -1,11 +1,9 @@
-#pragma once
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
-/*#include "../utils/common.h"*/
-/*#include "i_model.h"*/
+#pragma once
 
 namespace amdados {
 namespace app {

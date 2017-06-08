@@ -16,6 +16,9 @@
 #define ARMA_DONT_USE_OPENMP
 #include "../../../3rd-party/include/armadillo"
 
+#include "allscale/utils/assert.h"
+#include "amdados/app/amdados_grid.h"
+#include "amdados/app/utils/common.h"
 #include "amdados/app/utils/amdados_utils.h"
 #include "amdados/app/utils/configuration.h"
 #include "amdados/app/utils/matrix.h"
