@@ -38,6 +38,12 @@ what does it mean: Follow same structure as that implemented for Runga Kutta sol
 
 13) in "amdados_grid.h" using namespace allscale::api::user;  // Albert commented
 
+14) solver.h:  const auto& cur = A[idx]; 
+               auto& res = A[idx];   <--- B?
+               
+15) 
+
+
 //////////////////////////////////////////////////////////////////////////////////////
 Questions:
 1) Rationale for design?
@@ -53,4 +59,5 @@ Questions:
 pront into file in some MPI/threading safe way.
 8) Memory management for the last matrices.
 9) Type consistency: int and size_t are mixed up.
-10)
+10) Compilation bug in ReadObservations()
+11)

@@ -70,7 +70,7 @@ Grid<sub_domain_t,2> gridB(SubDomGridSize);
 
 // Data structures for observation data has enough room for all the nodal
 // points accross the whole domain at all timestamps.
-std::unique_ptr<cube_t> obsv_glob;
+unique_ptr<cube_t> obsv_glob;
 
 // Create data structure for storing data assimilation matrices.
 mat_grid_t P(SubDomGridSize);    // state covariance matrix
@@ -83,9 +83,11 @@ vec_grid_t Obvs(SubDomGridSize);
 vec_grid_t forecast(SubDomGridSize);
 vec_grid_t BLUE(SubDomGridSize);
 
+unique_ptr< IModel<NELEMS_X,NELEMS_Y> > model;
+
 // Create Kalman filters for each sub-domain.
 using Kalman_t = amdados::app::utils::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
-using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
+using Kalman_ptr_t = unique_ptr<Kalman_t>;
 Grid<Kalman_ptr_t,2> kalman_filters(SubDomGridSize);
 
 //-------------------------------------------------------------------------------------------------
@@ -106,8 +108,11 @@ void ReadObservations(cube_t & obsver, const std::string & filename, int observi
             int i = 0, j = 0;
             double val = 0;
             file >> i >> j >> val;
- //           assert_true((i == x) && (j == y));
-//                << "mismatch between the grid and observation layouts" << endl;
+            if (!((i == x) && (j == y))) {
+                assert_true(0) << "mismatch between the grid and observation layouts" << endl;
+            }
+            //assert_true((i == x) && (j == y))     // compilation BUG
+            //<< "mismatch between the grid and observation layouts" << endl;
             obsver[{i,j,t}] = val;
         }}
     }
@@ -242,21 +247,21 @@ void InitSolver(const Configuration & conf)
     pfor(Zero, SubDomGridSize, [&](const point2d_t & pos) {
         // initialize all cells on the 100m resolution
         gridA[pos].setActiveLayer(L_100m);
-     //   A[pos].DiscretizeElements();
-        // here we compute quadrature for each grid
-
-        // initialize the concentration
-        //gridA[pos].forAllActiveNodes([](const point2d_t & pos, double & value) {
-        //(void)pos;
-        //value = 0.0;        // initialize rho with 0
-        //});
-        gridA[pos].forAllActiveNodes([](double & value) { value = 0.0; });  // rho = 0
+        // initialize the concentration, rho = 0
+        gridA[pos].forAllActiveNodes([](double& value) { value = 0.0; });
     });
 
     // Set initial covariance matrices in each sub-domain.
     pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
         GetModelCovar(conf, P[idx]);
     });
+
+    // Allocate a placeholder for the entire observation data and read the observations.
+    const int T = conf.asInt("integration_T");
+    assert_true((0 < T) && (T < numeric_limits<int>::max()/10)) << "wrong T" << endl;
+    obsv_glob.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, T + 1}));
+    ReadObservations(*obsv_glob, conf.asString("observation_file"),
+                                 conf.asInt("observation_interval"));
 
     // Bring in a high concentration of substance at some spot.
     gridA[{spot_x / NELEMS_X, spot_y / NELEMS_Y}].getLayer<L_100m>()
@@ -272,10 +277,123 @@ void InitSolver(const Configuration & conf)
         kalman_filters[idx]->Init(forecast[idx], P[idx]);
     });
 
-    // Allocate a placeholder for the entire observation data.
-    const int T = conf.asInt("integration_T");
-    assert_true((0 < T) && (T < numeric_limits<int>::max()/10)) << "wrong T" << endl;
-    obsv_glob.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, T + 1}));
+    // Initialize the model.
+    model.reset(new EulerFiniteDifferenceModel<NELEMS_X,NELEMS_Y>(conf));
+}
+
+//-------------------------------------------------------------------------------------------------
+// steps for the solver;
+// 1) Need to initialize all domains to zero (& all layers I would think L100, L20 and L4)
+// 2) Need to distribute work across processors for solution of advection diffusion
+//      In this manner it would be relatively straightforward task to implement the solver within
+//      each subdomain
+// 3) Need to integrate data assimilation schemes from kalman_filter.h and filter.h
+//      Data structures are in place and simply needs to be integrated with appropriate data from
+//      advection-diffusion process
+// 4) Need to integrate adaptive meshing capabilities
+//      Right now this links with (3): If data is available then resolve solution to higher
+//      fidelity grid (down to 20m) and assimilate at this scale. Then solution returns to 100m
+//      grid and solution continues. For time being; advection-diffusion
+//      always happens on the 100m grid and we resolve at higher resolution only for data
+//      assimilation
+//-------------------------------------------------------------------------------------------------
+void Compute(const Configuration & conf)
+{
+    const int save_int = conf.asInt("output_every_nth_time_step");
+    const double time_delta = conf.asInt("time_delta");
+    const double space_delta = conf.asInt("space_delta");
+
+    // Time integration.
+    for (int t = 0, T = conf.asInt("integration_T"); t <= T; t++) {
+        std::cout << "Time = " << t << endl << flush;
+        if ((save_int > 0) && (t % save_int == 0)) SaveGrid2D(conf, "state", t, gridA);
+
+        // Go from time t to t+1. Compute next time step => store it in B.
+        pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+            // "curr" is defined as grid A[i,j] and distributed across shared memory.
+            // "next" is the next state estimation.
+            const auto & curr = gridA[idx];
+            auto &       next = gridB[idx];
+
+            // Initially two states coincide.
+            next = curr;
+
+            int    nx = 1;                      // TODO: description?
+            int    ny = 1;                      // TODO: description?
+            double timept = t * time_delta;     // TODO: description?
+            double flowu = utils::mu1(timept);  // TODO: description?
+            double flowv = utils::mu2(timept);  // TODO: description?
+
+            for (Direction dir : { Up, Down, Left, Right }) {
+                // Skip global boarder; for example, if direction == up and no neighbour to south.
+                if (dir == Up    && idx[0] == 0)                   continue;
+                if (dir == Down  && idx[0] == SubDomGridSize[0]-1) continue;
+                if (dir == Left  && idx[1] == 0)                   continue;
+                if (dir == Right && idx[1] == SubDomGridSize[1]-1) continue;
+
+                // Obtain the local boundary.
+                auto local_boundary = curr.getBoundary(dir);
+
+                // Obtain the neighboring boundary.
+                auto remote_boundary =
+                    (dir == Up)   ? gridA[idx + point2d_t{-1,0}].getBoundary(Down)  : // remote boundary is bottom strip of neighbour
+                    (dir == Down) ? gridA[idx + point2d_t{ 1,0}].getBoundary(Up)    : // remote boundary is top of neighbour
+                    (dir == Left) ? gridA[idx + point2d_t{0,-1}].getBoundary(Right) : // remote boundary is left of domain
+                                    gridA[idx + point2d_t{0, 1}].getBoundary(Left);
+
+                // Compute local flow in domain to decide if flow in or out of domain.
+                if (dir == Down) ny = -1; // flow into domain from below
+                if (dir == Left) nx = -1; // flow into domain from left
+                double flow_boundary =  nx*flowu + ny*flowv;
+                // TODO: scale the boundary vectors to the same resolution
+
+                // Compute updated boundary.
+                assert_true(local_boundary.size() == remote_boundary.size());
+                if (flow_boundary < 0) {  // then flow into domain need to update boundary with neighbour value
+                    for (size_t i = 0; i < local_boundary.size(); i++) {
+                        // for now, we just take the average
+                        // need to update this to account for flow direction (Fearghal)
+                        local_boundary[i] = remote_boundary[i];
+                    }
+                }
+                //	std::cout << "DIRECTION: " << (dir == Up ? "Up" :
+                //	(dir == Down ? "Down" : (dir == Left ? "Left" : "Right"))) << std::endl;
+
+                // Update boundary in result.
+                next.setBoundary(dir, local_boundary);
+            }
+
+            //// 2) run iterations of runge-kutta
+            //double error = 1000;
+            //while (error > 0.1) {           // runge kutta iteration on sub-domain
+                //error = applyRungeKutta(res,flowu,flowv,delta,stepsize);
+            //}
+
+            // For now data assimilation is done at periodic timesteps.
+            if (t % 1 == 0) {
+                // Compute Mapping matrix H to project from observation to model grid [nelems_tot,nelems_tot]
+                ComputeH(H[idx]);
+                // Estimate noise/uncertainty metrics of observations [nelems_tot,nelems_tot]
+                ComputeR(R[idx]);
+                // Extract appropriate observation data for subdomain and time [nelems_tot * nelems_tot]
+                GetObservation(Obvs[idx], *obsv_glob, t, idx);
+
+                utils::Reshape2Dto1D<NELEMS_X, NELEMS_Y>(forecast[idx], next.getLayer<L_100m>());
+
+                auto ModelAdapter = [&](DA_vector_t & state, DA_matrix_t & covar) {
+                    model->Update(flowu, flowv, time_delta, space_delta, state, covar);
+                };
+                Q[idx] = R[idx];    // TODO: this is stub: same noise covariances
+
+                Kalman_t * kf = kalman_filters[idx].get();
+                kf->IterateWithModel(ModelAdapter, Q[idx], H[idx], R[idx], Obvs[idx]);
+                BLUE[idx] = kf->GetStateVector();
+                P[idx] = kf->GetCovariance();
+
+                utils::Reshape1Dto2D<NELEMS_X, NELEMS_Y>(next.getLayer<L_100m>(), BLUE[idx]);
+            }
+        }); // end pfor
+    }
 }
 
 //} // anonymous namespace

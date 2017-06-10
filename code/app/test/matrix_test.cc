@@ -248,11 +248,11 @@ double TestMatrixMulVector(double max_rel_err)
 TEST(MatrixTests, Basic)
 {
     // Read configuration settings.
-    gConf.ReadConfigFile("../../amdados_unittest.conf");
+    gConf.ReadConfigFile("../../amdados.conf");
     gConf.PrintParameters();
-    MakeDirectory(gConf.asCString("output_dir"));
+    MakeDirectory(gConf.asCString("test_output_dir"));
 
-    std::string filename = gConf.asString("output_dir") + "/matrix_test.log";
+    std::string filename = gConf.asString("test_output_dir") + "/matrix_test.log";
     std::fstream fout(filename, std::ios::out | std::ios::trunc);
     assert_true(fout.good()) << "failed to oped the summary file: " << filename << std::endl;
 

@@ -31,6 +31,7 @@ namespace app {
 using ::std::endl;
 using ::std::flush;
 using ::std::numeric_limits;
+using ::std::unique_ptr;
 
 } // end namespace app
 } // end namespace amdados

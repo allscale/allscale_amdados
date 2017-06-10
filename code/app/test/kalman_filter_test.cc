@@ -24,18 +24,18 @@ static Configuration gConf;         // a single global configuration
 TEST(KalmanFilter, Basic)
 {
     // Read configuration settings.
-    gConf.ReadConfigFile("../../amdados_unittest.conf");
+    gConf.ReadConfigFile("../../amdados.conf");
     gConf.PrintParameters();
-    MakeDirectory(gConf.asCString("output_dir"));
+    MakeDirectory(gConf.asCString("test_output_dir"));
 
     // Open a file for printing summary of the test.
-    std::string summaryFileName = gConf.asString("output_dir") + "/kalman_summary_test.log";
+    std::string summaryFileName = gConf.asString("test_output_dir") + "/kalman_summary_test.log";
     std::fstream summaryFile(summaryFileName, std::ios::out | std::ios::trunc);
     assert_true(summaryFile.good())
         << "failed to oped the summary file: " << summaryFileName << std::endl;
 
     // Open a file for storing the results of particle path tracking by the Kalman filter.
-    std::string trackFileName = gConf.asString("output_dir") + "/kalman_filter_test.out";
+    std::string trackFileName = gConf.asString("test_output_dir") + "/kalman_filter_test.out";
     std::fstream trackFile(trackFileName, std::ios::out | std::ios::trunc);
     assert_true(trackFile.good())
         << "failed to oped the track file: " << trackFileName << std::endl;

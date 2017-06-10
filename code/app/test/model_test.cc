@@ -116,7 +116,7 @@ void TestEulerFiniteDifference(double & max_rel_diff)
 TEST(ModelTests, Basic)
 {
     // Read configuration settings.
-    gConf.ReadConfigFile("../../amdados_unittest.conf");
+    gConf.ReadConfigFile("../../amdados.conf");
     gConf.PrintParameters();
     MakeDirectory(gConf.asCString("output_dir"));
 
