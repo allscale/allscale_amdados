@@ -17,11 +17,12 @@
 #include "amdados/app/model/i_model.h"
 #include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/model/euler_finite_diff.h"
-
-using namespace amdados::app::utils;
+#include "i_solver.h"
 
 namespace amdados {
 namespace app {
+
+using namespace ::amdados::app::utils;
 
 using ::allscale::api::user::pfor;
 using ::allscale::api::user::data::Grid;
@@ -55,46 +56,83 @@ using DA_vector_t = Vector<SUB_PROBLEM_SIZE>;
 using DA_matrix_t = Matrix<SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
 using DA_sp_matrix_t = SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>;
 
-using sub_domain_t = Cell<double,sub_domain_config_t>;
+using sub_domain_t = Grid< Cell<double,sub_domain_config_t>, 2 >;
 using vec_grid_t = Grid<DA_vector_t,2>;
 using mat_grid_t = Grid<DA_matrix_t,2>;
 
-// Zero-coordinate point and global grid size counted in sub-domains.
+// Origin and global grid size, which define the logical coordinates of the first
+// sub-domain and the number of a sub-domains in each dimension respectively.
 const point2d_t Origin = 0;
 const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 
-// Create the overall grid. Two similar grids (A and B) are created
-// for convenience to alternate between successive states.
-//XXX:???: A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
-Grid<sub_domain_t,2> gridA(SubDomGridSize);
-Grid<sub_domain_t,2> gridB(SubDomGridSize);
-
-// Data structures for observation data has enough room for all the nodal
-// points accross the whole domain at all timestamps.
-unique_ptr<cube_t> obsv_glob;
-
-// Create data structure for storing data assimilation matrices.
-mat_grid_t P(SubDomGridSize);    // state covariance matrix
-mat_grid_t R(SubDomGridSize);    // observation noise covariance matrix
-mat_grid_t Q(SubDomGridSize);    // process noise covariance matrix
-mat_grid_t H(SubDomGridSize);    // projector from model space to observation space
-
-// Create data structure for storing data assimilation vectors.
-vec_grid_t Obvs(SubDomGridSize);
-vec_grid_t forecast(SubDomGridSize);
-vec_grid_t posterior(SubDomGridSize);
-
-unique_ptr< IModel<NELEMS_X,NELEMS_Y> > model;
-
 // Create Kalman filters for each sub-domain.
-using Kalman_t = amdados::app::utils::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
-using Kalman_ptr_t = unique_ptr<Kalman_t>;
-Grid<Kalman_ptr_t,2> kalman_filters(SubDomGridSize);
+using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
+
+//=================================================================================================
+// Implementation of the solver that uses Euler time integration (EI), finite-difference
+// discretization (FD) and Kalman Filter (KF) for data assimilation.
+//=================================================================================================
+class Solver_EI_FD_KF : public ISolver
+{
+private:
+    // Create the overall grid. Two similar grids are created
+    // for convenience to alternate between successive states.
+    //XXX:???: A is of form A[{ndox,ndomy}].layer[{xElCount,yElcount}]
+    sub_domain_t m_curr_state;
+    sub_domain_t m_next_state;
+
+    // Data structures for observation data has enough room for all the nodal
+    // points accross the whole domain at all timestamps.
+    std::unique_ptr<cube_t> m_all_observations;
+
+    // Data structure for storing data assimilation matrices.
+    mat_grid_t m_P;    // state covariance matrix
+    mat_grid_t m_R;    // observation noise covariance matrix
+    mat_grid_t m_Q;    // process noise covariance matrix
+    mat_grid_t m_H;    // projector from model space to observation space
+
+    // Data structure for storing data intermediate assimilation vectors.
+    vec_grid_t m_observation_vec;
+    vec_grid_t m_state_vec;
+
+    // Process model which is defined by the time-integration method.
+    std::unique_ptr< IModel<NELEMS_X,NELEMS_Y> > m_model;
+
+    // Kalman filters for each sub-domain.
+    Grid<Kalman_ptr_t,2> m_kalman_filters;
+
+public:
+//-------------------------------------------------------------------------------------------------
+// Constructor.
+//-------------------------------------------------------------------------------------------------
+Solver_EI_FD_KF(const Configuration &)
+: m_curr_state(SubDomGridSize),
+  m_next_state(SubDomGridSize),
+  m_all_observations(),
+  m_P(SubDomGridSize),
+  m_R(SubDomGridSize),
+  m_Q(SubDomGridSize),
+  m_H(SubDomGridSize),
+  m_observation_vec(SubDomGridSize),
+  m_state_vec(SubDomGridSize),
+  m_model(),
+  m_kalman_filters(SubDomGridSize)
+{
+}
+
+//-------------------------------------------------------------------------------------------------
+// Destructor.
+//-------------------------------------------------------------------------------------------------
+virtual ~Solver_EI_FD_KF()
+{
+}
 
 //-------------------------------------------------------------------------------------------------
 // Function reads observations from a file.
 // TODO: right now assume data available every timestep; need to update
 //-------------------------------------------------------------------------------------------------
+IBM_NOINLINE
 void ReadObservations(cube_t & obsver, const std::string & filename, int observint)
 {
     assert_true(observint == 1) << "so far, the observation interval must be equal to 1" << endl;
@@ -121,6 +159,7 @@ void ReadObservations(cube_t & obsver, const std::string & filename, int observi
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+IBM_NOINLINE
 // TODO: introduce a function to read flowfield data
 // Read of form I,J,U,V and map to grid of amdados application
 void ReadFlows(cube_t& /*flowfield*/,
@@ -130,8 +169,9 @@ void ReadFlows(cube_t& /*flowfield*/,
 //-------------------------------------------------------------------------------------------------
 // Utility function saves the current state.
 //-------------------------------------------------------------------------------------------------
+IBM_NOINLINE
 void SaveGrid2D(const Configuration & conf, const std::string & title, int t,
-                const Grid<sub_domain_t,2> & grid)
+                const sub_domain_t & grid)
 {
     std::stringstream ss;
     ss << conf.asString("output_dir") << "/" << title
@@ -154,6 +194,7 @@ void SaveGrid2D(const Configuration & conf, const std::string & title, int t,
 // Function computes the model covariance matrix as function of exponential distance.
 // XXX: what does it mean: Follow same structure as that implemented for Runga Kutta solver
 //-------------------------------------------------------------------------------------------------
+IBM_NOINLINE
 void GetModelCovar(const Configuration & conf, DA_matrix_t & covar)
 {
     // TODO: check matrix sizes.
@@ -169,31 +210,33 @@ void GetModelCovar(const Configuration & conf, DA_matrix_t & covar)
         covar[{i,i}] = var;
         for (int k = i + 1; k < static_cast<int>(SUB_PROBLEM_SIZE); ++k) {
             ind2sub(k, x2, y2);
-            covar[{k,i}] = covar[{i,k}] = var * exp(- Square((x1 - x2)/Rx) - Square((y1 - y2)/Ry));
+            covar[{k,i}] =
+            covar[{i,k}] = var * exp(- Square((x1 - x2)/Rx)
+                                     - Square((y1 - y2)/Ry));
         }
     }
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function computes the matrix of observations.
+// Function computes the matrix of observations; the matrix can be sparse.
 //-------------------------------------------------------------------------------------------------
-template<size_t MSIZE>
-void ComputeH(Matrix<MSIZE,MSIZE> & H)
+IBM_NOINLINE
+void ComputeH(DA_matrix_t & H)
 {
     MakeIdentityMatrix(H);
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function computes the observation noise covariance matrix.
+// Function computes the observation noise covariance matrix; the matrix can be sparse.
 //-------------------------------------------------------------------------------------------------
-template<size_t MSIZE>
-void ComputeR(Matrix<MSIZE,MSIZE> & R)
+IBM_NOINLINE
+void ComputeR(DA_matrix_t & R)
 {
     // Random values between 1 and 2, otherwise singular matrices can happen down the road.
     std::mt19937                           gen(std::time(nullptr));
     std::uniform_real_distribution<double> distrib(1.0, 2.0);
 
-    for (int i = 0; i < static_cast<int>(MSIZE); ++i) {
+    for (int i = 0; i < static_cast<int>(SUB_PROBLEM_SIZE); ++i) {
         R[{i,i}] = distrib(gen);
     }
 }
@@ -201,15 +244,16 @@ void ComputeR(Matrix<MSIZE,MSIZE> & R)
 //-------------------------------------------------------------------------------------------------
 // Function gets the observations at certain time and returns them unrolled into a vector.
 //-------------------------------------------------------------------------------------------------
-void GetObservation(DA_vector_t & obsver_vec, const cube_t & obsver,
-                    int timestep, const point2d_t & domain)
+IBM_NOINLINE
+void GetObservation(DA_vector_t & obsv_vec, int timestep, const point2d_t & domain)
 {
     subdomain_sub2ind_t sub2ind;
+    const cube_t & all_obsv = *m_all_observations;
     for (int x = 0; x < NELEMS_X; ++x) {
         int xg = x + domain[0] * NELEMS_X;                          // global abscissa
         for (int y = 0; y < NELEMS_Y; ++y) {
             int yg = y + domain[1] * NELEMS_Y;                      // global ordinate
-            obsver_vec[{sub2ind(x,y)}] = obsver[{xg,yg,timestep}];
+            obsv_vec[{sub2ind(x,y)}] = all_obsv[{xg,yg,timestep}];
         }
     }
 }
@@ -232,7 +276,8 @@ double mu2(double timestep)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-void InitSolver(const Configuration & conf)
+IBM_NOINLINE
+virtual void InitSolver(const Configuration & conf)
 {
     // Check the geometry.
     assert_true(conf.asInt("num_domains_x") == NUM_DOMAINS_X) << "num_domains_x mismatch" << endl;
@@ -249,51 +294,50 @@ void InitSolver(const Configuration & conf)
 
     // Set all the matrices and vectors to zero.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        FillMatrix(gridA[idx].getLayer<L_100m>(), 0.0);
-        FillMatrix(gridB[idx].getLayer<L_100m>(), 0.0);
-        FillMatrix(P[idx], 0.0);
-        FillMatrix(R[idx], 0.0);
-        FillMatrix(Q[idx], 0.0);
-        FillMatrix(H[idx], 0.0);
-        FillVector(Obvs[idx], 0.0);
-        FillVector(forecast[idx], 0.0);
-        FillVector(posterior[idx], 0.0);
+        FillMatrix(m_curr_state[idx].getLayer<L_100m>(), 0.0);
+        FillMatrix(m_next_state[idx].getLayer<L_100m>(), 0.0);
+        FillMatrix(m_P[idx], 0.0);
+        FillMatrix(m_R[idx], 0.0);
+        FillMatrix(m_Q[idx], 0.0);
+        FillMatrix(m_H[idx], 0.0);
+        FillVector(m_observation_vec[idx], 0.0);
+        FillVector(m_state_vec[idx], 0.0);
     });
 
     // TODO: comment.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & pos) {
         // initialize all cells on the 100m resolution
-        gridA[pos].setActiveLayer(L_100m);
+        m_curr_state[pos].setActiveLayer(L_100m);
         // initialize the concentration, rho = 0
-        gridA[pos].forAllActiveNodes([](double & value) { value = 0.0; });
+        m_curr_state[pos].forAllActiveNodes([](double & value) { value = 0.0; });
     });
 
     // Set initial covariance matrices in each sub-domain.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        GetModelCovar(conf, P[idx]);
+        GetModelCovar(conf, m_P[idx]);
     });
 
     // Allocate a placeholder for the entire observation data and read the observations.
     const int T = conf.asInt("integration_T");
     assert_true((0 < T) && (T < numeric_limits<int>::max()/10)) << "wrong T" << endl;
-    obsv_glob.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, T + 1}));
-    ReadObservations(*obsv_glob, conf.asString("observation_file"),
-                                 conf.asInt("observation_interval"));
+    m_all_observations.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, T + 1}));
+    ReadObservations(*m_all_observations, conf.asString("observation_file"),
+                                          conf.asInt("observation_interval"));
 
     // Bring in a high concentration of substance at some spot.
-    gridA[{spot_x / NELEMS_X, spot_y / NELEMS_Y}].getLayer<L_100m>()
-         [{spot_x % NELEMS_X, spot_y / NELEMS_Y}] = conf.asDouble("spot_density");
+    m_curr_state[{spot_x / NELEMS_X, spot_y / NELEMS_Y}].getLayer<L_100m>()
+                [{spot_x % NELEMS_X, spot_y / NELEMS_Y}] = conf.asDouble("spot_density");
 
 //  TODO: load the flows computed previously
 //  utils::Grid<double,3> flows({ num_domains_x, num_domains_y, T });
 
     // Initialize the sub-domain filters.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        kalman_filters[idx].reset(new Kalman_t());
+        m_kalman_filters[idx].reset(new Kalman_t());
     });
 
     // Initialize the model.
-    model.reset(new EulerFiniteDifferenceModel<NELEMS_X,NELEMS_Y>(conf));
+    m_model.reset(new EulerFiniteDifferenceModel<NELEMS_X,NELEMS_Y>(conf));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -312,7 +356,8 @@ void InitSolver(const Configuration & conf)
 //      always happens on the 100m grid and we resolve at higher resolution only for data
 //      assimilation
 //-------------------------------------------------------------------------------------------------
-void Compute(const Configuration & conf)
+IBM_NOINLINE
+virtual void RunSolver(const Configuration & conf)
 {
     const int save_int = conf.asInt("output_every_nth_time_step");
     const double time_delta = conf.asInt("time_delta");
@@ -321,14 +366,14 @@ void Compute(const Configuration & conf)
     // Time integration.
     for (int t = 0, T = conf.asInt("integration_T"); t <= T; t++) {
         std::cout << "Time = " << t << endl << flush;
-        if ((save_int > 0) && (t % save_int == 0)) SaveGrid2D(conf, "state", t, gridA);
+        if ((save_int > 0) && (t % save_int == 0)) SaveGrid2D(conf, "state", t, m_curr_state);
 
         // Go from time t to t+1. Compute next time step => store it in B.
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-            // "curr" is defined as grid A[i,j] and distributed across shared memory.
+            // "curr" is defined as on a grid and distributed across shared memory.
             // "next" is the next state estimation.
-            const auto & curr = gridA[idx];
-            auto &       next = gridB[idx];
+            const auto & curr = m_curr_state[idx];
+            auto &       next = m_next_state[idx];
 
             // Initially two states coincide.
             next = curr;
@@ -351,10 +396,10 @@ void Compute(const Configuration & conf)
 
                 // Obtain the neighboring boundary.
                 auto remote_boundary =
-                    (dir == Up)   ? gridA[idx + point2d_t{-1,0}].getBoundary(Down)  : // remote boundary is bottom strip of neighbour
-                    (dir == Down) ? gridA[idx + point2d_t{ 1,0}].getBoundary(Up)    : // remote boundary is top of neighbour
-                    (dir == Left) ? gridA[idx + point2d_t{0,-1}].getBoundary(Right) : // remote boundary is left of domain
-                                    gridA[idx + point2d_t{0, 1}].getBoundary(Left);
+                    (dir == Up)   ? m_curr_state[idx + point2d_t{-1,0}].getBoundary(Down)  : // remote boundary is bottom strip of neighbour
+                    (dir == Down) ? m_curr_state[idx + point2d_t{ 1,0}].getBoundary(Up)    : // remote boundary is top of neighbour
+                    (dir == Left) ? m_curr_state[idx + point2d_t{0,-1}].getBoundary(Right) : // remote boundary is left of domain
+                                    m_curr_state[idx + point2d_t{0, 1}].getBoundary(Left);
 
                 // Compute local flow in domain to decide if flow in or out of domain.
                 if (dir == Down) ny = -1; // flow into domain from below
@@ -378,65 +423,48 @@ void Compute(const Configuration & conf)
                 next.setBoundary(dir, local_boundary);
             }
 
-            //// 2) run iterations of runge-kutta
-            //double error = 1000;
-            //while (error > 0.1) {           // runge kutta iteration on sub-domain
-                //error = applyRungeKutta(res,flowu,flowv,delta,stepsize);
-            //}
-
             // For now data assimilation is done at periodic timesteps.
             if (t % 1 == 0) {
                 // Compute mapping matrix H to project from model to observation grid.
-                ComputeH(H[idx]);
+                ComputeH(m_H[idx]);
                 // Estimate measurement noise covariance matrix.
-                ComputeR(R[idx]);
+                ComputeR(m_R[idx]);
                 // Extract appropriate observation data for subdomain and time.
-                GetObservation(Obvs[idx], *obsv_glob, t, idx);
+                GetObservation(m_observation_vec[idx], t, idx);
                 // Estimate process noise covariance matrix.
-                Q[idx] = R[idx];    // TODO: this is stub: same noise covariances
+                m_Q[idx] = m_R[idx];    // TODO: this is stub: same noise covariances
 
-                // Get current state.
-                utils::Reshape2Dto1D<NELEMS_X, NELEMS_Y>(forecast[idx], next.getLayer<L_100m>());
+                // Unroll the state into a vector, so the Kalman can work with it.
+                utils::Reshape2Dto1D<NELEMS_X,NELEMS_Y>(m_state_vec[idx], next.getLayer<L_100m>());
 
-                // Ligh-weight adapter helps to get the model matrix from within Kalman framework.
-                //struct ModelAdapter {
-                    //ModelAdapter()
-                    //const SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> & operator()() {
-                        //return model->ModelMatrix(flowu, flowv, time_delta, space_delta, t);
-                    //}
-                //}
-                auto ModelAdapter = [&]() -> const DA_sp_matrix_t & {
-                    const DA_sp_matrix_t & spmat =
-                            model->ModelMatrix(flowu, flowv, time_delta, space_delta, t);
-                    return spmat;
-                };
+                // Update the Kalman filter using the process model and current process matrices.
+                Kalman_t * kf = m_kalman_filters[idx].get();
+                kf->Iterate(m_model->ModelMatrix(flowu, flowv, time_delta, space_delta, t),
+                            m_Q[idx], m_H[idx], m_R[idx], m_observation_vec[idx],
+                            m_state_vec[idx], m_P[idx]);
 
-                // Upadate the Kalman filter using the process model and current process matrices.
-                Kalman_t * kf = kalman_filters[idx].get();
-                kf->IterateWithModel(ModelAdapter, Q[idx], H[idx], R[idx], Obvs[idx],
-                                     forecast[idx], P[idx]);
-                //// Get a-posteriory estimationis for the state and covariance.
-                //posterior[idx] = kf->GetStateVector();
-                //P[idx] = kf->GetCovariance();
-
-                // next state = posterior.
-                utils::Reshape1Dto2D<NELEMS_X, NELEMS_Y>(next.getLayer<L_100m>(), forecast[idx]);
+                // Put updated state_vec back to the next state.
+                utils::Reshape1Dto2D<NELEMS_X,NELEMS_Y>(next.getLayer<L_100m>(), m_state_vec[idx]);
             }
         }); // end pfor
 
-        // swap A and B
-        //gridA.swap(gridB);
+        // Update the current state by the new estimation.
+        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+            m_curr_state[idx] = m_next_state[idx];
+        });
     }
 }
+
+}; // class Solver_EI_FD_KF
 
 //} // anonymous namespace
 
 //-------------------------------------------------------------------------------------------------
+// Function creates an instance of the solver.
 //-------------------------------------------------------------------------------------------------
-void AmdadosSolver(const Configuration & conf)
+std::unique_ptr<ISolver> CreateSolver_EI_FD_KF(const utils::Configuration & conf)
 {
-    InitSolver(conf);
-    Compute(conf);
+    return std::unique_ptr<ISolver>(new Solver_EI_FD_KF(conf));
 }
 
 } // end namespace app

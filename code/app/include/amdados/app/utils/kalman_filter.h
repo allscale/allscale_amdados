@@ -55,7 +55,9 @@ KalmanFilter() : m_chol()
 
 //-------------------------------------------------------------------------------------------------
 // Function makes an iteration of Kalman filter which includes prediction and correction phases.
-// \param  A  model transition matrix: x_k = A_k * x_{k-1} + w_{k-1}.
+// It is assumed that the model adapter can compute the prior estimations of state and covariance,
+// e.g. for the linear transition operator A: x_prior = A * x, P_prior = A * P * A^t.
+// \param  A  model matrix for computing the prior estimations of state and covariance.
 // \param  Q  process noise (w_k) covariance.
 // \param  H  observation model: z_k = H_k * x_k + v_k.
 // \param  R  measurement noise (v_k) covariance.
@@ -63,44 +65,17 @@ KalmanFilter() : m_chol()
 // \param  x  in: current state; out: new state.
 // \param  P  in: current covariance; out: new covariance.
 //-------------------------------------------------------------------------------------------------
-void Iterate(const matrix_t & A, const matrix_t & Q,
+template<typename MODEL_MATRIX>
+void Iterate(MODEL_MATRIX & A, const matrix_t & Q,
              const matrix_MxN_t & H, const matrix_MxM_t & R,
              const vector_obs_t & z,
              vector_t & x, matrix_t & P)
 {
-    // x_prior = A * x
-    MatVecMult(m_x_prior, A, x);
-    // P_prior = A * P * A^t + Q
-    MatMultTransposed(m_PAt, P, A);
-    MatMult(m_P_prior, A, m_PAt);
-    AddMatrices(m_P_prior, m_P_prior, Q);
-    // Estimate posterior state and covariance.
-    PosteriorEstimation(H, R, z, x, P);
-}
-
-//-------------------------------------------------------------------------------------------------
-// Function makes an iteration of Kalman filter which includes prediction and correction phases.
-// It is assumed that the model adapter can compute the prior estimations of state and covariance,
-// e.g. for the linear transition operator A: x_prior = A * x, P_prior = A * P * A^t.
-// \param  model  model adapter for computing the prior estimations of state and covariance.
-// \param  Q      process noise (w_k) covariance.
-// \param  H      observation model: z_k = H_k * x_k + v_k.
-// \param  R      measurement noise (v_k) covariance.
-// \param  z      vector of observations.
-// \param  x      in: current state; out: new state.
-// \param  P      in: current covariance; out: new covariance.
-//-------------------------------------------------------------------------------------------------
-template<typename MODEL>
-void IterateWithModel(MODEL & model, const matrix_t & Q,
-                      const matrix_MxN_t & H, const matrix_MxM_t & R,
-                      const vector_obs_t & z,
-                      vector_t & x, matrix_t & P)
-{
     // Model updates the state and covariance:
-    // x_prior = A * x, P_prior = A * P * A^t, where A is some linear operator (matrix here)
+    // x_prior = A * x, P_prior = A * P * A^t, where A is some linear operator (matrix here).
     m_x_prior = x;
     m_P_prior = P;
-    UpdateState(model(), m_x_prior, m_P_prior);
+    UpdateState(A, m_x_prior, m_P_prior);
     // P_prior += Q
     AddMatrices(m_P_prior, m_P_prior, Q);
     // Estimate posterior state and covariance.
@@ -152,56 +127,6 @@ void PosteriorEstimation(const matrix_MxN_t & H, const matrix_MxM_t & R, const v
     // Correct symmetry loss due to round-off errors.
     Symmetrize(P);
 }
-
-
-
-/*//>>>>> TODO: temporary function <<<<<*/
-/*public:*/
-/*void Iterate(const vector_t & x_prior, const matrix_t & Q,*/
-/*const matrix_MxN_t & H, const matrix_MxM_t & R, const vector_obs_t & z)*/
-/*{*/
-/*assert(m_ready);*/
-
-/*// In conventional Kalman filter we would do: x_prior = A * x, but here we just copy.*/
-/*m_x_prior = x_prior;*/
-
-/*// In conventional Kalman filter we would do: P_prior = A * P * A^t + Q, but here A = I.*/
-/*AddMatrices(m_P_prior, P, Q);*/
-
-/*// y = z - H * x_prior*/
-/*MatVecMult(m_y, H, m_x_prior);*/
-/*SubtractVectors(m_y, z, m_y);*/
-
-/*// S = H * P_prior * H^t + R*/
-/*MatMultTransposed(m_PHt, m_P_prior, H);*/
-/*MatMult(m_S, H, m_PHt);*/
-/*AddMatrices(m_S, m_S, R);*/
-
-/*// Correct symmetry loss due to round-off errors.*/
-/*Symmetrize(m_S);*/
-
-/*// Compute Cholesky decomposition  S = L * L^t  to facilitate matrix inversion.*/
-/*m_chol.ComputeDecomposition(m_S);*/
-
-/*// m_invSy = S^{-1} * y*/
-/*m_chol.Solve(m_invSy, m_y);*/
-
-/*// x  =  x_prior + K * y  =  x_prior + P_prior * H^t * S^{-1} * y*/
-/*MatVecMult(x, m_PHt, m_invSy);*/
-/*AddVectors(x, x, m_x_prior);*/
-
-/*// m_invSHP = S^{-1} * H * P_prior*/
-/*GetTransposed(m_HP, m_PHt);*/
-/*m_chol.BatchSolve(m_invSHP, m_HP);*/
-
-/*// P  =  (I - K * H) * P_prior  =  P_prior - P_prior * H^t * S^{-1} * H * P_prior.*/
-/*MatMult(P, m_PHt, m_invSHP);*/
-/*SubtractMatrices(P, m_P_prior, P);*/
-
-/*// Correct symmetry loss due to round-off errors.*/
-/*Symmetrize(P);*/
-/*}*/
-
 
 }; // class KalmanFilter
 
