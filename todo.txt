@@ -38,11 +38,19 @@ what does it mean: Follow same structure as that implemented for Runga Kutta sol
 
 13) in "amdados_grid.h" using namespace allscale::api::user;  // Albert commented
 
-14) solver.h:  const auto& cur = A[idx]; 
+14) solver.h:  const auto& cur = A[idx];
                auto& res = A[idx];   <--- B?
-               
-15) 
 
+15) Different extensions: cc, cxx, cpp
+
+16) Too many nestings in the project structure.
+17) namespace "app" should go before "amdados"
+
+18) Can we do reshape without explicit copying?
+
+19) What do the functions mu1() and mu2() stand for?
+
+20)
 
 //////////////////////////////////////////////////////////////////////////////////////
 Questions:

@@ -14,8 +14,8 @@
 #include "amdados/app/utils/sparse_matrix.h"
 #include "amdados/app/utils/configuration.h"
 #include "amdados/app/utils/cholesky.h"
-#include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/model/i_model.h"
+#include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/model/euler_finite_diff.h"
 
 using namespace amdados::app::utils;
@@ -53,13 +53,14 @@ using size3d_t = point3d_t;
 using cube_t = Grid<double,3>;
 using DA_vector_t = Vector<SUB_PROBLEM_SIZE>;
 using DA_matrix_t = Matrix<SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE>;
+using DA_sp_matrix_t = SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>;
 
 using sub_domain_t = Cell<double,sub_domain_config_t>;
 using vec_grid_t = Grid<DA_vector_t,2>;
 using mat_grid_t = Grid<DA_matrix_t,2>;
 
 // Zero-coordinate point and global grid size counted in sub-domains.
-const point2d_t Zero = 0;
+const point2d_t Origin = 0;
 const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 
 // Create the overall grid. Two similar grids (A and B) are created
@@ -81,7 +82,7 @@ mat_grid_t H(SubDomGridSize);    // projector from model space to observation sp
 // Create data structure for storing data assimilation vectors.
 vec_grid_t Obvs(SubDomGridSize);
 vec_grid_t forecast(SubDomGridSize);
-vec_grid_t BLUE(SubDomGridSize);
+vec_grid_t posterior(SubDomGridSize);
 
 unique_ptr< IModel<NELEMS_X,NELEMS_Y> > model;
 
@@ -214,6 +215,22 @@ void GetObservation(DA_vector_t & obsver_vec, const cube_t & obsver,
 }
 
 //-------------------------------------------------------------------------------------------------
+// TODO: what is this?
+//-------------------------------------------------------------------------------------------------
+double mu1(double timestep)
+{
+    return -0.6 * sin(timestep/10 - M_PI) * 0.2;
+}
+
+//-------------------------------------------------------------------------------------------------
+// TODO: what is this?
+//-------------------------------------------------------------------------------------------------
+double mu2(double timestep)
+{
+    return -1.2 * sin(timestep/5 - M_PI) * 0.2;
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void InitSolver(const Configuration & conf)
 {
@@ -228,10 +245,10 @@ void InitSolver(const Configuration & conf)
     const int spot_y = static_cast<int>(std::floor(conf.asDouble("spot_y") + 0.5));
     assert_true(IsInsideRange(spot_x, 0, GLOBAL_NELEMS_X) &&
                 IsInsideRange(spot_y, 0, GLOBAL_NELEMS_Y))
-                << "substance spot is not inside the domain" << endl;
+                    << "species spot is not inside the domain" << endl;
 
     // Set all the matrices and vectors to zero.
-    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         FillMatrix(gridA[idx].getLayer<L_100m>(), 0.0);
         FillMatrix(gridB[idx].getLayer<L_100m>(), 0.0);
         FillMatrix(P[idx], 0.0);
@@ -240,19 +257,19 @@ void InitSolver(const Configuration & conf)
         FillMatrix(H[idx], 0.0);
         FillVector(Obvs[idx], 0.0);
         FillVector(forecast[idx], 0.0);
-        FillVector(BLUE[idx], 0.0);
+        FillVector(posterior[idx], 0.0);
     });
 
     // TODO: comment.
-    pfor(Zero, SubDomGridSize, [&](const point2d_t & pos) {
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & pos) {
         // initialize all cells on the 100m resolution
         gridA[pos].setActiveLayer(L_100m);
         // initialize the concentration, rho = 0
-        gridA[pos].forAllActiveNodes([](double& value) { value = 0.0; });
+        gridA[pos].forAllActiveNodes([](double & value) { value = 0.0; });
     });
 
     // Set initial covariance matrices in each sub-domain.
-    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         GetModelCovar(conf, P[idx]);
     });
 
@@ -271,10 +288,8 @@ void InitSolver(const Configuration & conf)
 //  utils::Grid<double,3> flows({ num_domains_x, num_domains_y, T });
 
     // Initialize the sub-domain filters.
-    pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         kalman_filters[idx].reset(new Kalman_t());
-        Reshape2Dto1D<NELEMS_X,NELEMS_Y>(forecast[idx], gridA[idx].getLayer<L_100m>());
-        kalman_filters[idx]->Init(forecast[idx], P[idx]);
     });
 
     // Initialize the model.
@@ -309,7 +324,7 @@ void Compute(const Configuration & conf)
         if ((save_int > 0) && (t % save_int == 0)) SaveGrid2D(conf, "state", t, gridA);
 
         // Go from time t to t+1. Compute next time step => store it in B.
-        pfor(Zero, SubDomGridSize, [&](const point2d_t & idx) {
+        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
             // "curr" is defined as grid A[i,j] and distributed across shared memory.
             // "next" is the next state estimation.
             const auto & curr = gridA[idx];
@@ -321,8 +336,8 @@ void Compute(const Configuration & conf)
             int    nx = 1;                      // TODO: description?
             int    ny = 1;                      // TODO: description?
             double timept = t * time_delta;     // TODO: description?
-            double flowu = utils::mu1(timept);  // TODO: description?
-            double flowv = utils::mu2(timept);  // TODO: description?
+            double flowu = mu1(timept);         // TODO: description?
+            double flowv = mu2(timept);         // TODO: description?
 
             for (Direction dir : { Up, Down, Left, Right }) {
                 // Skip global boarder; for example, if direction == up and no neighbour to south.
@@ -371,28 +386,46 @@ void Compute(const Configuration & conf)
 
             // For now data assimilation is done at periodic timesteps.
             if (t % 1 == 0) {
-                // Compute Mapping matrix H to project from observation to model grid [nelems_tot,nelems_tot]
+                // Compute mapping matrix H to project from model to observation grid.
                 ComputeH(H[idx]);
-                // Estimate noise/uncertainty metrics of observations [nelems_tot,nelems_tot]
+                // Estimate measurement noise covariance matrix.
                 ComputeR(R[idx]);
-                // Extract appropriate observation data for subdomain and time [nelems_tot * nelems_tot]
+                // Extract appropriate observation data for subdomain and time.
                 GetObservation(Obvs[idx], *obsv_glob, t, idx);
-
-                utils::Reshape2Dto1D<NELEMS_X, NELEMS_Y>(forecast[idx], next.getLayer<L_100m>());
-
-                auto ModelAdapter = [&](DA_vector_t & state, DA_matrix_t & covar) {
-                    model->Update(flowu, flowv, time_delta, space_delta, state, covar);
-                };
+                // Estimate process noise covariance matrix.
                 Q[idx] = R[idx];    // TODO: this is stub: same noise covariances
 
-                Kalman_t * kf = kalman_filters[idx].get();
-                kf->IterateWithModel(ModelAdapter, Q[idx], H[idx], R[idx], Obvs[idx]);
-                BLUE[idx] = kf->GetStateVector();
-                P[idx] = kf->GetCovariance();
+                // Get current state.
+                utils::Reshape2Dto1D<NELEMS_X, NELEMS_Y>(forecast[idx], next.getLayer<L_100m>());
 
-                utils::Reshape1Dto2D<NELEMS_X, NELEMS_Y>(next.getLayer<L_100m>(), BLUE[idx]);
+                // Ligh-weight adapter helps to get the model matrix from within Kalman framework.
+                //struct ModelAdapter {
+                    //ModelAdapter()
+                    //const SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> & operator()() {
+                        //return model->ModelMatrix(flowu, flowv, time_delta, space_delta, t);
+                    //}
+                //}
+                auto ModelAdapter = [&]() -> const DA_sp_matrix_t & {
+                    const DA_sp_matrix_t & spmat =
+                            model->ModelMatrix(flowu, flowv, time_delta, space_delta, t);
+                    return spmat;
+                };
+
+                // Upadate the Kalman filter using the process model and current process matrices.
+                Kalman_t * kf = kalman_filters[idx].get();
+                kf->IterateWithModel(ModelAdapter, Q[idx], H[idx], R[idx], Obvs[idx],
+                                     forecast[idx], P[idx]);
+                //// Get a-posteriory estimationis for the state and covariance.
+                //posterior[idx] = kf->GetStateVector();
+                //P[idx] = kf->GetCovariance();
+
+                // next state = posterior.
+                utils::Reshape1Dto2D<NELEMS_X, NELEMS_Y>(next.getLayer<L_100m>(), forecast[idx]);
             }
         }); // end pfor
+
+        // swap A and B
+        //gridA.swap(gridB);
     }
 }
 
@@ -403,6 +436,7 @@ void Compute(const Configuration & conf)
 void AmdadosSolver(const Configuration & conf)
 {
     InitSolver(conf);
+    Compute(conf);
 }
 
 } // end namespace app

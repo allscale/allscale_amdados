@@ -12,6 +12,7 @@
 #include "amdados/app/utils/cholesky.h"
 #include "amdados/app/utils/configuration.h"
 
+using namespace amdados::app;
 using namespace amdados::app::utils;
 
 static Configuration gConf;         // a single global configuration
@@ -48,7 +49,7 @@ void TestCholeskyGivenProblemSize(double & max_rel_err)
     // Compute |A*x - b| and print the relative error.
     {
         vector_t b, x, Ax;
-        MakeRandomVector(b);
+        MakeRandomVector(b, 'u');
         chol.Solve(x, b);
         MatVecMult(Ax, A, x);
         double diff_norm = NormVecDiff(Ax, b);

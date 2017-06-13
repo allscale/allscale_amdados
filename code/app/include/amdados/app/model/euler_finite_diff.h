@@ -17,9 +17,7 @@ class EulerFiniteDifferenceModel : public IModel<SizeX, SizeY>
 public:
     using base_model_t = IModel<SizeX, SizeY>;
     using base_model_t::PROBLEM_SIZE;
-    using typename base_model_t::vector_t;
-    using typename base_model_t::matrix_t;
-    using sp_matrix_t = utils::SpMatrix<PROBLEM_SIZE, PROBLEM_SIZE>;
+    using typename base_model_t::sp_matrix_t;
     using triplet_t = utils::Triplet;
 
 public:
@@ -47,20 +45,20 @@ virtual ~EulerFiniteDifferenceModel()
 //! @copydoc IModel::Update()
 //-------------------------------------------------------------------------------------------------
 IBM_NOINLINE
-virtual void Update(double flow_x, double flow_y, double time_delta, double step_size,
-                    vector_t & state, matrix_t & covar)
+virtual const sp_matrix_t & ModelMatrix(double flow_x, double flow_y,
+                                        double time_delta, double space_delta, double t)
 {
-    MakeModelMatrix(flow_x, flow_y, time_delta, step_size);
-    UpdateState(state);
-    UpdateCovariance(covar);
+    (void)t;
+    MakeModelMatrix(flow_x, flow_y, time_delta, space_delta);
+    return *mM;
 }
 
 private:
     using triplet_arr_t = std::vector<triplet_t>;
 
-    const utils::Configuration &   mConf;       ///< reference to external parameter handler
-    std::unique_ptr<sp_matrix_t>   mM;          ///< model matrix
-    std::unique_ptr<triplet_arr_t> mTriplets;   ///< triplets for constructing the model matrix
+    const utils::Configuration & mConf;     ///< reference to external parameter handler
+    unique_ptr<sp_matrix_t>      mM;        ///< model matrix
+    unique_ptr<triplet_arr_t>    mTriplets; ///< triplets for constructing the model matrix
 
 private:
 //-------------------------------------------------------------------------------------------------
@@ -69,7 +67,7 @@ private:
 // as follows:  u_{t+1} = mM * u_t.
 //-------------------------------------------------------------------------------------------------
 IBM_NOINLINE
-void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double step_size)
+void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double space_delta)
 {
     using namespace amdados::app::utils;
 
@@ -79,9 +77,9 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double ste
     mTriplets->reserve(5 * PROBLEM_SIZE);
 
     const double c = mConf.asDouble("diffusion_coef");
-    const double diffmult = (time_delta * c) / std::pow(step_size,2);
-    const double advmult_x = (flow_x * time_delta) / (2*step_size);
-    const double advmult_y = (flow_y * time_delta) / (2*step_size);
+    const double diffmult = (time_delta * c) / std::pow(space_delta,2);
+    const double advmult_x = (flow_x * time_delta) / (2*space_delta);
+    const double advmult_y = (flow_y * time_delta) / (2*space_delta);
     const int NX = static_cast<int>(SizeX);
     const int NY = static_cast<int>(SizeY);
 
@@ -160,24 +158,6 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double ste
     // Assemble the model matrix.
     assert(mTriplets->capacity() == 5 * PROBLEM_SIZE);      // no reallocation had happened
     mM->SetFromTriplets(*mTriplets, MemoryPolicy::RETAIN_MEMORY);
-}
-
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-void UpdateState(utils::Vector<PROBLEM_SIZE> & state)
-{
-    std::unique_ptr<vector_t> old_state(new vector_t());    // TODO: pool of free vectors
-    *old_state = state;
-    SparseMulVector(state, *mM, *old_state);                // state = M * old_state
-}
-
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
-void UpdateCovariance(utils::Matrix<PROBLEM_SIZE, PROBLEM_SIZE> & covar)
-{
-    std::unique_ptr<matrix_t> old_covar(new matrix_t());    // TODO: pool of free matrices
-    DenseMulSparseTr(*old_covar, covar, *mM);
-    SparseMulDense(covar, *mM, *old_covar);                 // covar = M * old_covar * M^T
 }
 
 }; // class EulerFiniteDifferenceModel

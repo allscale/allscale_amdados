@@ -14,6 +14,13 @@
 #include "amdados/app/model/i_model.h"
 #include "amdados/app/model/euler_finite_diff.h"
 
+using ::std::endl;
+using ::std::flush;
+using ::std::numeric_limits;
+using ::std::unique_ptr;
+using ::std::string;
+
+using namespace amdados::app;
 using namespace amdados::app::utils;
 
 static Configuration gConf;         // a single global configuration
@@ -36,7 +43,7 @@ void EulerFiniteDifferenceDirect(Matrix<SizeX,SizeY> & state,
     const int NX = static_cast<int>(SizeX);
     const int NY = static_cast<int>(SizeY);
 
-    std::unique_ptr< Matrix<SizeX,SizeY> > new_state(new Matrix<SizeX,SizeY>());
+    unique_ptr< Matrix<SizeX,SizeY> > new_state(new Matrix<SizeX,SizeY>());
     for (int i = 0; i < NX; ++i) {
         for (int j = 0; j < NY; ++j) {
             double sum = state[{i,j}];
@@ -89,17 +96,20 @@ void TestEulerFiniteDifference(double & max_rel_diff)
     std::unique_ptr<vector_t> state(new vector_t()), state2(new vector_t());
 
     MakeIdentityMatrix(*covar);
-    MakeRandomVector(*state);
+    MakeRandomVector(*state, 'u');
     *state2 = *state;
 
     // Make several "iterations".
     for (int iterNo = 0; iterNo < 3; ++iterNo) {
         // Time integration by means of model matrix.
-        model.Update(flow_x, flow_y, time_delta, step_size, *state, *covar);
+        {
+            const auto & M = model.ModelMatrix(flow_x, flow_y, time_delta, step_size, 0);
+            UpdateState(M, *state, *covar);
+        }
 
         // Direct time integration on the grid.
         {
-            std::unique_ptr<field_t> state_field(new field_t());
+            unique_ptr<field_t> state_field(new field_t());
             Reshape1Dto2D<SizeX,SizeY>(*state_field, *state2);
             EulerFiniteDifferenceDirect(*state_field, flow_x, flow_y, time_delta, step_size);
             Reshape2Dto1D<SizeX,SizeY>(*state2, *state_field);

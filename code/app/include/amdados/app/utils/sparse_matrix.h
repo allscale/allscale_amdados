@@ -80,6 +80,27 @@ public:
         friend void DenseMulSparseTr(Matrix< NROWS_other, NCOLS_other >   & result,
                                      const Matrix< NROWS_other, MSIZE >   & A,
                                      const SpMatrix< NCOLS_other, MSIZE > & B);
+
+    template<size_t NROWS_other, size_t NCOLS_other>
+        friend void MatVecMult(Vector< NROWS_other >                      & result,
+                               const SpMatrix< NROWS_other, NCOLS_other > & A,
+                               const Vector< NCOLS_other >                & vec);
+
+    template<size_t MSIZE, size_t NROWS_other, size_t NCOLS_other>
+        friend void MatMult(Matrix< NROWS_other, NCOLS_other >   & result,
+                            const SpMatrix< NROWS_other, MSIZE > & A,
+                            const Matrix< MSIZE, NCOLS_other >   & B);
+
+    template<size_t MSIZE, size_t NROWS_other, size_t NCOLS_other>
+        friend void MatMult(Matrix< NROWS_other, NCOLS_other >   & result,
+                            const Matrix< NROWS_other, MSIZE >   & A,
+                            const SpMatrix< MSIZE, NCOLS_other > & B);
+
+    template<size_t MSIZE, size_t NROWS_other, size_t NCOLS_other>
+        friend void MatMultTr(Matrix< NROWS_other, NCOLS_other >   & result,
+                              const Matrix< NROWS_other, MSIZE >   & A,
+                              const SpMatrix< NCOLS_other, MSIZE > & B);
+
 private:
     // Column index and value of matrix element.
     struct ColumnAndValue {
@@ -182,6 +203,20 @@ void SparseMulVector(Vector<NROWS> & result,
         result[{r}] = sum;
     }
 }
+template<size_t NROWS, size_t NCOLS>
+void MatVecMult(Vector<NROWS> & result,
+                const SpMatrix<NROWS,NCOLS> & A, const Vector<NCOLS> & vec)
+{
+    assert(CheckDistinctObjects(result, vec));
+    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+        double sum = 0.0;
+        for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
+            sum += it->val * vec[{static_cast<int>(it->col)}];
+        }
+        result[{r}] = sum;
+    }
+}
+
 
 //-------------------------------------------------------------------------------------------------
 // Sparse times dense matrix multiplication: dense_result = sparse_A * dense_B.
@@ -189,6 +224,21 @@ void SparseMulVector(Vector<NROWS> & result,
 template<size_t MSIZE, size_t NROWS, size_t NCOLS>
 void SparseMulDense(Matrix<NROWS,NCOLS> & result,
                     const SpMatrix<NROWS,MSIZE> & A, const Matrix<MSIZE,NCOLS> & B)
+{
+    assert(CheckDistinctObjects(result, B));
+    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
+            double sum = 0.0;
+            for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
+                sum += it->val * B[{static_cast<int>(it->col),c}];
+            }
+            result[{r,c}] = sum;
+        }
+    }
+}
+template<size_t MSIZE, size_t NROWS, size_t NCOLS>
+void MatMult(Matrix<NROWS,NCOLS> & result,
+             const SpMatrix<NROWS,MSIZE> & A, const Matrix<MSIZE,NCOLS> & B)
 {
     assert(CheckDistinctObjects(result, B));
     for (int r = 0; r < static_cast<int>(NROWS); ++r) {
@@ -219,6 +269,20 @@ void DenseMulSparse(Matrix<NROWS,NCOLS> & result,
         }
     }
 }
+template<size_t MSIZE, size_t NROWS, size_t NCOLS>
+void MatMult(Matrix<NROWS,NCOLS> & result,
+             const Matrix<NROWS,MSIZE> & A, const SpMatrix<MSIZE,NCOLS> & B)
+{
+    assert(CheckDistinctObjects(result, A));
+    FillMatrix(result, 0.0);
+    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+        for (int c = 0; c < static_cast<int>(MSIZE); ++c) {
+            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
+                result[{r,static_cast<int>(it->col)}] += A[{r,c}] * it->val;
+            }
+        }
+    }
+}
 
 //-------------------------------------------------------------------------------------------------
 // Dense times sparse^T matrix multiplication: dense_result = dense_A * transposed(sparse_B).
@@ -227,6 +291,21 @@ void DenseMulSparse(Matrix<NROWS,NCOLS> & result,
 template<size_t MSIZE, size_t NROWS, size_t NCOLS>
 void DenseMulSparseTr(Matrix<NROWS,NCOLS> & result,
                       const Matrix<NROWS,MSIZE> & A, const SpMatrix<NCOLS,MSIZE> & B)
+{
+    assert(CheckDistinctObjects(result, A));
+    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
+            double sum = 0.0;
+            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
+                sum += A[{r,static_cast<int>(it->col)}] * it->val;
+            }
+            result[{r,c}] = sum;
+        }
+    }
+}
+template<size_t MSIZE, size_t NROWS, size_t NCOLS>
+void MatMultTr(Matrix<NROWS,NCOLS> & result,
+               const Matrix<NROWS,MSIZE> & A, const SpMatrix<NCOLS,MSIZE> & B)
 {
     assert(CheckDistinctObjects(result, A));
     for (int r = 0; r < static_cast<int>(NROWS); ++r) {

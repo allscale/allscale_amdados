@@ -24,6 +24,7 @@
 #include "amdados/app/utils/matrix.h"
 #include "amdados/app/utils/sparse_matrix.h"
 
+using namespace amdados::app;
 using namespace amdados::app::utils;
 
 static Configuration gConf;         // a single global configuration
@@ -212,7 +213,7 @@ double TestMatrixMulVector(double max_rel_err)
     Vector<NROWS> result;
     Vector<NCOLS> source;
     arma::vec res1, res2, src;
-    MakeRandomVector(source);
+    MakeRandomVector(source, 'u');
     CopyToArma(src, source);
 
     {

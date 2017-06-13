@@ -56,17 +56,6 @@ T Square(const T & v)
     return (v * v);
 }
 
-
-
-
-double mu1(double timestep){
-    return  -0.6 * sin(timestep/10 - M_PI) * 0.2;
-}
-
-double mu2(double timestep){
-    return  -1.2 * sin(timestep/5 - M_PI) * 0.2;
-}
-
 //-------------------------------------------------------------------------------------------------
 // Functor converts 2D index (x,y) into a plain one.
 //-------------------------------------------------------------------------------------------------
@@ -133,26 +122,12 @@ void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRI
 }
 
 //-------------------------------------------------------------------------------------------------
-// As temporary measure make explicit loop that sets all values to zero.
-//-------------------------------------------------------------------------------------------------
-template<size_t SizeX, size_t SizeY>
-void SetAllValsToZero(allscale::utils::grid<double,SizeX,SizeY>& init)
-{
-    for(int i=0; i<(int)SizeX; ++i) {      //SizeX and SizeY are number of elements in X and Y
-        for(int j=0; j<(int)SizeY; ++j) {      //SizeX and SizeY are number of elements in X and
-            init[{i,j}] = 1000.;   // Set all vals to zero
-        }
-    }
-
-}
-
-//-------------------------------------------------------------------------------------------------
 // Function creates a new directory or does nothing if it already exists.
 //-------------------------------------------------------------------------------------------------
 void MakeDirectory(const char * dir)
 {
     assert_true(dir != nullptr);
-    std::string cmd("mkdir -p ");   // TODO: not portable
+    std::string cmd("mkdir -p ");   // TODO: not portable, use STL "experimental" instead
     cmd += dir;
     int retval = std::system(cmd.c_str());  // TODO: mutex
     retval = std::system("sync");

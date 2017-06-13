@@ -78,6 +78,24 @@ void MatMultTransposed(      Matrix<NROWS, NCOLS> & result,
         }
     }
 }
+template<size_t NROWS, size_t MSIZE, size_t NCOLS>
+void MatMultTr(      Matrix<NROWS, NCOLS> & result,
+               const Matrix<NROWS, MSIZE> & A,
+               const Matrix<NCOLS, MSIZE> & B)
+{
+    assert(CheckDistinctObjects(result, A));
+    assert(CheckDistinctObjects(result, B));
+
+    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
+            double sum = 0.0;
+            for (int k = 0; k < static_cast<int>(MSIZE); ++k) {
+                sum += A[{r,k}] * B[{c,k}];     // note: B is transposed
+            }
+            result[{r,c}] = sum;
+        }
+    }
+}
 
 //-------------------------------------------------------------------------------------------------
 // Matrix-vector multiplication: result = A * v.
@@ -225,7 +243,18 @@ void Symmetrize(Matrix<MSIZE, MSIZE> & A)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Multiplying by a scalar: A = A * mult.
+// Multiplying vector by a scalar: v = v * mult.
+//-------------------------------------------------------------------------------------------------
+template<size_t LENGTH>
+void VecScalarMult(Vector<LENGTH> & v, const double mult)
+{
+    for (int i = 0; i < static_cast<int>(LENGTH); ++i) {
+        v[{i}] *= mult;
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Multiplying matrix by a scalar: A = A * mult.
 //-------------------------------------------------------------------------------------------------
 template<size_t NROWS, size_t NCOLS>
 void MatScalarMult(Matrix<NROWS, NCOLS> & A, const double mult)
@@ -315,13 +344,19 @@ double Trace(const Matrix<NROWS, NCOLS> & A)
 // Function generates a random vector.
 //-------------------------------------------------------------------------------------------------
 template<size_t LENGTH>
-void MakeRandomVector(Vector<LENGTH> & v)
+void MakeRandomVector(Vector<LENGTH> & v, const char type)
 {
     std::mt19937                           gen(std::time(nullptr));
-    std::uniform_real_distribution<double> distrib(1.0, 2.0);
+    /*std::uniform_real_distribution<double> distrib(1.0, 2.0);*/
 
-    for (int i = 0; i < static_cast<int>(LENGTH); ++i) {
-        v[{i}] = distrib(gen);
+    if (type == 'n') { // normal, mu = 0, sigma = 1
+        std::normal_distribution<double> distrib;
+        for (int i = 0; i < static_cast<int>(LENGTH); ++i) { v[{i}] = distrib(gen); }
+    } else if (type == 'u') { // uniform, [0 ... 1]
+        std::uniform_real_distribution<double> distrib;
+        for (int i = 0; i < static_cast<int>(LENGTH); ++i) { v[{i}] = distrib(gen); }
+    } else {
+        assert_true(0) << "unknown distribution" << endl;
     }
 }
 
