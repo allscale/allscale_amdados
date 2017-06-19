@@ -4,7 +4,7 @@
 # Copyright: IBM Research Ireland, 2014 - 2017
 #--------------------------------------------------------------------------------------------------
 
-VER=7.900.1
+VER=7.950.1
 
 FNAME="armadillo-${VER}.tar.xz"
 DNAME="armadillo-${VER}"
@@ -55,7 +55,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export SOFT="."
 
 # Create destination directory.
-DEST="3rd-party"
+DEST="./api/armadillo"
 mkdir -p "${DEST}"
 
 # Load the library.

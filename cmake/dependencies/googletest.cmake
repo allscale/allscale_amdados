@@ -4,7 +4,9 @@ if(BUILD_TESTS AND NOT TARGET googletest)
 	# gtest should be build with the same compiler as the project using it
 	ExternalProject_Add(
 		googletest
-		URL http://insieme-compiler.org/ext_libs/gtest-1.8.0.tar.gz
+        #Albert changed URL to enable compilation behind firewall.
+        #URL http://insieme-compiler.org/ext_libs/gtest-1.8.0.tar.gz
+        URL file://${PROJECT_SOURCE_DIR}/../api/gtest-1.8.0.tar.gz
 		URL_HASH SHA256=58a6f4277ca2bc8565222b3bbd58a177609e9c488e8a72649359ba51450db7d8
 		INSTALL_COMMAND ""
 		CMAKE_ARGS ${CMAKE_EXTERNALPROJECT_FORWARDS}

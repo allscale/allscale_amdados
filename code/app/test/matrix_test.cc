@@ -14,7 +14,7 @@
 #define ARMA_DONT_USE_SUPERLU
 #define ARMA_DONT_USE_HDF5
 #define ARMA_DONT_USE_OPENMP
-#include "../../../3rd-party/include/armadillo"
+#include "../../../api/armadillo/include/armadillo"
 
 #include "allscale/utils/assert.h"
 #include "amdados/app/amdados_grid.h"

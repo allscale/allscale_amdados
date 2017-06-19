@@ -116,7 +116,14 @@ not capable of dealing with such a setup correctly.
 
 The Armadillo matrix library is used only (!) for testing of matrix operations.
 It is not included in the repository (see .gitignore).
-In order to install a local copy just run on the Linux machine in the project's root directory:
-        bash ./armadillo.sh
+Armadillo is installed along with other dependencies, see below.
 
+### Dependecies
+
+In order to compile the project on machine without Internet connection
+(e.g. blade behind firewall), some prerequisites should be downloaded beforehand.
+From the project root folder, one should execute:
+    bash ./scripts/download.sh
+This will install all necessary dependencies (including the Armadillo library)
+into the folder "api".
 
