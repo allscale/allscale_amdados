@@ -73,8 +73,9 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double spa
 
     Sub2Ind<SizeX,SizeY> sub2ind;   // converts 2D index (x,y) to plain index
 
-    mTriplets->clear();
-    mTriplets->reserve(5 * PROBLEM_SIZE);
+    mTriplets->resize(5 * PROBLEM_SIZE);
+    triplet_t * pTriplets = mTriplets->data();
+    size_t      count = 0;
 
     const double c = mConf.asDouble("diffusion_coef");
     const double diffmult = (time_delta * c) / std::pow(space_delta,2);
@@ -92,71 +93,77 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double spa
     //
     for (int x = 1; x < NX-1; ++x) {
         for (int y = 1; y < NY-1; ++y) {
+            assert_true(count + 5 <= 5 * PROBLEM_SIZE);
             int r = sub2ind(x,y);
-            mTriplets->push_back(triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x));
-            mTriplets->push_back(triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x));
-            mTriplets->push_back(triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y));
-            mTriplets->push_back(triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y));
-            mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+            pTriplets[count++] = triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x);
+            pTriplets[count++] = triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x);
+            pTriplets[count++] = triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y);
+            pTriplets[count++] = triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y);
+            pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
         }
     }
 
     // Boundary: x == 0.
     for (int x = 0, y = 1; y < NY-1; ++y) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
         int r = sub2ind(x,y);
-        mTriplets->push_back(triplet_t(r, sub2ind(x+1,y), diffmult - 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x  ,y), diffmult + 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y));
-        mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+        pTriplets[count++] = triplet_t(r, sub2ind(x+1,y), diffmult - 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x  ,y), diffmult + 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y);
+        pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
     }
 
     // Boundary: x == NX-1.
     for (int x = NX-1, y = 1; y < NY-1; ++y) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
         int r = sub2ind(x,y);
-        mTriplets->push_back(triplet_t(r, sub2ind(x  ,y), diffmult - 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x-1,y), diffmult + 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y));
-        mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+        pTriplets[count++] = triplet_t(r, sub2ind(x  ,y), diffmult - 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x-1,y), diffmult + 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y+1), diffmult - advmult_y);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y-1), diffmult + advmult_y);
+        pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
     }
 
     // Boundary: y == 0.
     for (int y = 0, x = 1; x < NX-1; ++x) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
         int r = sub2ind(x,y);
-        mTriplets->push_back(triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y+1), diffmult - 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y  ), diffmult + 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+        pTriplets[count++] = triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y+1), diffmult - 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y  ), diffmult + 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
     }
 
     // Boundary: y == NY-1.
     for (int y = NY-1, x = 1; x < NX-1; ++x) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
         int r = sub2ind(x,y);
-        mTriplets->push_back(triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y  ), diffmult - 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,y-1), diffmult + 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+        pTriplets[count++] = triplet_t(r, sub2ind(x+1,y), diffmult - advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x-1,y), diffmult + advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y  ), diffmult - 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,y-1), diffmult + 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
     }
 
     // At the corner points.
     const int corner_x[4] = {0, 0, NX-1, NX-1};
     const int corner_y[4] = {0, NY-1, NY-1, 0};
     for (int k = 0; k < 4; ++k) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
         int x = corner_x[k];
         int y = corner_y[k];
         int r = sub2ind(x,y);
-        mTriplets->push_back(triplet_t(r, sub2ind(std::min(x+1,NX-1),y), diffmult - 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(std::max(x-1,   0),y), diffmult + 2*advmult_x));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,std::min(y+1,NY-1)), diffmult - 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, sub2ind(x,std::max(y-1,   0)), diffmult + 2*advmult_y));
-        mTriplets->push_back(triplet_t(r, r, 1 - 4*diffmult));
+        pTriplets[count++] = triplet_t(r, sub2ind(std::min(x+1,NX-1),y), diffmult - 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(std::max(x-1,   0),y), diffmult + 2*advmult_x);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,std::min(y+1,NY-1)), diffmult - 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, sub2ind(x,std::max(y-1,   0)), diffmult + 2*advmult_y);
+        pTriplets[count++] = triplet_t(r, r, 1 - 4*diffmult);
     }
 
     // Assemble the model matrix.
-    assert(mTriplets->capacity() == 5 * PROBLEM_SIZE);      // no reallocation had happened
+    assert_true(count == 5 * PROBLEM_SIZE);
     mM->SetFromTriplets(*mTriplets, MemoryPolicy::RETAIN_MEMORY);
 }
 

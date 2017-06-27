@@ -50,7 +50,10 @@ what does it mean: Follow same structure as that implemented for Runga Kutta sol
 
 19) What do the functions mu1() and mu2() stand for?
 
-20)
+20) Rather than creating grids of individual entities (e.g. matrices), create
+    a grid of solvers.
+
+21)
 
 //////////////////////////////////////////////////////////////////////////////////////
 Questions:

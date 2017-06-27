@@ -36,10 +36,10 @@ using ::allscale::api::user::data::GridPoint;
 const int GLOBAL_NELEMS_X = NELEMS_X * NUM_DOMAINS_X;
 const int GLOBAL_NELEMS_Y = NELEMS_Y * NUM_DOMAINS_Y;
 
-// Number of elements (or nodal points) in a sub-domain.
+// Number of elements (or nodal points) in a subdomain.
 const size_t SUB_PROBLEM_SIZE = NELEMS_X * NELEMS_Y;
 
-// Number of measurement locations in a sub-domain.
+// Number of measurement locations in a subdomain.
 const size_t NUM_MEASUREMENTS = NELEMS_X * NELEMS_Y;
 
 using subdomain_sub2ind_t = Sub2Ind<NELEMS_X, NELEMS_Y>;
@@ -60,12 +60,15 @@ using sub_domain_t = Grid< Cell<double,sub_domain_config_t>, 2 >;
 using vec_grid_t = Grid<DA_vector_t,2>;
 using mat_grid_t = Grid<DA_matrix_t,2>;
 
-// Origin and global grid size, which define the logical coordinates of the first
-// sub-domain and the number of a sub-domains in each dimension respectively.
+// Origin and global grid size. The latter grid is the grid of subdomains,
+// where the logical coordinates give a subdomain indices in each dimension.
 const point2d_t Origin = 0;
 const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 
-// Create Kalman filters for each sub-domain.
+// Type of model (pointer) for each subdomain.
+using model_ptr_t = std::unique_ptr< IModel<NELEMS_X,NELEMS_Y> >;
+
+// Type of Kalman filter for each subdomain.
 using Kalman_t = KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
 using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
 
@@ -83,7 +86,7 @@ private:
     sub_domain_t m_next_state;
 
     // Data structures for observation data has enough room for all the nodal
-    // points accross the whole domain at all timestamps.
+    // points across the whole domain at all timestamps.
     std::unique_ptr<cube_t> m_all_observations;
 
     // Data structure for storing data assimilation matrices.
@@ -96,10 +99,10 @@ private:
     vec_grid_t m_observation_vec;
     vec_grid_t m_state_vec;
 
-    // Process model which is defined by the time-integration method.
-    std::unique_ptr< IModel<NELEMS_X,NELEMS_Y> > m_model;
+    // Process models (for each subdomain). Model is defined by the time-integration method.
+    Grid<model_ptr_t,2> m_models;
 
-    // Kalman filters for each sub-domain.
+    // Kalman filters for each subdomain.
     Grid<Kalman_ptr_t,2> m_kalman_filters;
 
 public:
@@ -116,7 +119,7 @@ Solver_EI_FD_KF(const Configuration &)
   m_H(SubDomGridSize),
   m_observation_vec(SubDomGridSize),
   m_state_vec(SubDomGridSize),
-  m_model(),
+  m_models(SubDomGridSize),
   m_kalman_filters(SubDomGridSize)
 {
 }
@@ -312,7 +315,7 @@ virtual void InitSolver(const Configuration & conf)
         m_curr_state[pos].forAllActiveNodes([](double & value) { value = 0.0; });
     });
 
-    // Set initial covariance matrices in each sub-domain.
+    // Set initial covariance matrices in each subdomain.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         GetModelCovar(conf, m_P[idx]);
     });
@@ -331,13 +334,11 @@ virtual void InitSolver(const Configuration & conf)
 //  TODO: load the flows computed previously
 //  utils::Grid<double,3> flows({ num_domains_x, num_domains_y, T });
 
-    // Initialize the sub-domain filters.
+    // Initialize the subdomain models and filters.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+        m_models[idx].reset(new EulerFiniteDifferenceModel<NELEMS_X,NELEMS_Y>(conf));
         m_kalman_filters[idx].reset(new Kalman_t());
     });
-
-    // Initialize the model.
-    m_model.reset(new EulerFiniteDifferenceModel<NELEMS_X,NELEMS_Y>(conf));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -368,7 +369,7 @@ virtual void RunSolver(const Configuration & conf)
         std::cout << "Time = " << t << endl << flush;
         if ((save_int > 0) && (t % save_int == 0)) SaveGrid2D(conf, "state", t, m_curr_state);
 
-        // Go from time t to t+1. Compute next time step => store it in B.
+        // Go from time t to t+1 and compute the next state.
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
             // "curr" is defined as on a grid and distributed across shared memory.
             // "next" is the next state estimation.
@@ -381,8 +382,13 @@ virtual void RunSolver(const Configuration & conf)
             int    nx = 1;                      // TODO: description?
             int    ny = 1;                      // TODO: description?
             double timept = t * time_delta;     // TODO: description?
+#if 1
             double flowu = mu1(timept);         // TODO: description?
             double flowv = mu2(timept);         // TODO: description?
+#else
+            double flowu = 0.0;
+            double flowv = 0.0;
+#endif
 
             for (Direction dir : { Up, Down, Left, Right }) {
                 // Skip global boarder; for example, if direction == up and no neighbour to south.
@@ -423,6 +429,7 @@ virtual void RunSolver(const Configuration & conf)
                 next.setBoundary(dir, local_boundary);
             }
 
+#if 0
             // For now data assimilation is done at periodic timesteps.
             if (t % 1 == 0) {
                 // Compute mapping matrix H to project from model to observation grid.
@@ -439,13 +446,20 @@ virtual void RunSolver(const Configuration & conf)
 
                 // Update the Kalman filter using the process model and current process matrices.
                 Kalman_t * kf = m_kalman_filters[idx].get();
-                kf->Iterate(m_model->ModelMatrix(flowu, flowv, time_delta, space_delta, t),
+                kf->Iterate(m_models[idx]->ModelMatrix(flowu, flowv, time_delta, space_delta, t),
                             m_Q[idx], m_H[idx], m_R[idx], m_observation_vec[idx],
                             m_state_vec[idx], m_P[idx]);
 
                 // Put updated state_vec back to the next state.
                 utils::Reshape1Dto2D<NELEMS_X,NELEMS_Y>(next.getLayer<L_100m>(), m_state_vec[idx]);
             }
+#else
+            auto & M = m_models[idx]->ModelMatrix(flowu, flowv, time_delta, space_delta, t);
+            utils::Reshape2Dto1D<NELEMS_X,NELEMS_Y>(m_state_vec[idx], next.getLayer<L_100m>());
+            DA_vector_t tmp_vec;
+            MatVecMult(tmp_vec, M, m_state_vec[idx]);
+            utils::Reshape1Dto2D<NELEMS_X,NELEMS_Y>(next.getLayer<L_100m>(), tmp_vec);
+#endif
         }); // end pfor
 
         // Update the current state by the new estimation.
