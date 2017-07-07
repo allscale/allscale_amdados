@@ -15,6 +15,7 @@ rsync -arv \
 --exclude 'Results' --exclude 'tags' --exclude "octave-workspace" \
 --exclude '*.*.swp' --exclude '*~' --exclude '*.swo' --exclude '*.log' \
 --exclude 'documentation'  --exclude 'doc' --exclude 'experimental' \
+--exclude '__pycache__' \
 ../allscale_amdados ${DESTIN}
 
 # Overwrite some cmake files to enable compilation on the blade machines.

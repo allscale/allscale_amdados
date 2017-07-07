@@ -400,7 +400,7 @@ virtual void RunSolver(const Configuration & conf)
                 // Obtain the local boundary.
                 auto local_boundary = curr.getBoundary(dir);
 
-                // Obtain the neighboring boundary.
+                // Obtain the neighbouring boundary.
                 auto remote_boundary =
                     (dir == Up)   ? m_curr_state[idx + point2d_t{-1,0}].getBoundary(Down)  : // remote boundary is bottom strip of neighbour
                     (dir == Down) ? m_curr_state[idx + point2d_t{ 1,0}].getBoundary(Up)    : // remote boundary is top of neighbour

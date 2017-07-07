@@ -12,7 +12,18 @@ build*
 *.run
 Observation.txt
 DumpAllScale.txt
-doc
+
+doc/python*
+doc/references
+*.aux
+*.toc
+*.log
+*.pdf
+*.ps
+*.png
+*.jpg
+*.jpeg
+
 .settings
 *~
 *.*~
@@ -29,4 +40,8 @@ output
 3rd-party
 api
 
+__pycache__
+.ipynb_checkpoints
+*.ipynb
+.idea
 

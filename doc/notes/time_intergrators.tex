@@ -1,0 +1,124 @@
+\documentclass[]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+
+\title{Time Integration Models for Advection-Diffusion Equation}
+\author{Albert Akhriev}
+
+\begin{document}
+\maketitle
+
+%\begin{abstract}
+%\end{abstract}
+
+\newcommand{\myu}[3]{u_{{#1},{#2}}^{#3}}
+\newcommand{\mydt}{{\Delta{t}}}
+\newcommand{\mydx}{{\Delta{x}}}
+\newcommand{\mydy}{{\Delta{y}}}
+\newcommand{\TODO}[1]{({\bf{\color{red}{TODO:}}}\,\,\,{\footnotesize\it{#1}})}
+
+\section{Implicit Euler}
+
+\subsection{Assumptions}
+\begin{enumerate}
+\item constant diffusion coefficient;
+\item advection flux components do not depend on coordinates, only on time;
+\item zero Dirichlet boundary conditions;
+\item there is not sources at the domain boundary $\Gamma$.
+\end{enumerate}
+
+\subsection{Equation}
+\begin{equation}
+\frac{\partial u}{\partial t} =
+D \left(\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2}\right)
+- v_x \frac{\partial u}{\partial x}
+- v_y \frac{\partial u}{\partial y} + f(x,y,t),
+\end{equation}
+where $D$ is the diffusion coefficient, $v_x = v_x(t)$, $v_y = v_y(t)$ are flow components that do \textit{not} depend on coordinates, $f = f(x,y,t)$ is the source term, and $u = u(x,y,t)$ is a 2D field of interest, for example, concentration of some substance that is being dissolved and transported over a spacial domain.
+
+\subsection{Goal}
+The goal is to find such a model matrix ${\bf A}$ that propagates state over time:
+\begin{equation}
+{\bf u}_{t+1} = {\bf A}_t {\bf u}_t,
+\label{eq:model-mat-A}
+\end{equation}
+where ${\bf u}$ is a discretized property field. This model propagation equation will be subsequently plugged into more generic framework using Kalman filtering.
+
+\subsection{Discretization}
+Here we use the implicit Euler scheme,
+\begin{equation}
+\begin{aligned}
+\frac{\myu{i}{j}{t+1} - \myu{i}{j}{t}}{\Delta t} = {} &
+D \left(
+\frac{\myu{i+1}{j}{t+1} - 2\myu{i}{j}{t+1} + \myu{i-1}{j}{t+1}}{\mydx^2} +
+\frac{\myu{i}{j+1}{t+1} - 2\myu{i}{j}{t+1} + \myu{i}{j-1}{t+1}}{\mydy^2}
+\right) \\
+& {\!\!\!\!\!\!\!\!}
+-v_x^{t+1} \frac{\myu{i+1}{j}{t+1} - \myu{i-1}{j}{t+1}}{2\mydx} 
+-v_y^{t+1} \frac{\myu{i}{j+1}{t+1} - \myu{i}{j-1}{t+1}}{2\mydy}
++ f_{i,j}^{t+1},
+\end{aligned}
+\end{equation}
+where the discrete indices $(i,j)$ run over a domain grid, $\mydt$ and $\mydx$, $\mydy$ are the time and space discretization steps respectively, and $v_x^{t+1}$, $v_y^{t+1}$, $f_{i,j}^{t+1}$ are taken in the ``future'' at $t+1$ \TODO{is that correct?}.
+
+Let us introduce compact notations,
+\begin{equation}
+\rho_x \triangleq D \mydt / \mydx^2, \qquad \rho_y \triangleq D \mydt / \mydy^2.
+\end{equation}
+\begin{equation}
+v_{0x} \triangleq 2\mydx / \mydt, \qquad v_{0y} \triangleq 2\mydy / \mydt.
+\end{equation}
+
+Rearranging terms in the Euler implicit scheme, we obtain,
+\begin{equation}
+\begin{aligned}
+\myu{i}{j}{t} = {} & (1 + 2 \rho_x + 2 \rho_y) \myu{i}{j}{t+1} - 
+f_{i,j}^{t+1} \mydt \,\,+ \\
+& \left(\frac{v_x^{t+1}}{v_{0x}} - \rho_x\right) \myu{i+1}{j}{t+1} +
+  \left(\frac{v_y^{t+1}}{v_{0y}} - \rho_y\right) \myu{i}{j+1}{t+1} \,+ \\
+& \left(-\frac{v_x^{t+1}}{v_{0x}} - \rho_x\right) \myu{i-1}{j}{t+1} +
+  \left(-\frac{v_y^{t+1}}{v_{0y}} - \rho_y\right) \myu{i}{j-1}{t+1}
+\end{aligned}
+\label{eq:discretization}
+\end{equation}
+Making a vector ${\bf u}$ out of individual items $u_{i,j}$, and similarly for the sources ${\bf f}_{t+1}$, the latter equation can be written as follow,
+\begin{equation}
+{\bf u}_{t} = {\bf B}_t {\bf u}_{t+1} - {\bf f}_{t+1}\mydt
+\end{equation}
+or alternatively,
+\begin{equation}
+{\bf u}_{t+1} = {\bf B}_t^{-1} {\bf u}_t + {\bf B}_t^{-1} {\bf f}_{t+1}\mydt,
+\end{equation}
+where ${\bf A}_t = {\bf B}^{-1}_t$ is a model propagation matrix, see (\ref{eq:model-mat-A}), and ${\bf B}_t$ is a very sparse discretization matrix invertible with a moderate computational cost.
+
+\textit{Important}, the equation is only valid for internal domain points. For the boundary points, $(x_i,y_j) \in \Gamma$, which are not changing according to Dirichlet boundary condition, equation takes the form (assuming no sources on domain boundary),
+\begin{equation}
+\myu{i}{j}{t} = \myu{i}{j}{t+1},
+\end{equation}
+and the corresponding entries of ${\bf B}_t$ are all equal to one.
+
+\subsection{Stability}
+Von Neumann stability for diffusion equation in case of \textit{explicit} discretization method, gives the following upper bound on integration time step,
+\begin{equation}
+\mydt < \frac{\min\left(\mydx^2, \mydy^2\right)}{2 D}
+\label{eq:von-neumann}
+\end{equation}
+\TODO{the formula was derived for 1D case, confirm it is valid in 2D or make a correction}. \TODO{Change the code if correction was made}.
+
+Even for unconditionally stable implicit methods it was found that violation of the last condition leads to significant oscillation of the solution. In practice, it is recommended to honour condition (\ref{eq:von-neumann}), although different methods have different sensitivity to $\mydt$ size. For example, the less accurate backward Euler method is often used instead of the more accurate ones (like Crank-Nicolson), if large time steps or high spatial resolution is necessary. 
+
+For advection equation, following the CFL condition helps to avoid aliasing,
+\begin{equation}
+\frac{|v_x| \mydt}{\mydx} + \frac{|v_y| \mydt}{\mydy} < 1.
+\end{equation}
+
+Combining both conditions,
+\begin{equation}
+\mydt < \min\left(
+\frac{\min\left(\mydx^2, \mydy^2\right)}{2 D},
+\frac{1}{\frac{|v_x|}{\mydx} + \frac{|v_y|}{\mydy}}
+\right).
+\end{equation}
+
+\end{document}
