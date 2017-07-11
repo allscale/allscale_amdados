@@ -44,7 +44,7 @@ int main()
     using namespace ::amdados::app;
     using namespace ::amdados::app::utils;
     Configuration conf;
-    conf.ReadConfigFile("amdados.conf");
+    conf.ReadConfigFile("amdados_old.conf");
     conf.PrintParameters();
     MakeDirectory(conf.asCString("output_dir"));
     std::unique_ptr<ISolver> pSolv = CreateSolver_EI_FD_KF(conf);
