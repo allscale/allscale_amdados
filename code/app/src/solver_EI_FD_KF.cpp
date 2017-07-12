@@ -429,7 +429,7 @@ virtual void RunSolver(const Configuration & conf)
                 next.setBoundary(dir, local_boundary);
             }
 
-#if 0
+#if 1
             // For now data assimilation is done at periodic timesteps.
             if (t % 1 == 0) {
                 // Compute mapping matrix H to project from model to observation grid.

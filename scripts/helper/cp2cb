@@ -11,7 +11,7 @@ CUDABLADE="albert@iribigd01.mul.ie.ibm.com"
 DESTIN="${CUDABLADE}:${HOME}/work/"
 
 rsync -arv \
---exclude 'bin' --exclude 'output*' --exclude 'build_debug' --exclude 'build_release' \
+--exclude 'bin' --exclude 'output' --exclude 'build_debug' --exclude 'build_release' \
 --exclude '*.jpg' --exclude '*.pdf' --exclude 'verdandi*' \
 --exclude '*.tgz' --exclude '*.zip' --exclude '*gdb.sh' --exclude '.git*' \
 --exclude 'Results' --exclude 'tags' --exclude "octave-workspace" \
