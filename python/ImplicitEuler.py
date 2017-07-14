@@ -37,6 +37,7 @@ class ImplicitEuler:
         conf = self.conf
         nx = int(conf["num_domains_x"] * conf["num_elems_x"])   # here 'elems' are nodal points
         ny = int(conf["num_domains_y"] * conf["num_elems_y"])   # here 'elems' are nodal points
+        assert nx > 1 and ny > 1
 
         self.size_x = nx
         self.size_y = ny
@@ -66,7 +67,6 @@ class ImplicitEuler:
 # public:
     def Iterate(self, t, dt, flow_model, field, covar):
         assert field.shape == (self.size_x, self.size_y)
-        field = np.reshape(field, (self.problem_size,))
         assert covar is None
         #assert covar.shape == (self.problem_size, self.problem_size)
 
@@ -76,7 +76,6 @@ class ImplicitEuler:
         problem_size = int(self.problem_size)
         dx = self.dx
         dy = self.dy
-        assert dx > 0 and dy > 0
         D = float(self.conf["diffusion_coef"])
 
         # By assumption, flow does not depend on coordinates but on time.
@@ -88,12 +87,12 @@ class ImplicitEuler:
                           1.0/(abs(max_vx)/dx + abs(max_vy)/dy + tiny) ) )
         assert dt > 0
 
+        # Here we assume the flow velocity is the same everywhere given the time 't'.
         rho_x = D * dt / dx**2;   v0x = 2.0 * dx / dt;   vx = float(vx) / v0x
         rho_y = D * dt / dy**2;   v0y = 2.0 * dy / dt;   vy = float(vy) / v0y
 
         # Here we repeat the loops in Initialize(..) except that the sparse
-        # matrix entries are computed rather than row/column indices,
-        # which are already done at this stage.
+        # matrix entries are computed rather than row/column indices.
         vals = self.values
         N = int(0)
         for x in range(1,nx-1):
@@ -118,6 +117,7 @@ class ImplicitEuler:
                         shape=(problem_size, problem_size))
         field = spsolve(B, field)
         field = np.reshape(field, (nx, ny))
+        self.ApplyBoundaryCondition(self.border, field)
         return dt, field
 
 # private:

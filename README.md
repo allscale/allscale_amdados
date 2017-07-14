@@ -127,3 +127,21 @@ From the project root folder, one should execute:
 This will install all necessary dependencies (including the Armadillo library)
 into the folder "api".
 
+### Python
+
+Python-based prototype (./python) is a simplified version of the application
+for testing and comparison against C++ implementation.
+Prerequisites:
+1) Python3 + numpy + scipy + matplotlib.
+2) 'ffmpeg' utility for generating AVI files (installable from Ubuntu 16.04 repository).
+3) optional 'mplayer' for playing AVI files, e.g.
+        mplayer -nosound -x 512 -y 512 output/field.avi
+   mplayer is also installable from the standard Ubuntu 16.04 repository.
+
+In order to run Python prototype, standing in the project root directory:
+        python3 ./python/Amdados.py
+or, if you want just to generate observations:
+        python3 ./python/Amdados.py -g
+Results will appear in ./output folder, such as a sequence of fields, AVI file
+where all the field are put together or a file of observations (observations.bin).
+        
