@@ -38,7 +38,7 @@ verdandi*
 output/
 3rd_party
 3rd-party
-api
+*.git
 .DS_Store
 
 __pycache__
