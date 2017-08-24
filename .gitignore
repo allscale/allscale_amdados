@@ -32,7 +32,7 @@ doc/references
 .*.swo
 tags
 *.zip
-api/allscale_api
+*.git
 verdandi
 verdandi*
 output/

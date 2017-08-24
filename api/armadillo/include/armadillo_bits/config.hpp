@@ -215,7 +215,7 @@
 #if defined(ARMA_USE_WRAPPER)
   #if defined(ARMA_USE_CXX11)
     #if !defined(ARMA_USE_EXTERN_CXX11_RNG)
-/* #undef ARMA_USE_EXTERN_CXX11_RNG */
+      #define ARMA_USE_EXTERN_CXX11_RNG
     #endif
   #endif
 #endif
