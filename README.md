@@ -127,6 +127,22 @@ From the project root folder, one should execute:
 This will install all necessary dependencies (including the Armadillo library)
 into the folder "api".
 
+### Visualization
+
+For live visualization of C++ code on Linux just install gnuplot.
+
+On Mac OS ( https://apple.stackexchange.com/questions/103814/cant-plot-with-gnuplot-on-my-mac ):
+1) Install XQuartz (via brew);
+2) brew uninstall gnuplot
+3) brew install gnuplot --with-x11
+Now gnuplot supports the x11 terminal.
+
+Gnuplot on Windows is also easy to get running, but at the moment we do not support this OS.
+
+Enabling flag should be defined prior to gnuplot header inclusion:
+'#define AMDADOS_ENABLE_GNUPLOT'
+'#include "gnuplot.h"'
+
 ### Python
 
 Python-based prototype (./python) is a simplified version of the application

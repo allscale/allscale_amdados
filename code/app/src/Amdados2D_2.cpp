@@ -586,7 +586,8 @@ void ComputeTrueFields(const Configuration & conf)
     assert_true((Origin[_X_] == 0) && (Origin[_Y_] == 0)) << "origin is expected at (0,0)";
     //true_fields = np.zeros((conf.nx, conf.ny, conf.Nt))
 
-    std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot(nullptr, "-background yellow"));
+    //std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot(nullptr, "-background yellow"));
+    std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot());   // mac os
 
     // Global grid structures defined for all the subdomains.
     // The difference between subdomains 'curr[i]' and 'state[i]' is that the latter

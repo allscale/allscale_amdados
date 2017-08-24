@@ -11,12 +11,25 @@ namespace amdados {
 namespace app {
 namespace gnuplot {
 
+#if defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+#else
+#undef AMDADOS_ENABLE_GNUPLOT
+#warning Plotting with Gnuplot is not supported on this system
+#endif
+
 #ifdef AMDADOS_ENABLE_GNUPLOT
 
 namespace details {
 namespace {
 
 // Linux or Mac OS.
+#if defined(__APPLE__) || defined(__linux__) || defined(__unix__)
+
+// On Mac OS ( https://apple.stackexchange.com/questions/103814/cant-plot-with-gnuplot-on-my-mac ):
+// 1) Install XQuartz (via brew);
+// 2) brew uninstall gnuplot
+// 3) brew install gnuplot --with-x11
+// Now gnuplot supports the x11 terminal.
 
 const char   PathDelimiter[] = ":";
 const char   GnuplotName[] = "gnuplot";
@@ -109,6 +122,8 @@ std::string GetProgramPath(const char * user_specified)
     return std::string();
 }
 
+#endif // checking for the OS
+
 } // anonymous namespace
 } // namespace details
 
@@ -123,7 +138,6 @@ private:
     std::vector<char> mBuffer;  ///< command buffer
 
 private:
-    Gnuplot();
     Gnuplot(const Gnuplot &);
     Gnuplot & operator=(const Gnuplot &);
 
