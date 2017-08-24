@@ -10,7 +10,12 @@ namespace app {
 namespace utils {
 
 //=================================================================================================
-// Very basic class for handling parameter settings of an application.
+// Simple class for managing the application parameters.
+// Parameters can be read from a text file where the format of each parameter is as follows:
+//          <parameter name>  <parameter value>  # comment
+// Parameter name is a single word without spaces, special symbols or quotation.
+// Parameter value is a double, an integer or a string without spaces and quotation.
+// Everything to the right of the symbol '#' is ignored. Blank lines are ignored as well.
 //=================================================================================================
 class Configuration
 {
@@ -53,12 +58,14 @@ public:
 ////////////////       Remove "inline" keyword once moved to the *.cpp file
 
 //-------------------------------------------------------------------------------------------------
+// Constructor.
 //-------------------------------------------------------------------------------------------------
 inline Configuration::Configuration() : m_params()
 {
 }
 
 //-------------------------------------------------------------------------------------------------
+// Function reads parameters from the configuration file.
 //-------------------------------------------------------------------------------------------------
 inline void Configuration::ReadConfigFile(const char * filename)
 {
@@ -125,8 +132,7 @@ inline void Configuration::PrintParameters(std::ostream & out) const
 //-------------------------------------------------------------------------------------------------
 inline void Configuration::CheckExist(bool do_exist, const char * param_name) const
 {
-    assert_true(do_exist)
-        << "Parameter " << param_name << " was not found" << std::endl;
+    assert_true(do_exist) << "Parameter " << param_name << " was not found" << std::endl;
 }
 
 //-------------------------------------------------------------------------------------------------

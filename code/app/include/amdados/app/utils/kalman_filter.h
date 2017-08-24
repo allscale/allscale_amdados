@@ -12,7 +12,7 @@ namespace utils {
 //=================================================================================================
 // Class implements a Kalman filter using AllScale API grid for matrices and vectors.
 //=================================================================================================
-template<size_t PROBLEM_SIZE, size_t NUM_MEASUREMENTS>
+template<int PROBLEM_SIZE, int NUM_MEASUREMENTS>
 class KalmanFilter
 {
 public:
@@ -99,7 +99,7 @@ void PosteriorEstimation(const matrix_MxN_t & H, const matrix_MxM_t & R, const v
     SubtractVectors(m_y, z, m_y);
 
     // S = H * P_prior * H^t + R
-    MatMultTransposed(m_PHt, m_P_prior, H);
+    MatMultTr(m_PHt, m_P_prior, H);
     MatMult(m_S, H, m_PHt);
     AddMatrices(m_S, m_S, R);
 
@@ -107,7 +107,7 @@ void PosteriorEstimation(const matrix_MxN_t & H, const matrix_MxM_t & R, const v
     Symmetrize(m_S);
 
     // Compute Cholesky decomposition  S = L * L^t  to facilitate matrix inversion.
-    m_chol.ComputeDecomposition(m_S);
+    m_chol.Init(m_S);
 
     // m_invSy = S^{-1} * y
     m_chol.Solve(m_invSy, m_y);

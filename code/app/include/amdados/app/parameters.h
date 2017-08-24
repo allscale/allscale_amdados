@@ -27,8 +27,8 @@ namespace app {
 
 		const int nelems_x = 10;
 		const int nelems_y = 10;
-		const size_t SUB_PROBLEM_SIZE = nelems_x * nelems_y;
-		const size_t NUM_MEASUREMENTS = nelems_x * nelems_y;
+		const int SUB_PROBLEM_SIZE = nelems_x * nelems_y;
+		const int NUM_MEASUREMENTS = nelems_x * nelems_y;
 		const int nelems_glob_x = nelems_x * num_domains_x;
 		const int nelems_glob_y = nelems_y * num_domains_y;
 

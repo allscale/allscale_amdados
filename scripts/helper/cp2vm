@@ -6,7 +6,7 @@
 
 echo "Copying the project to the virtual machine ..."
 
-DESTIN="${VM}:${HOME}/work/"
+DESTIN="${VM}:/home/${USER}/work/"
 
 rsync -arv \
 --exclude 'bin' --exclude 'output' --exclude 'build_debug' --exclude 'build_release' \

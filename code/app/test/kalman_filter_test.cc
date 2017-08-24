@@ -18,31 +18,30 @@
 using namespace amdados::app;
 using namespace amdados::app::utils;
 
-static Configuration gConf;         // a single global configuration
-
 //-------------------------------------------------------------------------------------------------
 // Function for testing a Kalman filter on a toy 2D problem.
 //-------------------------------------------------------------------------------------------------
 TEST(KalmanFilter, Basic)
 {
     // Read configuration settings.
-    gConf.ReadConfigFile("../../amdados.conf");
-    gConf.PrintParameters();
-    MakeDirectory(gConf.asCString("test_output_dir"));
+    Configuration conf;         // a single global configuration
+    conf.ReadConfigFile("../../amdados.conf");
+    conf.PrintParameters();
+    MakeDirectory(conf.asCString("test_output_dir"));
 
     // Open a file for printing summary of the test.
-    std::string summaryFileName = gConf.asString("test_output_dir") + "/kalman_summary_test.log";
+    std::string summaryFileName = conf.asString("test_output_dir") + "/kalman_summary_test.log";
     std::fstream summaryFile(summaryFileName, std::ios::out | std::ios::trunc);
     assert_true(summaryFile.good())
         << "failed to oped the summary file: " << summaryFileName << endl;
 
     // Open a file for storing the results of particle path tracking by the Kalman filter.
-    std::string trackFileName = gConf.asString("test_output_dir") + "/kalman_filter_test.out";
+    std::string trackFileName = conf.asString("test_output_dir") + "/kalman_filter_test.out";
     std::fstream trackFile(trackFileName, std::ios::out | std::ios::trunc);
     assert_true(trackFile.good())
         << "failed to oped the track file: " << trackFileName << endl;
 
-    const size_t DIM = 3;
+    const int    DIM = 3;
     const int    NUM_TIME_STEPS = 5000;
     const double DEVIATION_MODEL = 1.0;
     const double DEVIATION_MEASUREMENT = 1.0;
@@ -79,9 +78,9 @@ TEST(KalmanFilter, Basic)
         double t = k * (10.0 * M_PI) / (NUM_TIME_STEPS - 1);
 
         // Generate the next true state.
-        true_x[{0}] = t * std::sqrt(std::fabs(t)) * (1 + 0.1*std::cos(5.0*t)) * std::cos(t);
-        true_x[{1}] = t * std::sqrt(std::fabs(t)) * (1 + 0.1*std::cos(5.0*t)) * std::sin(t);
-        true_x[{2}] = t                           * (1 + 0.1*std::cos(5.0*t));
+        true_x(0) = t * std::sqrt(std::fabs(t)) * (1 + 0.1*std::cos(5.0*t)) * std::cos(t);
+        true_x(1) = t * std::sqrt(std::fabs(t)) * (1 + 0.1*std::cos(5.0*t)) * std::sin(t);
+        true_x(2) = t                           * (1 + 0.1*std::cos(5.0*t));
 
         // Some statistics for debugging.
         if (k > 0) { mean_step += NormVecDiff(true_x, prev_true_x); }
@@ -101,7 +100,7 @@ TEST(KalmanFilter, Basic)
         kf.Iterate(A, Q, H, R, z, x, P);
 
         // Mean deviation is a square root of the mean diagonal element of the matrix P.
-        double mean_dev = Trace(P) / static_cast<double>(DIM);
+        double mean_dev = Trace(P) / DIM;
         total_mean_dev += mean_dev;
         mean_dev = std::sqrt(std::fabs(mean_dev));
 
@@ -109,16 +108,16 @@ TEST(KalmanFilter, Basic)
         // measurements followed by the state vector estimated by the Kalman filter
         // followed by the mean eigenvalue of the estimated covariance matrix.
         trackFile << t << SPACE;
-        for (int j = 0; j < static_cast<int>(DIM); ++j) { trackFile << true_x[{j}] << SPACE; }
-        for (int j = 0; j < static_cast<int>(DIM); ++j) { trackFile << z[{j}] << SPACE; }
-        for (int j = 0; j < static_cast<int>(DIM); ++j) { trackFile << x[{j}] << SPACE; }
+        for (int j = 0; j < DIM; ++j) { trackFile << true_x(j) << SPACE; }
+        for (int j = 0; j < DIM; ++j) { trackFile << z(j) << SPACE; }
+        for (int j = 0; j < DIM; ++j) { trackFile << x(j) << SPACE; }
         trackFile << mean_dev << endl;
     }
     trackFile.flush();
-    mean_inno /= static_cast<double>(NUM_TIME_STEPS - 1);   // first step was missed
-    mean_step /= static_cast<double>(NUM_TIME_STEPS - 1);   // first step was missed
+    mean_inno /= (NUM_TIME_STEPS - 1);   // first step was missed
+    mean_step /= (NUM_TIME_STEPS - 1);   // first step was missed
     EXPECT_NEAR(mean_step, 0.47272, 1e-5);
-    total_mean_dev = std::sqrt(std::fabs(total_mean_dev / static_cast<double>(NUM_TIME_STEPS)));
+    total_mean_dev = std::sqrt(std::fabs(total_mean_dev / NUM_TIME_STEPS));
     EXPECT_NEAR(total_mean_dev, 0.786159, 1e-5);
 
     summaryFile << "TestKalmanFilter():" << endl;

@@ -59,31 +59,31 @@ T Square(const T & v)
 //-------------------------------------------------------------------------------------------------
 // Functor converts 2D index (x,y) into a plain one.
 //-------------------------------------------------------------------------------------------------
-template<size_t SizeX, size_t SizeY>
+template<int SizeX, int SizeY>
 struct Sub2Ind {
     Sub2Ind() {
-        static_assert(SizeX * SizeY < static_cast<size_t>(numeric_limits<int>::max()), "overflow");
+        static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");
     }
 
-    int operator()(int x, int y) const {
-        assert_true(static_cast<size_t>(x) < SizeX);
-        assert_true(static_cast<size_t>(y) < SizeY);
+    int operator()(int ix, int iy) const {
+        assert_true((0 <= ix) && (ix < SizeX));
+        assert_true((0 <= iy) && (iy < SizeY));
         //return (x + static_cast<int>(SizeX) * y);
-        return (x * static_cast<int>(SizeY) + y);   // TODO: we already have observations based
-    }                                               // on this indexing: y changes faster, swap?
+        return (ix * SizeY + iy);   // TODO: we already have observations based
+    }                               // on this indexing: y changes faster, swap?
 };
 
 //-------------------------------------------------------------------------------------------------
 // Functor converts a plane index into 2D one (x,y).
 //-------------------------------------------------------------------------------------------------
-template<size_t SizeX, size_t SizeY>
+template<int SizeX, int SizeY>
 struct Ind2Sub {
     Ind2Sub() {
-        static_assert(SizeX * SizeY < static_cast<size_t>(numeric_limits<int>::max()), "overflow");
+        static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");
     }
 
     void operator()(const int idx, int & x, int & y) const {
-        assert_true(static_cast<size_t>(idx) < SizeX * SizeY);
+        assert_true((0 <= idx) && (idx < SizeX * SizeY));
         std::div_t divresult = std::div(idx, SizeY);    // if y is the fastest
         x = divresult.quot;
         y = divresult.rem;
@@ -94,7 +94,7 @@ struct Ind2Sub {
 // Function reshapes a vector into 2D grid structure,
 // in Matlab notation: grid = reshape(vec, [SizeX, SizeY]).
 //-------------------------------------------------------------------------------------------------
-template<size_t SizeX, size_t SizeY, typename GRID>
+template<int SizeX, int SizeY, typename GRID>
 void Reshape1Dto2D(GRID & grid, const allscale::utils::grid<double, SizeX * SizeY> & vec)
 {
     // TODO: check grid sizes: must be SizeX by SizeY
@@ -109,7 +109,7 @@ void Reshape1Dto2D(GRID & grid, const allscale::utils::grid<double, SizeX * Size
 //-------------------------------------------------------------------------------------------------
 // Function unrolls 2D grid structure into a vector, in Matlab notation: vec = grid(:).
 //-------------------------------------------------------------------------------------------------
-template<size_t SizeX, size_t SizeY, typename GRID>
+template<int SizeX, int SizeY, typename GRID>
 void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRID & grid)
 {
     // TODO: check grid sizes: must be SizeX by SizeY
@@ -124,7 +124,7 @@ void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRI
 //-------------------------------------------------------------------------------------------------
 // Function creates a new directory or does nothing if it already exists.
 //-------------------------------------------------------------------------------------------------
-void MakeDirectory(const char * dir)
+inline void MakeDirectory(const char * dir)
 {
     assert_true(dir != nullptr);
     std::string cmd("mkdir -p ");   // TODO: not portable, use STL "experimental" instead
@@ -137,3 +137,33 @@ void MakeDirectory(const char * dir)
 } // end namespace utils
 } // end namespace app
 } // end namespace allscale
+
+/*#ifndef NDEBUG*/
+    /*for (int i = 0; i < MSIZE; ++i) {*/
+    /*for (int j = 0; j < MSIZE; ++j) {*/
+    /*std::cout << std::setw(7) << std::setprecision(4) << M[{i,j}] << " ";*/
+    /*}*/
+    /*std::cout << endl;*/
+    /*}*/
+    /*std::cout << endl;*/
+
+
+//std::cout << idx[0] << "  " << idx[1] << endl << flush;
+//if (idx[0]==0 && idx[1]==0)
+//{
+    //std::fstream f("/tmp/mat.txt", std::ios::trunc | std::ios::out);
+    //for (int i = 0; i < SUB_PROBLEM_SIZE; ++i) {
+    //for (int j = 0; j < SUB_PROBLEM_SIZE; ++j) {
+        //f << B[{i,j}] << " ";
+    //}
+    //f << endl << flush;
+    //}
+    //std::cout << "matrix was written" << endl << flush;
+//}
+//std::system("sleep 100");
+//assert_true(0);
+
+/*#endif*/
+
+
+

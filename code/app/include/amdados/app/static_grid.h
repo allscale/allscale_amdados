@@ -6,7 +6,7 @@
 namespace allscale {
 namespace utils {
 
-	template<size_t size>
+	template<int size>
 	struct grid_offset {
 
 		int pos;
@@ -50,7 +50,7 @@ namespace utils {
 		}
 	};
 
-	template<size_t size>
+	template<int size>
 	std::ostream& operator<<(std::ostream& out, const grid_offset<size>& off) {
 		return out << off.pos << "," << off.nested;
 	}
@@ -65,10 +65,10 @@ namespace utils {
 
 
 
-	template<size_t ... sizes>
+	template<int ... sizes>
 	struct grid_address;
 
-	template<size_t f, size_t ... rest>
+	template<int f, int ... rest>
 	struct grid_address<f,rest...> {
 
 		using offset = grid_offset<sizeof...(rest)+1>;
@@ -119,7 +119,7 @@ namespace utils {
 		template<typename Container>
 		grid_address(const Container& c) : grid_address(c.begin(), c.end()) {}
 
-		grid_address(const std::initializer_list<size_t>& list) : grid_address(list.begin(), list.end()) {}
+		grid_address(const std::initializer_list<int>& list) : grid_address(list.begin(), list.end()) {}
 
 		template<typename Iter>
 		grid_address(const Iter& a, const Iter& b) {
@@ -136,12 +136,12 @@ namespace utils {
 	};
 
 
-	template<size_t ... sizes>
+	template<int ... sizes>
 	std::ostream& operator<<(std::ostream& out, const grid_address<sizes...>& addr) {
 		return out << addr.pos << "," << addr.nested;
 	}
 
-	template<size_t size>
+	template<int size>
 	inline std::ostream& operator<<(std::ostream& out, const grid_address<size>& addr) {
 		return out << addr.pos;
 	}
@@ -152,10 +152,10 @@ namespace utils {
 
 
 
-	template<typename Cell, size_t ... size>
+	template<typename Cell, int ... size>
 	struct grid;
 
-	template<typename Cell, size_t a, size_t ... rest>
+	template<typename Cell, int a, int ... rest>
 	struct grid<Cell,a,rest...> {
 		using data_type = std::array<grid<Cell,rest...>,a>;
 		using addr_type = grid_address<a,rest...>;
@@ -207,7 +207,7 @@ namespace utils {
 
 		template<typename Lambda>
 		void for_each(addr_type& addr, const Lambda& lambda) const {
-			for(size_t i = 0; i<a; i++) {
+			for(int i = 0; i<a; i++) {
 				addr.pos = i;
 				data[i].for_each(addr.nested, lambda);
 			}
@@ -215,7 +215,7 @@ namespace utils {
 
 		template<typename Lambda>
 		void for_each(addr_type& addr, const Lambda& lambda) {
-			for(size_t i = 0; i<a; i++) {
+			for(int i = 0; i<a; i++) {
 				addr.pos = i;
 				data[i].for_each(addr.nested, lambda);
 			}

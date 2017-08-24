@@ -131,17 +131,42 @@ into the folder "api".
 
 Python-based prototype (./python) is a simplified version of the application
 for testing and comparison against C++ implementation.
+
 Prerequisites:
-1) Python3 + numpy + scipy + matplotlib.
-2) 'ffmpeg' utility for generating AVI files (installable from Ubuntu 16.04 repository).
-3) optional 'mplayer' for playing AVI files, e.g.
+(1) Python3 + numpy + scipy + matplotlib.
+(2) 'ffmpeg' utility for generating AVI files (installable from the standard
+    Ubuntu 16.04 repository).
+(3) optional 'mplayer' for playing AVI files, e.g.
         mplayer -nosound -x 512 -y 512 output/field.avi
-   mplayer is also installable from the standard Ubuntu 16.04 repository.
+    'mplayer' is also installable from the standard Ubuntu 16.04 repository.
 
 In order to run Python prototype, standing in the project root directory:
-        python3 ./python/Amdados.py
-or, if you want just to generate observations:
-        python3 ./python/Amdados.py -g
-Results will appear in ./output folder, such as a sequence of fields, AVI file
-where all the field are put together or a file of observations (observations.bin).
-        
+        python3 ./python/Amdados2D.py
+
+Results will appear in the "./output" folder, such as a sequence of fields,
+AVI file where all the field are put together, etc.
+Suppose the script had finished successfully, then user can run the following
+commands to visualize the results (from the project root directory):
+
+    # play the [t]rue density field AVI file:
+        bash ./scripts/python/show_results.sh -t
+
+    # play [b]oth fields - the true density field and data assimilation solution:
+        bash ./scripts/python/show_results.sh -b
+
+    # plot the relative [d]ifference between the true density field and
+    # data assimilation solution:
+        bash ./scripts/python/show_results.sh -d
+
+Note, the output of the Python scrip depends on few state flags
+defined at the beginning of Amdados2D.py script file (see the description therein):
+    conf.generate_video
+    conf.generate_text_output
+    conf.generate_observations_only
+
+There are also 1D and 2D Matlab implementations of the same algorithm as in
+Amdados2D.py called Amdados1D.m and Amdados2D.m respectively. Matlab version
+is faster and more readable. It can be run in terminal (from the project root
+directory) as described at the beginning of each script. The script Amdados2D.m
+produces only "./output/both_fields.avi".
+

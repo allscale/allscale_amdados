@@ -11,7 +11,7 @@ namespace app {
 //=================================================================================================
 // Euler method for advection-diffusion equation discretized by finite difference approximation.
 //=================================================================================================
-template<size_t SizeX, size_t SizeY>
+template<int SizeX, int SizeY>
 class EulerFiniteDifferenceModel : public IModel<SizeX, SizeY>
 {
 public:
@@ -25,10 +25,8 @@ public:
 // Constructor.
 //-------------------------------------------------------------------------------------------------
 IBM_NOINLINE
-EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf)
+EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf), mM(), mTriplets()
 {
-    mM.reset(new sp_matrix_t());
-    mTriplets.reset(new triplet_arr_t());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -37,8 +35,6 @@ EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf)
 IBM_NOINLINE
 virtual ~EulerFiniteDifferenceModel()
 {
-    mM.reset();             // this is not necessary but for debugging
-    mTriplets.reset();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -50,15 +46,15 @@ virtual const sp_matrix_t & ModelMatrix(double flow_x, double flow_y,
 {
     (void)t;
     MakeModelMatrix(flow_x, flow_y, time_delta, space_delta);
-    return *mM;
+    return mM;
 }
 
 private:
     using triplet_arr_t = std::vector<triplet_t>;
 
     const utils::Configuration & mConf;     ///< reference to external parameter handler
-    unique_ptr<sp_matrix_t>      mM;        ///< model matrix
-    unique_ptr<triplet_arr_t>    mTriplets; ///< triplets for constructing the model matrix
+    sp_matrix_t                  mM;        ///< model matrix
+    triplet_arr_t                mTriplets; ///< triplets for constructing the model matrix
 
 private:
 //-------------------------------------------------------------------------------------------------
@@ -73,9 +69,9 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double spa
 
     Sub2Ind<SizeX,SizeY> sub2ind;   // converts 2D index (x,y) to plain index
 
-    mTriplets->resize(5 * PROBLEM_SIZE);
-    triplet_t * pTriplets = mTriplets->data();
-    size_t      count = 0;
+    mTriplets.resize(5 * PROBLEM_SIZE);
+    triplet_t * pTriplets = mTriplets.data();
+    int         count = 0;
 
     const double c = mConf.asDouble("diffusion_coef");
     const double diffmult = (time_delta * c) / std::pow(space_delta,2);
@@ -164,7 +160,7 @@ void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double spa
 
     // Assemble the model matrix.
     assert_true(count == 5 * PROBLEM_SIZE);
-    mM->SetFromTriplets(*mTriplets, MemoryPolicy::RETAIN_MEMORY);
+    mM.SetFromTriplets(mTriplets, MemoryPolicy::RETAIN_MEMORY);
 }
 
 }; // class EulerFiniteDifferenceModel

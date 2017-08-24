@@ -8,6 +8,9 @@ CONF=Release
 FULL=false
 TEST=false
 
+# Print blank lines for better visibility.
+for i in {1..100}; do echo; done
+
 # Any subsequent(*) commands which fail will cause the shell script to exit immediately:
 set -e
 
@@ -22,7 +25,13 @@ echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 echo
 
 # Get the number of CPUs to run building and testing.
-NCPUs=$(grep -c ^processor /proc/cpuinfo)
+if [[ "$(uname)" == 'Linux' ]]; then
+    NCPUs=$(grep -c ^processor /proc/cpuinfo)
+elif [[ "$(uname)" == 'Darwin' ]]; then
+    NCPUs=$(sysctl -n hw.ncpu)
+    #alias gcc="/usr/local/bin/gcc-7"
+    #alias g++="/usr/local/bin/g++-7"
+fi
 echo "Number of available CPUs: ${NCPUs}"
 ONE=1
 useNCPUs=$((NCPUs-ONE))
@@ -58,15 +67,20 @@ if [ ! -d "build" ]; then
     cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
     cd ../
 elif ${FULL}; then
+    /bin/rm -fr build/*
     cd build
     cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
     cd ../
 fi
 
+# Generate ctags for Vim editor.
+ctags -R .
+
 # Building and, possibly, testing.
 cd ./build
 if $TEST; then
-    (make -j ${useNCPUs}) && (ctest -j ${useNCPUs})
+    (make -j ${useNCPUs}) && (/bin/rm -fr ../output/*.log) && \
+        (ctest -j ${useNCPUs}) && (cat ../output/*.log)
 else
     make -j ${useNCPUs}
 fi

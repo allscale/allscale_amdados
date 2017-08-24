@@ -35,13 +35,13 @@ const double TOL = std::sqrt(std::numeric_limits<double>::epsilon());
 //-------------------------------------------------------------------------------------------------
 // Function copies an "allscale" matrix to "armadillo" one.
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 void CopyToArma(arma::mat & dest, const Matrix<NROWS,NCOLS> & source)
 {
     dest.zeros(NROWS, NCOLS);
     for (int r = 0; r < static_cast<int>(NROWS); ++r) {
         for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
-            dest(r,c) = source[{r,c}];
+            dest(r,c) = source(r,c);
         }
     }
 }
@@ -49,19 +49,19 @@ void CopyToArma(arma::mat & dest, const Matrix<NROWS,NCOLS> & source)
 //-------------------------------------------------------------------------------------------------
 // Function copies an "allscale" vector to "armadillo" one.
 //-------------------------------------------------------------------------------------------------
-template<size_t LENGTH>
+template<int LENGTH>
 void CopyToArma(arma::vec & dest, const Vector<LENGTH> & source)
 {
     dest.zeros(LENGTH);
     for (int k = 0; k < static_cast<int>(LENGTH); ++k) {
-        dest(k) = source[{k}];
+        dest(k) = source(k);
     }
 }
 
 //-------------------------------------------------------------------------------------------------
 // Function initializes a random "allscale" matrix along with corresponding "armadillo" one.
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 void InitRandomSparse(SpMatrix<NROWS,NCOLS> & A, arma::sp_mat & B)
 {
     // Make "allscale" sparse matrix.
@@ -94,10 +94,10 @@ double RelativeErrorCheckAndUpdate(const arma::mat & A, const arma::mat & B,
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 double TestDenseMulDense(double max_rel_err)
 {
-    const size_t MSIZE = 167;
+    const int MSIZE = 167;
 
     Matrix<NROWS,MSIZE> A1;
     Matrix<MSIZE,NCOLS> A2;
@@ -120,10 +120,10 @@ double TestDenseMulDense(double max_rel_err)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 double TestSparseMulDense(double max_rel_err)
 {
-    const size_t MSIZE = 111;
+    const int MSIZE = 111;
 
     // Make "allscale" and "armadillo" sparse matrices.
     SpMatrix<NROWS,MSIZE> A;
@@ -149,10 +149,10 @@ double TestSparseMulDense(double max_rel_err)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 double TestDenseMulSparse(double max_rel_err)
 {
-    const size_t MSIZE = 143;
+    const int MSIZE = 143;
 
     // Make "allscale" and "armadillo" sparse matrices.
     SpMatrix<MSIZE,NCOLS> A;
@@ -178,10 +178,10 @@ double TestDenseMulSparse(double max_rel_err)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 double TestDenseMulSparseTransposed(double max_rel_err)
 {
-    const size_t MSIZE = 119;
+    const int MSIZE = 119;
 
     // Make "allscale" and "armadillo" sparse matrices.
     SpMatrix<NCOLS,MSIZE> A;
@@ -207,7 +207,7 @@ double TestDenseMulSparseTransposed(double max_rel_err)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-template<size_t NROWS, size_t NCOLS>
+template<int NROWS, int NCOLS>
 double TestMatrixMulVector(double max_rel_err)
 {
     Vector<NROWS> result;

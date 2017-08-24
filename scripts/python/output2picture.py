@@ -1,3 +1,8 @@
+#------------------------------------------------------------------------------
+# Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+# Copyright : IBM Research Ireland, 2017
+#------------------------------------------------------------------------------
+
 """
 Script converts state fields into pictures given the folder for simulation results.
 """

@@ -10,7 +10,7 @@ namespace utils {
 
 		// compute model covariance structure as function of exponential distance
 		// Follow same structure as that implemented for Runga Kutta solver
-		template<size_t SizeX, size_t SizeY>
+		template<int SizeX, int SizeY>
 		void getModelCovar(allscale::utils::grid<double,SizeX,SizeY>& mod_covar) {
 			int m = 0;
 			int n = 0;
@@ -25,7 +25,7 @@ namespace utils {
 		}
 
 
-		template<size_t SizeX, size_t SizeY>
+		template<int SizeX, int SizeY>
 		void ComputeH(allscale::utils::grid<double,SizeX,SizeY>& HMatrix)
 		{
 		    for(int i=0; i<(int)SizeX; ++i) {      //SizeX and SizeY are number of elements in X and Y
@@ -33,7 +33,7 @@ namespace utils {
 		    }
 		}
 
-		template<size_t SizeX, size_t SizeY>
+		template<int SizeX, int SizeY>
 		void ComputeR(allscale::utils::grid<double,SizeX,SizeY>& RMatrix) {
 		    for(int i=0; i<(int)SizeX; ++i) {      //SizeX and SizeY are number of elements in X and Y
 		        //RMatrix[{i,i}] = ((double) rand() / (RAND_MAX)) ;   // Random noise between 0 and 1 for now
@@ -43,7 +43,7 @@ namespace utils {
 		    }
 		}
 
-		template<size_t SizeX>
+		template<int SizeX>
 		void getObservation(allscale::utils::grid<double,SizeX>& obsvloc,data::Grid<double,3>& obsver,
 		                    int nx, int ny, int timestep, const data::GridPoint<2>& domain)
 		{

@@ -67,13 +67,15 @@ namespace app {
         }
 
         template<unsigned Layer>
-        typename std::enable_if<Layer < layer_number, decltype(nested.template getLayer<Layer>())>::type
+        typename std::enable_if<Layer < layer_number,
+            decltype(nested.template getLayer<Layer>())>::type
         getLayer() {
             return nested.template getLayer<Layer>();
         }
 
         template<unsigned Layer>
-        typename std::enable_if<Layer < layer_number, decltype(static_cast<const nested_type&>(nested).template getLayer<Layer>())>::type
+        typename std::enable_if<Layer < layer_number,
+            decltype(static_cast<const nested_type&>(nested).template getLayer<Layer>())>::type
         getLayer() const {
             return nested.template getLayer<Layer>();
         }
@@ -88,71 +90,69 @@ namespace app {
             }
         }
 
-        std::vector<T> getBoundary(unsigned layer, Direction dir) const {   // returns vector of boundary data in each direction
+        // returns vector of boundary data in each direction
+        // TODO: avoid the temporary array creation.
+        std::vector<T> getBoundary(unsigned layer, Direction dir) const {
             if (layer == getLayerNumber()) {
-
                 int size[] = {Sizes...};
-                int x = size[0];
-                int y = size[1];
-                switch(dir) {
-                case Up: {  //returns data from bottom strip of domain to neighbour
-                    std::vector<T> res(x);
-                    for(int i=0; i<x; i++) res[i] = data[{0,i}];
-                    return res;
-                }
-                case Down: { // returns data from top strip of domain to neighbour
-                    std::vector<T> res(x);
-                    for(int i=0; i<x; i++) res[i] = data[{y-1,i}];
-                    return res;
-                }
-                case Left: {
-                    std::vector<T> res(y);
-                    for(int i=0; i<y; i++) res[i] = data[{i,0}];
-                    return res;
-                }
-                case Right: {
-                    std::vector<T> res(y);
-                    for(int i=0; i<y; i++) res[i] = data[{i,x-1}];
-                    return res;
-                }
+                int Nx = size[0];
+                int Ny = size[1];
+                switch (dir) {
+                    case Up: {      // returns data from TOP strip of domain to neighbour
+                        std::vector<T> res(Nx);
+                        for (int x = 0; x < Nx; ++x) res[x] = data[{x,Ny-1}];
+                        return res;
+                    }
+                    case Down: {    // returns data from BOTTOM strip of domain to neighbour
+                        std::vector<T> res(Nx);
+                        for (int x = 0; x < Nx; ++x) res[x] = data[{x,0}];
+                        return res;
+                    }
+                    case Left: {
+                        std::vector<T> res(Ny);
+                        for (int y = 0; y < Ny; ++y) res[y] = data[{0,y}];
+                        return res;
+                    }
+                    case Right: {
+                        std::vector<T> res(Ny);
+                        for (int y = 0; y < Ny; ++y) res[y] = data[{Nx-1,y}];
+                        return res;
+                    }
                 }
             }
-            return nested.getBoundary(layer,dir);
+            return nested.getBoundary(layer, dir);
         }
 
-        void setBoundary(unsigned layer, Direction dir, const std::vector<T>& boundary) {
+        void setBoundary(unsigned layer, Direction dir, const std::vector<T> & boundary) {
             if (layer == getLayerNumber()) {
-
                 int size[] = {Sizes...};
-                int x = size[0];
-                int y = size[1];
-
-                switch(dir) {
-                case Up: {
-                    assert(boundary.size() == (size_t)x);
-                    for(int i=0; i<x; i++) data[{0,i}] = boundary[i];
-                    return;
-                }
-                case Down: {
-                    assert(boundary.size() == (size_t)x);
-                    for(int i=0; i<x; i++) data[{y-1,i}] = boundary[i];
-                    return;
-                }
-                case Left: {
-                    assert(boundary.size() == (size_t)y);
-                    for(int i=0; i<y; i++) data[{i,0}] = boundary[i];
-                    return;
-                }
-                case Right: {
-                    assert(boundary.size() == (size_t)y);
-                    for(int i=0; i<y; i++) data[{i,x-1}] = boundary[i];
-                    return;
-                }
+                int Nx = size[0];
+                int Ny = size[1];
+                switch (dir) {
+                    case Up: {
+                        assert_true(boundary.size() == static_cast<size_t>(Nx));
+                        for (int x = 0; x < Nx; ++x) data[{x,Ny-1}] = boundary[x];
+                        return;
+                    }
+                    case Down: {
+                        assert_true(boundary.size() == static_cast<size_t>(Nx));
+                        for (int x = 0; x < Nx; ++x) data[{x,0}] = boundary[x];
+                        return;
+                    }
+                    case Left: {
+                        assert_true(boundary.size() == static_cast<size_t>(Ny));
+                        for (int y = 0; y < Ny; ++y) data[{0,y}] = boundary[y];
+                        return;
+                    }
+                    case Right: {
+                        assert_true(boundary.size() == static_cast<size_t>(Ny));
+                        for (int y = 0; y < Ny; ++y) data[{Nx-1,y}] = boundary[y];
+                        return;
+                    }
                 }
             }
-            nested.setBoundary(layer,dir,boundary);
+            nested.setBoundary(layer, dir, boundary);
         }
-
     };
 
 
@@ -180,7 +180,7 @@ namespace app {
             case 1: getLayer<1>() = other.getLayer<1>(); return *this;
             case 2: getLayer<2>() = other.getLayer<2>(); return *this;
             case 3: getLayer<3>() = other.getLayer<3>(); return *this;
-            default: assert(false && "Unsupported number of levels!");
+            default: assert_true(false && "Unsupported number of levels!");
             }
             return *this;
         }
@@ -264,72 +264,71 @@ namespace app {
             data.for_each(op);
         }
 
+        // TODO: avoid the temporary array creation.
         std::vector<T> getBoundary(unsigned layer, Direction dir) const {
             if (layer == 0) {
-
                 int size[] = {Sizes...};
-                int x = size[0];
-                int y = size[1];
-                switch(dir) {
-                case Up: {
-                    std::vector<T> res(x);
-                    for(int i=0; i<x; i++) res[i] = data[{0,i}];
-                    return res;
-                }
-                case Down: {
-                    std::vector<T> res(x);
-                    for(int i=0; i<x; i++) res[i] = data[{y-1,i}];
-                    return res;
-                }
-                case Left: {
-                    std::vector<T> res(y);
-                    for(int i=0; i<y; i++) res[i] = data[{i,0}];
-                    return res;
-                }
-                case Right: {
-                    std::vector<T> res(y);
-                    for(int i=0; i<y; i++) res[i] = data[{i,x-1}];
-                    return res;
-                }
+                int Nx = size[0];
+                int Ny = size[1];
+                switch (dir) {
+                    case Up: {      // returns data from TOP strip of domain to neighbour
+                        std::vector<T> res(Nx);
+                        for (int x = 0; x < Nx; ++x) res[x] = data[{x,Ny-1}];
+                        return res;
+                    }
+                    case Down: {    // returns data from BOTTOM strip of domain to neighbour
+                        std::vector<T> res(Nx);
+                        for (int x = 0; x < Nx; ++x) res[x] = data[{x,0}];
+                        return res;
+                    }
+                    case Left: {
+                        std::vector<T> res(Ny);
+                        for (int y = 0; y < Ny; ++y) res[y] = data[{0,y}];
+                        return res;
+                    }
+                    case Right: {
+                        std::vector<T> res(Ny);
+                        for (int y = 0; y < Ny; ++y) res[y] = data[{Nx-1,y}];
+                        return res;
+                    }
                 }
             }
-            assert(false && "No such layer!");
+            assert_true(false && "No such layer!");
             return std::vector<T>();
         }
 
-        void setBoundary(unsigned layer, Direction dir, const std::vector<T>& boundary) {
+        void setBoundary(unsigned layer, Direction dir, const std::vector<T> & boundary) {
             if (layer == 0) {
-
                 int size[] = {Sizes...};
-                int x = size[0];
-                int y = size[1];
-
-                switch(dir) {
-                case Up: {
-                    assert(boundary.size() == (size_t)x);
-                    for(int i=0; i<x; i++) data[{0,i}] = boundary[i];
-                    return;
-                }
-                case Down: {
-                    assert(boundary.size() == (size_t)x);
-                    for(int i=0; i<x; i++) data[{y-1,i}] = boundary[i];
-                    return;
-                }
-                case Left: {
-                    assert(boundary.size() == (size_t)y);
-                    for(int i=0; i<y; i++) data[{i,0}] = boundary[i];
-                    return;
-                }
-                case Right: {
-                    assert(boundary.size() == (size_t)y);
-                    for(int i=0; i<y; i++) data[{i,x-1}] = boundary[i];
-                    return;
-                }
+                int Nx = size[0];
+                int Ny = size[1];
+                switch (dir) {
+                    case Up: {
+                        assert_true(boundary.size() == static_cast<size_t>(Nx));
+                        for (int x = 0; x < Nx; ++x) data[{x,Ny-1}] = boundary[x];
+                        return;
+                    }
+                    case Down: {
+                        assert_true(boundary.size() == static_cast<size_t>(Nx));
+                        for (int x = 0; x < Nx; ++x) data[{x,0}] = boundary[x];
+                        return;
+                    }
+                    case Left: {
+                        assert_true(boundary.size() == static_cast<size_t>(Ny));
+                        for (int y = 0; y < Ny; ++y) data[{0,y}] = boundary[y];
+                        return;
+                    }
+                    case Right: {
+                        assert_true(boundary.size() == static_cast<size_t>(Ny));
+                        for (int y = 0; y < Ny; ++y) data[{Nx-1,y}] = boundary[y];
+                        return;
+                    }
                 }
             }
-            assert(false && "No such layer!");
+            assert_true(false && "No such layer!");
         }
     };
 
 } // end namespace app
 } // end namespace amdados
+

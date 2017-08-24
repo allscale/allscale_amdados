@@ -6,7 +6,7 @@
 
 echo "Copying the project to the blade machine ..."
 
-DESTIN="${BLADE}:${HOME}/work/"
+DESTIN="${BLADE}:/home/${USER}/work/"
 
 rsync -arv \
 --exclude 'bin' --exclude 'output' --exclude 'build_debug' --exclude 'build_release' \
@@ -17,15 +17,6 @@ rsync -arv \
 --exclude 'documentation'  --exclude 'doc' --exclude 'experimental' \
 --exclude '__pycache__' \
 ../allscale_amdados ${DESTIN}
-
-# Overwrite some cmake files to enable compilation on the blade machines.
-# Namely, the googletest is not downloaded but read from "ext_libs" folder.
-
-#rsync -arv --ignore-times ./ext_libs/parec_add_unit_test.cmake \
-#        ${DESTIN}/allscale-api-protoype/code/parec/code/cmake/add_unit_test.cmake
-#
-#rsync -arv --ignore-times ./ext_libs/add_unit_test.cmake \
-#        ${DESTIN}/allscale-api-protoype/code/cmake/add_unit_test.cmake
 
 echo ""
 echo ""

@@ -35,10 +35,11 @@ tags
 *.gz
 verdandi
 verdandi*
-output
+output/
 3rd_party
 3rd-party
 api
+.DS_Store
 
 __pycache__
 .ipynb_checkpoints

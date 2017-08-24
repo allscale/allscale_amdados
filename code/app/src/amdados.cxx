@@ -3,12 +3,8 @@
 //             Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
-
-#include "amdados/app/amdados_grid.h"
-#include "amdados/app/utils/common.h"
-#include "amdados/app/utils/amdados_utils.h"
-#include "amdados/app/utils/configuration.h"
-#include "i_solver.h"
+#include <iostream>
+#include <sstream>
 
 // Components to be included
 // 1) Grid structures specific to each subdomain
@@ -39,21 +35,43 @@
 // Data assimilation solver
 // File output at periodic intervals
 
-int main()
+int main(int argc, char ** argv)
 {
-    using namespace ::amdados::app;
-    using namespace ::amdados::app::utils;
-    Configuration conf;
-    conf.ReadConfigFile("amdados_old.conf");
-    conf.PrintParameters();
-    MakeDirectory(conf.asCString("output_dir"));
-    std::unique_ptr<ISolver> pSolv = CreateSolver_EI_FD_KF(conf);
-    pSolv->InitSolver(conf);
-    pSolv->RunSolver(conf);
-    return EXIT_SUCCESS;
+    std::cout << std::endl << std::endl << std::endl;
+    int scenario = 0;
+    if (argc > 1) {
+        if (argc > 2) {
+            std::cout << "ERROR: at most 1 input argument is expected" << std::endl;
+            return 1;
+        }
+        int val = 0;
+        if ((std::istringstream(argv[1]) >> val) && (val >= 0)) {
+            scenario = val;
+        } else {
+            std::cout << "WARNING: scenarion ID must be non-negative value; defaults to "
+                      << scenario << std::endl;
+        }
+    }
+    std::cout << "Scenario: " << scenario << std::endl << std::endl << std::flush;
+
+    switch (scenario) {
+        case 0: {
+            int Amdados2DMain(void);
+            return Amdados2DMain();
+        }
+        break;
+        case 1: {
+            int FailTest1();
+            return FailTest1();
+        }
+        break;
+        case 2: {
+            int Amdados2DMain_2(void);
+            return Amdados2DMain_2();
+        }
+        break;
+        default: std::cout << "ERROR: unknown scenario: " << scenario << std::endl;
+    }
+    return 1;
 }
-
-//Compute(zero, size_global);
-//std::cout << "active layer: " << A[{1,1}].getActiveLayer() << std::endl;  // XXX ???
-
 

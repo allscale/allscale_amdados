@@ -12,11 +12,11 @@ namespace app {
 // Interface to any model that propagates state according to a 2D physical model in hand
 // (e.g. advection-diffusion equation).
 //=================================================================================================
-template<size_t SizeX, size_t SizeY>
+template<int SizeX, int SizeY>
 class IModel
 {
 public:
-    static const size_t PROBLEM_SIZE = SizeX * SizeY;
+    static const int PROBLEM_SIZE = SizeX * SizeY;
     using vector_t = utils::Vector<PROBLEM_SIZE>;
     using matrix_t = utils::Matrix<PROBLEM_SIZE, PROBLEM_SIZE>;
     using sp_matrix_t = utils::SpMatrix<PROBLEM_SIZE, PROBLEM_SIZE>;
@@ -48,11 +48,11 @@ IBM_NOINLINE
 void UpdateState(const MODEL & M, STATE & state, COVAR & covar)
 {
 #if 1
-    std::unique_ptr<STATE> tmp_state(new STATE{state});
-    utils::MatVecMult(state, M, *tmp_state);                // state <- M * state
-    std::unique_ptr<COVAR> tmp_covar(new COVAR{covar});
-    utils::MatMultTr(*tmp_covar, covar, M);
-    utils::MatMult(covar, M, *tmp_covar);                   // covar <- M * old_covar * M^T
+    STATE tmp_state;
+    utils::MatVecMult(state, M, tmp_state);                 // state <- M * state
+    COVAR tmp_covar;
+    utils::MatMultTr(tmp_covar, covar, M);
+    utils::MatMult(covar, M, tmp_covar);                    // covar <- M * old_covar * M^T
 #else   // this is fast:
     STATE tmp_state{state};
     utils::MatVecMult(state, M, tmp_state);                 // state <- M * state

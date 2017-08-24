@@ -16,6 +16,7 @@
 #include <memory>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 
 #ifndef IBM_NOINLINE
 #ifdef _MSC_VER                                         // assume MS Visual C++
@@ -31,8 +32,21 @@ namespace app {
 using ::std::endl;
 using ::std::flush;
 using ::std::numeric_limits;
-using ::std::unique_ptr;
+/*using ::std::unique_ptr;*/
 using ::std::string;
 
 } // end namespace app
 } // end namespace amdados
+
+
+
+/*#ifdef ASSERT*/
+/*#error ASSERT is already defined*/
+/*#endif*/
+/*#ifndef NDEBUG*/
+/*#define ASSERT(cond) {if (!(cond)) {std::cout << "ERROR at " << __FILE__ << ":" << __LINE__ \*/
+/*<< std::endl << std::flush; assert_true(0); }}*/
+/*#else*/
+/*#define ASSERT(cond)*/
+/*#endif*/
+

@@ -54,7 +54,7 @@ auto SaveGrid2D = [](const std::string & path, const std::string & title, int t,
 
     stateFile << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values"
               << std::endl;
-    size_t dim = 2;
+    int dim = 2;
     stateFile << dim << std::endl << (nelems_x * num_domains_x) << std::endl
                                   << (nelems_y * num_domains_y) << std::endl;
     for (int k = 0; k < nelems_x * num_domains_x; ++k) {
@@ -166,7 +166,7 @@ void Compute(data::GridPoint<2>& zero, data::GridPoint<2> size_global)
                         // compute updated boundary
                         assert(local_boundary.size() == remote_boundary.size());
                         if (flow_boundary < 0) {  // then flow into domain need to update boundary with neighbour value
-                            for(size_t i = 0; i<local_boundary.size(); i++) {
+                            for(int i = 0; i<local_boundary.size(); i++) {
                                 // for now, we just take the average
                                 // need to update this to account for flow direction (Fearghal)
                                 local_boundary[i] = remote_boundary[i];
