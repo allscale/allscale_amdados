@@ -7,6 +7,9 @@
 #include "allscale/utils/assert.h"
 #include "amdados/app/amdados_grid.h"
 
+namespace amdados {
+namespace app {
+
 using namespace ::allscale::utils;
 using namespace ::amdados::app;
 using ::allscale::api::user::pfor;
@@ -58,8 +61,13 @@ const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 const int _X_ = 0;  // index of abscissa
 const int _Y_ = 1;  // index of ordinate
 
+} // namespace app
+} // namespace amdados
+
 int FailTest1()
 {
+    using namespace ::amdados::app;
+
     {
         ::allscale::api::user::data::Grid<int,2> grid(SubDomGridSize);
 
