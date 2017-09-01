@@ -38,15 +38,26 @@ using ::std::string;
 } // end namespace app
 } // end namespace amdados
 
+// The macro can enforce inlining even in debugging mode.
+#ifdef IBM_ALWAYS_INLINE
+#error IBM_ALWAYS_INLINE is already defined
+#endif
+#if defined(__GNUC__) || defined(__GNUG__)
+#define IBM_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define IBM_ALWAYS_INLINE
+#endif
 
+inline IBM_ALWAYS_INLINE void CheckRange1D(int x, int Nx)
+{
+    if (!(static_cast<unsigned>(x) < static_cast<unsigned>(Nx)))
+        assert_true(0);
+}
 
-/*#ifdef ASSERT*/
-/*#error ASSERT is already defined*/
-/*#endif*/
-/*#ifndef NDEBUG*/
-/*#define ASSERT(cond) {if (!(cond)) {std::cout << "ERROR at " << __FILE__ << ":" << __LINE__ \*/
-/*<< std::endl << std::flush; assert_true(0); }}*/
-/*#else*/
-/*#define ASSERT(cond)*/
-/*#endif*/
+inline IBM_ALWAYS_INLINE void CheckRange2D(int x, int y, int Nx, int Ny)
+{
+    if (!((static_cast<unsigned>(x) < static_cast<unsigned>(Nx)) &&
+          (static_cast<unsigned>(y) < static_cast<unsigned>(Ny))))
+        assert_true(0);
+}
 

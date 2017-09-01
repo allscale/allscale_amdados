@@ -267,7 +267,9 @@ Gnuplot & SetPostscriptTerminal(const char * filename)
 
 //-------------------------------------------------------------------------------------------------
 // Function plots greyscaled image (Gnuplot 4.2+).
-// It assumed that a pixel value at (x,y) is addressed as follows: image[y*width + x].
+// It assumed that a pixel value at (x,y) is addressed as follows: image[x*height + y],
+// i.e., ordinate changes faster then abscissa. The image is implicitly transposed upon
+// drawing, so that the "image(x,y)" looks as expected.
 //-------------------------------------------------------------------------------------------------
 IBM_NOINLINE
 Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
@@ -309,11 +311,11 @@ Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
             // Copy image into string buffer in textual format. I use 'n+9 < N' guard to exclude
             // any possibility to overrun the buffer (actually 'n+5' would be enough).
             n = 0;
-            for (int y = 0; y < height; ++y) {
+            for (int y = 0; y < height; ++y) {  // y first, x second - this transposes the image
                 const int yy = flipY ? (height-1-y) : y;
                 for (int x = 0; x < width; ++x) {
                     if (n+9 < N) {  // convert unsigned char into up to 3-char string
-                        div_t res = div(static_cast<int>(image[yy*width + x]), 100);
+                        div_t res = div(static_cast<int>(image[x * height + yy]), 100);
                         if (res.quot > 0) {             // pixel value >= 100
                             p[n++] = '0' + res.quot;
                             res = div(res.rem, 10);

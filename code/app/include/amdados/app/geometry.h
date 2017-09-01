@@ -69,6 +69,29 @@ const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 const int _X_ = 0;  // index of abscissa
 const int _Y_ = 1;  // index of ordinate
 
+#if 1
+#define SUB2IND(x, y, SizeX, SizeY) ((x) * (SizeY) + (y))       // row major
+#else
+#define SUB2IND(x, y, SizeX, SizeY) ((x) + (SizeX) * (y))       // column major
+#endif
+
+//-------------------------------------------------------------------------------------------------
+// Function maps the subdomain local abscissa to global one.
+//-------------------------------------------------------------------------------------------------
+inline int Sub2GloX(const point2d_t & subdomain, const int x)
+{
+    CheckRange1D(x, NELEMS_X);
+    return (x + subdomain[0] * NELEMS_X);
+}
+//-------------------------------------------------------------------------------------------------
+// Function maps the subdomain local ordinate to global one.
+//-------------------------------------------------------------------------------------------------
+inline int Sub2GloY(const point2d_t & subdomain, const int y)
+{
+    CheckRange1D(y, NELEMS_Y);
+    return (y + subdomain[1] * NELEMS_Y);
+}
+
 } // namespace app
 } // namespace amdados
 

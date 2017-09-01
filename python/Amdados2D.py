@@ -10,6 +10,7 @@ import matplotlib                       # ; matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import traceback
 import os
+import re
 import getopt
 import math
 import numpy as np
@@ -19,46 +20,15 @@ import scipy.sparse
 import scipy.sparse.linalg
 from timeit import default_timer as timer
 
-def Amdados2D():
+ZERO_BOUNDARY_CONDITIONS = True
+
+def Amdados2D(config_file):
     """ Advection-diffusion PDE solver with data assimilation based on Kalman filter.
     """
-
+    # Initialize parameters, global indices and output directory.
     class Configuration: pass
     conf = Configuration()
-
-    # Primary parameters set by user.
-    conf.output_dir = 'output'        # the output folder for the main application
-    conf.diffusion_coef = 7.0         # coefficient of diffusion
-
-    conf.nx = 64                      # number of nodal points in x dimension
-    conf.ny = 64                      # number of nodal points in y dimension
-
-    conf.domain_size_x = 1000         # global domain size in x-dimension [meters]
-    conf.domain_size_y = 1000         # global domain size in y-dimension [meters]
-
-    conf.spot_x = 30                  # substance spot abscissa in the global domain [meters]
-    conf.spot_y = 150                 # substance spot ordinate in the global domain [meters]
-
-    conf.spot_density = 10000         # substance spot concentration at initial time [units???]
-    conf.observation_nx = 30          # #observation points in x dimension
-    conf.observation_ny = 30          # #observation points in y dimension
-
-    conf.integration_period = 3500    # integration period 0...T [seconds]
-    conf.integration_nsteps = 200     # min. number of time steps to be done
-
-    conf.flow_model_max_vx = 1.0      # module of max. flow velocity in x-dimension [meters/seconds]
-    conf.flow_model_max_vy = 1.0      # module of max. flow velocity in y-dimension [meters/seconds]
-
-    conf.model_ini_var          = 1.0 # initial variance (diag. elements of model cov. matrix P)
-    conf.model_ini_covar_radius = 1.0 # initial radius of correlation among domain points [meters]
-    conf.model_noise_Q          = 1.0 # amplitude (here deviation) of model noise
-    conf.model_noise_R          = 1.0 # amplitude (here deviation) of measurement noise
-
-    conf.generate_video = 0             # 0/1 enables generation of video (needs ffmpeg installed)
-    conf.generate_text_output = 1       # 0/1 enables text output of simulation
-    conf.generate_observations_only = 1 # 0/1 enables observations only or full data assimilation
-
-    # Initialize the rest of parameters that can be deduced from the primary ones.
+    conf = ReadConfiguration(config_file, conf)
     conf = InitDependentParams(conf)
     glo_idx = GlobalIndices(conf)
     for attr, val in vars(conf).items(): print('{} : {}'.format(attr, val))
@@ -79,12 +49,31 @@ def Amdados2D():
 # Initialization.
 ###################################################################################################
 
+def ReadConfiguration(filename, conf):
+    """ Function reads and parses configuration file of application parameters.
+    """
+    assert isinstance(filename, str), "expecting file name string"
+    assert filename, "empty file name"
+    with open(filename) as config_file:
+        for line in config_file:
+            line_nocomments = re.sub(re.compile("#.*?$"), "", line.strip())
+            if line_nocomments:
+                name, var = line_nocomments.partition(" ")[::2]
+                name = name.strip()
+                var = var.strip()
+                try:
+                    setattr(conf, name, float(var))
+                except ValueError:
+                    setattr(conf, name, var)        # if not a float, then a string
+    return conf
+
+
 def InitDependentParams(conf):
     """ Function initializes dependent parameters given the primary ones specified by user.
     """
     # Ensure integer values.
-    conf.nx = round(conf.nx)
-    conf.ny = round(conf.ny)
+    conf.nx = round(conf.num_domains_x * conf.num_elems_x)
+    conf.ny = round(conf.num_domains_y * conf.num_elems_y)
     conf.observation_nx = round(conf.observation_nx)
     conf.observation_ny = round(conf.observation_ny)
     conf.integration_nsteps = round(conf.integration_nsteps)
@@ -134,8 +123,11 @@ def ApplyBoundaryCondition(conf, field):
     """ Function applies zero Dirichlet boundary condition to the state field.
     """
     assert field.shape[0] == conf.nx and field.shape[1] == conf.ny
-    field[0,:] = 0;  field[-1,:] = 0
-    field[:,0] = 0;  field[:,-1] = 0
+    if ZERO_BOUNDARY_CONDITIONS:
+        field[0,:] = 0
+        field[:,0] = 0
+        field[-1,:] = 0
+        field[:,-1] = 0
     return field
 
 
@@ -148,7 +140,12 @@ def InverseModelMatrix(conf, glo_idx, t):
     ny = conf.ny
     problem_size = conf.problem_size
 
-    num_nz = 4 + 2*(nx-2) + 2*(ny-2) + 5*(nx-2)*(ny-2)
+    if ZERO_BOUNDARY_CONDITIONS:
+        #num_nz = 4 + 2*(nx-2) + 2*(ny-2) + 5*(nx-2)*(ny-2)
+        num_nz = 5*nx*ny
+    else:
+        num_nz = 5*nx*ny
+
     rows = np.zeros((num_nz,), dtype=int)
     cols = np.zeros((num_nz,), dtype=int)
     vals = np.zeros((num_nz,), dtype=float)
@@ -164,7 +161,44 @@ def InverseModelMatrix(conf, glo_idx, t):
         for y in range(ny):
             i = glo_idx[x,y]
             if x == 0 or x == nx-1 or y == 0 or y == ny-1:
-                rows[N] = i;  cols[N] = i;               vals[N] = 1;                      N += 1
+                if ZERO_BOUNDARY_CONDITIONS:
+                    # This is just a Dirichlet boundary condition; insufficient in diffusion case.
+                    #rows[N] = i;  cols[N] = i;  vals[N] = 1;  N += 1
+
+                    # Enforce Newmann boundary condition (du/dn = 0).
+                    xm = x-1 if x > 0    else 1
+                    xp = x+1 if x < nx-1 else nx-2
+
+                    ym = y-1 if y > 0    else 1
+                    yp = y+1 if y < ny-1 else ny-2
+
+                    rows[N] = i;  cols[N] = i;     vals[N] = 1 + 2*(rho_x + rho_y);  N += 1
+                    rows[N] = i;  cols[N] = glo_idx[xm,y];  vals[N] = - vx - rho_x;  N += 1
+                    rows[N] = i;  cols[N] = glo_idx[xp,y];  vals[N] = + vx - rho_x;  N += 1
+                    rows[N] = i;  cols[N] = glo_idx[x,ym];  vals[N] = - vy - rho_y;  N += 1
+                    rows[N] = i;  cols[N] = glo_idx[x,yp];  vals[N] = + vy - rho_y;  N += 1
+                else:
+                    rows[N] = i;  cols[N] = i;  vals[N] = 1 + 2*(rho_x + rho_y);  N += 1
+
+                    if x == 0:
+                        rows[N] = i;  cols[N] = glo_idx[x,  y];  vals[N] = - 2*vx - rho_x;  N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x+1,y];  vals[N] = + 2*vx - rho_x;  N += 1
+                    elif x == nx-1:
+                        rows[N] = i;  cols[N] = glo_idx[x-1,y];  vals[N] = - 2*vx - rho_x;  N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x,  y];  vals[N] = + 2*vx - rho_x;  N += 1
+                    else:
+                        rows[N] = i;  cols[N] = glo_idx[x-1,y];  vals[N] = - vx - rho_x;    N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x+1,y];  vals[N] = + vx - rho_x;    N += 1
+
+                    if y == 0:
+                        rows[N] = i;  cols[N] = glo_idx[x,y  ];  vals[N] = - 2*vy - rho_y;  N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x,y+1];  vals[N] = + 2*vy - rho_y;  N += 1
+                    elif y == ny-1:
+                        rows[N] = i;  cols[N] = glo_idx[x,y-1];  vals[N] = - 2*vy - rho_y;  N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x,y  ];  vals[N] = + 2*vy - rho_y;  N += 1
+                    else:
+                        rows[N] = i;  cols[N] = glo_idx[x,y-1];  vals[N] = - vy - rho_y;    N += 1
+                        rows[N] = i;  cols[N] = glo_idx[x,y+1];  vals[N] = + vy - rho_y;    N += 1
             else:
                 rows[N] = i;  cols[N] = i;               vals[N] = 1 + 2*(rho_x + rho_y);  N += 1
                 rows[N] = i;  cols[N] = glo_idx[x-1,y];  vals[N] = - vx - rho_x;           N += 1
@@ -174,7 +208,7 @@ def InverseModelMatrix(conf, glo_idx, t):
 
     assert N == num_nz
     invA = scipy.sparse.csr_matrix((vals, (rows, cols)), shape=(problem_size, problem_size))
-    assert invA.nnz == num_nz
+    assert invA.nnz <= num_nz
     return invA
 
 
@@ -219,7 +253,7 @@ def ComputeTrueFields(conf, glo_idx):
     true_fields = np.zeros((conf.nx, conf.ny, conf.Nt))
     field = InitialField(conf)
     writer = None
-    if conf.generate_text_output: writer = Writer(conf, 'observations')
+    if conf.generate_text_output: writer = Writer(conf, conf.analytic_solution)
 
     hFigure = None
     for k in range(conf.Nt):
@@ -360,7 +394,7 @@ def DataAssimilation(conf, glo_idx, true_fields):
     H = ComputeH(conf, glo_idx)
     rel_diff = np.zeros((conf.Nt,))
     writer = None
-    if conf.generate_text_output: writer = Writer(conf, 'assimilation')
+    if conf.generate_text_output: writer = Writer(conf, conf.simulation_solution)
 
     # Time integration with data assimilation.
     hFigure = None
@@ -448,16 +482,14 @@ def DataAssimilation(conf, glo_idx, true_fields):
 class Writer:
     """ Class for writing simulation result in textual form.
     """
-# public:
-    def __init__(self, conf, filetitle):
+    def __init__(self, conf, filename):
         """ Constructor
         """
-        assert isinstance(filetitle, str)
+        assert isinstance(filename, str)
         self.fid = None
         # N O T E: for some strange reason np.savetxt() expects file opened in binary format 'wb'.
-        self.fid = open(conf.output_dir + '/' + filetitle + '.txt', 'wb')
+        self.fid = open(conf.output_dir + '/' + filename, 'wb')
 
-# public:
     def __del__(self):
         """ This method is not a destructor, is just a normal method you can call whenever
             you want to perform any operation, but it is always called before the garbage
@@ -469,7 +501,6 @@ class Writer:
             self.fid.close()
             self.fid = None
 
-#public:
     def WriteField(self, field, discrete_time, physical_time):
         """ Function appends the new field to the output file.
         """
@@ -482,7 +513,7 @@ class Writer:
         data = np.column_stack((rows, cols, field.flatten()))
         np.savetxt(self.fid, np.reshape(np.array([discrete_time, physical_time]), (1,2)),
                     fmt='%5d %.7f', delimiter='\t', newline='\n');
-        np.savetxt(self.fid, data, fmt='%3d %3d %.7f', delimiter='\t', newline='\n');
+        np.savetxt(self.fid, data, fmt='%d %d %.10f', delimiter='\t', newline='\n');
 
 
 def CreateAndCleanOutputDir(conf):
@@ -518,7 +549,12 @@ def MakeVideo(conf, filetitle):
 
 if __name__ == '__main__':
     try:
-        Amdados2D()
+        if len(sys.argv) == 2:
+            config_file = sys.argv[1]
+            assert isinstance(config_file, str), "script agrument must be a file name string"
+        else:
+            config_file = 'amdados.conf'
+        Amdados2D(config_file)
     except Exception as error:
         traceback.print_exc()
         print('ERROR: ' + str(error.args))

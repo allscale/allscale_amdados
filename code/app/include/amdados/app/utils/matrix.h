@@ -8,12 +8,6 @@ namespace amdados {
 namespace app {
 namespace utils {
 
-#undef  __AMDADOS_BOUND_CHECKING__
-#define __AMDADOS_BOUND_CHECKING__
-
-#undef  __AMDADOS_ROW_MAJOR__
-//#define __AMDADOS_ROW_MAJOR__
-
 //=================================================================================================
 // Base class for vector or matrix (of size 'SIZE') which cannot be instantiated on its
 // own but can be used as a light-weight, vector-like view to derived class.
@@ -41,21 +35,13 @@ public:
 
     // Indexing operator provides read only access to vector element.
     inline const double & operator()(int i) const {
-#ifndef NDEBUG
-#ifdef __AMDADOS_BOUND_CHECKING__
-        if (!(static_cast<unsigned int>(i) < static_cast<unsigned int>(SIZE))) assert_true(0);
-#endif
-#endif
+        CheckRange1D(i,SIZE);
         return data[i];
     }
 
     // Indexing operator provides read/write access to vector element.
     inline double & operator()(int i) {
-#ifndef NDEBUG
-#ifdef __AMDADOS_BOUND_CHECKING__
-        if (!(static_cast<unsigned int>(i) < static_cast<unsigned int>(SIZE))) assert_true(0);
-#endif
-#endif
+        CheckRange1D(i,SIZE);
         return data[i];
     }
 
@@ -69,12 +55,15 @@ public:
 
 //=================================================================================================
 // Simple vector-like wrapper around a raw array of constant size.
-// Rationale: (1) safe indexing operations; (2) no stack overflow for automatic objects.
+// Rationale: (1) safe indexing operations; (2) no stack overflow if automatic object was
+// instantiated with a large size.
 //=================================================================================================
 template<int SIZE>
 class Vector : public VectorView<SIZE>
 {
-private: using VectorView<SIZE>::data;
+private:
+    using VectorView<SIZE>::data;
+
 public:
     // Default constructor creates vector filled by zeros.
     inline Vector() : VectorView<SIZE>(new double[SIZE]) {
@@ -94,16 +83,21 @@ public:
 
 //=================================================================================================
 // Simple matrix-like wrapper around a raw array of constant size.
-// Rationale: (1) safe indexing operations; (2) no stack overflow for automatic objects.
+// Rationale: (1) safe indexing operations; (2) no stack overflow if automatic object was
+// instantiated with a large size.
 // Note, the matrix is row-major, i.e. the column index is faster than the row one.
-// Note, implicit casting from matrix to vector view is allowed.
+// Note, implicit casting from matrix to vector-view is allowed.
 //=================================================================================================
 template<int NROWS, int NCOLS>
 class Matrix : public VectorView<NROWS * NCOLS>
 {
-public:  enum { SIZE = NROWS * NCOLS };
-private: using VectorView<SIZE>::data;
-private: VectorView<SIZE> & operator=(const VectorView<SIZE> &);    // vector copy is disabled
+public:
+    enum { SIZE = NROWS * NCOLS };
+
+private:
+    using VectorView<SIZE>::data;
+    VectorView<SIZE> & operator=(const VectorView<SIZE> &);    // vector copy is disabled
+
 public:
     // Default constructor creates matrix filled by zeros.
     inline Matrix() : VectorView<SIZE>(new double[SIZE]) {
@@ -128,50 +122,20 @@ public:
 
     // Indexing operator provides read only access to matrix element.
     inline const double & operator()(int r, int c) const {
-#ifndef NDEBUG
-#ifdef __AMDADOS_BOUND_CHECKING__
-        if (!((static_cast<unsigned int>(r) < static_cast<unsigned int>(NROWS)) &&
-              (static_cast<unsigned int>(c) < static_cast<unsigned int>(NCOLS)))) assert_true(0);
-#endif
-#endif
-
-#ifdef __AMDADOS_ROW_MAJOR__
+        CheckRange2D(r,c,NROWS,NCOLS);
         return data[r * NCOLS + c];
-#else
-        return data[r + NROWS * c];
-#endif
     }
 
     // Indexing operator provides read/write access to matrix element.
     inline double & operator()(int r, int c) {
-#ifndef NDEBUG
-#ifdef __AMDADOS_BOUND_CHECKING__
-        if (!((static_cast<unsigned int>(r) < static_cast<unsigned int>(NROWS)) &&
-              (static_cast<unsigned int>(c) < static_cast<unsigned int>(NCOLS)))) assert_true(0);
-#endif
-#endif
-
-#ifdef __AMDADOS_ROW_MAJOR__
+        CheckRange2D(r,c,NROWS,NCOLS);
         return data[r * NCOLS + c];
-#else
-        return data[r + NROWS * c];
-#endif
     }
 
     // Function converts 2D index to a flat 1D one.
     static inline int sub2ind(int r, int c) {
-#ifndef NDEBUG
-#ifdef __AMDADOS_BOUND_CHECKING__
-        if (!((static_cast<unsigned int>(r) < static_cast<unsigned int>(NROWS)) &&
-              (static_cast<unsigned int>(c) < static_cast<unsigned int>(NCOLS)))) assert_true(0);
-#endif
-#endif
-
-#ifdef __AMDADOS_ROW_MAJOR__
+        CheckRange2D(r,c,NROWS,NCOLS);
         return (r * NCOLS + c);
-#else
-        return (r + NROWS * c);
-#endif
     }
 };
 

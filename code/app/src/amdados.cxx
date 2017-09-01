@@ -61,8 +61,8 @@ int main(int argc, char ** argv)
         }
         break;
         case 1: {
-            int FailTest1();
-            return FailTest1();
+            int Amdados2DMain_1(void);
+            return Amdados2DMain_1();
         }
         break;
         case 2: {

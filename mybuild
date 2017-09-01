@@ -74,7 +74,7 @@ elif ${FULL}; then
 fi
 
 # Generate ctags for Vim editor.
-#ctags -R .
+ctags -R .
 
 # Building and, possibly, testing.
 cd ./build
