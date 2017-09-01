@@ -1,0 +1,21 @@
+#!/bin/bash
+#--------------------------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c) 2017
+#--------------------------------------------------------------------------------------------------
+
+echo
+echo "Converting a sequence of PGM images into AVI file and playing the latter one ..."
+echo "Prerequisites: (1) ImageMagick; (2) ffmpeg; (3) mplayer."
+echo
+
+NAME=field
+sync
+for f in ./output/${NAME}*.pgm; do convert $f ${f%.*}__tmp__.png; done
+sync
+ffmpeg -y -f image2 -framerate 24 -pattern_type glob -i './output/*__tmp__.png' ./output/${NAME}.avi
+sync
+mplayer -nosound -x 512 -y 512 ./output/${NAME}.avi
+/bin/rm ./output/*__tmp__.png
+sync
+
