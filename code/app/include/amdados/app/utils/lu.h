@@ -25,7 +25,6 @@ public:
 //-------------------------------------------------------------------------------------------------
 // Constructor.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 LUdecomposition() : m_LU()
 {
     m_Perm.resize(MSIZE, 0);
@@ -36,7 +35,6 @@ LUdecomposition() : m_LU()
 // The decomposition P*M = L*U is based on so called partial pivoting of matrix row (permutation
 // matrix P), which is often sufficient in practice.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 void Init(const Matrix<MSIZE,MSIZE> & M)
 {
     const double TINY = numeric_limits<double>::min() /
@@ -87,7 +85,6 @@ void Init(const Matrix<MSIZE,MSIZE> & M)
 // Function solves a linear system A*x = b through the backsubstitution, where A is
 // the matrix whose LU decomposition was computed by Init() function.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 void Solve(VectorView<MSIZE> & x, const VectorView<MSIZE> & b) const
 {
 	const auto & A = m_LU;                  // short-hand aliases
@@ -111,7 +108,6 @@ void Solve(VectorView<MSIZE> & x, const VectorView<MSIZE> & b) const
 // decomposition was computed by the Init() function, X and B are the matrices of the same size.
 //-------------------------------------------------------------------------------------------------
 template<int NCOLS>
-IBM_NOINLINE
 void BatchSolve(Matrix<MSIZE,NCOLS> & X, const Matrix<MSIZE,NCOLS> & B) const
 {
 	const auto & A = m_LU;                  // short-hand aliases

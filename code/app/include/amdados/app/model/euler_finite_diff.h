@@ -24,7 +24,6 @@ public:
 //-------------------------------------------------------------------------------------------------
 // Constructor.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf), mM(), mTriplets()
 {
 }
@@ -32,7 +31,6 @@ EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf), mM(
 //-------------------------------------------------------------------------------------------------
 // Destructor.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 virtual ~EulerFiniteDifferenceModel()
 {
 }
@@ -40,7 +38,6 @@ virtual ~EulerFiniteDifferenceModel()
 //-------------------------------------------------------------------------------------------------
 //! @copydoc IModel::Update()
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 virtual const sp_matrix_t & ModelMatrix(double flow_x, double flow_y,
                                         double time_delta, double space_delta, double t)
 {
@@ -62,7 +59,6 @@ private:
 // to the field 'u_{t+1}' at time 't+1' (both fields are unrolled into vectors) can be written
 // as follows:  u_{t+1} = mM * u_t.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double space_delta)
 {
     using namespace amdados::app::utils;

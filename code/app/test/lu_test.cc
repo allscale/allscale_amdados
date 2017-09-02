@@ -83,7 +83,7 @@ TEST(LU, Basic)
     assert_true(fout.good()) << "failed to oped the summary file: " << filename << std::endl;
 
     double max_rel_err = 0.0;
-    TestLUGivenProblemSize<3600>(max_rel_err);
+    //TestLUGivenProblemSize<3600>(max_rel_err);
     for (int testNo = 0; testNo < 3; ++testNo) {
         TestLUGivenProblemSize< 1>(max_rel_err);
         TestLUGivenProblemSize< 2>(max_rel_err);

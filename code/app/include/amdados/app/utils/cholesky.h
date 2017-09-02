@@ -29,7 +29,6 @@ public:
 //-------------------------------------------------------------------------------------------------
 // Constructor.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Cholesky() : m_L()
 {
 }
@@ -38,7 +37,6 @@ Cholesky() : m_L()
 // Function computes and stores Cholesky decomposition
 // of a positive-definite symmetric matrix: A = L * L^t.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 void Init(const matrix_t & A)
 {
     const double TINY = numeric_limits<double>::min() /
@@ -72,7 +70,6 @@ void Init(const matrix_t & A)
 // Function solves a linear system A*x = b, where A is the matrix whose Cholesky
 // decomposition was computed by the Init() function.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 void Solve(vector_t & x, const vector_t & b) const
 {
     const matrix_t & L = m_L;       // short-hand alias
@@ -95,7 +92,6 @@ void Solve(vector_t & x, const vector_t & b) const
 // decomposition was computed by the Init() function, X and B are the matrices of the same size.
 //-------------------------------------------------------------------------------------------------
 template<int NCOLS>
-IBM_NOINLINE
 void BatchSolve(Matrix<MSIZE,NCOLS> & X, const Matrix<MSIZE,NCOLS> & B) const
 {
     const matrix_t & L = m_L;       // short-hand alias

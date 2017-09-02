@@ -15,8 +15,6 @@
 #include "amdados/app/utils/configuration.h"
 #include "amdados/app/utils/cholesky.h"
 #include "amdados/app/utils/lu.h"
-
-#undef AMDADOS_ENABLE_GNUPLOT
 #include "gnuplot.h"
 
 #include <cstdlib>
@@ -58,6 +56,7 @@ using ::amdados::app::utils::Configuration;
 
 namespace amdados {
 namespace app {
+namespace {
 
 const double TINY = numeric_limits<double>::min() /
            std::pow(numeric_limits<double>::epsilon(),3);
@@ -67,24 +66,38 @@ using namespace ::amdados::app::utils;
 using ::allscale::api::user::data::Grid;
 using ::allscale::api::user::data::GridPoint;
 
-// Structure keeps 4-side boundary of a subdomain.
-struct Boundary { std::vector<double> side[4]; };
+const int NSIDES = 4;                   // number of sides any subdomain has
+const int ACTIVE_LAYER = L_100m;        // should be template a parameter eventually
 
-using cube_t         = Grid<double,3>;
-using DA_subfield_t  = Matrix<NELEMS_X,NELEMS_Y>;
-using DA_vector_t    = Vector<SUB_PROBLEM_SIZE>;
-using DA_matrix_t    = Matrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>;
-using DA_sp_matrix_t = SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>;
+// Structure keeps information about 4-side boundary of a subdomain (Up, Down, Left, Right).
+struct Boundary {
+    std::vector<double> myself;         // temporary vector for storing this subdomain boundary
+    std::vector<double> remote;         // temporary vector for storing remote boundary values
+    double              rel_diff;       // relative difference across in-flow borders (Schwarz)
+    bool                inflow[NSIDES]; // true, if flow is coming in along a side
+    bool                outer[NSIDES];  // true, if a side belongs to the domain's outer boundary
+};
+typedef Grid<Boundary,2> boundary_grid_t;       // grid of subdomain boundaries
 
-using field_grid_t    = Grid<DA_subfield_t,2>;
-using vec_grid_t      = Grid<DA_vector_t,2>;
-using mat_grid_t      = Grid<DA_matrix_t,2>;
-using cholesky_grid_t = Grid<Cholesky<SUB_PROBLEM_SIZE>,2>;
-using lu_grid_t       = Grid<LUdecomposition<SUB_PROBLEM_SIZE>,2>;
-using boundary_grid_t = Grid<Boundary,2>;
+typedef std::pair<double,double>                    flow_t;           // flow components (fx,fy)
+typedef Grid<double,3>                              cube_t;           // 3D array of doubles
+
+typedef Matrix<NELEMS_X,NELEMS_Y>                   DA_subfield_t;    // subdomain as matrix
+typedef Grid<DA_subfield_t,2>                       field_grid_t;     // grid of subdomains
+
+typedef Vector<SUB_PROBLEM_SIZE>                    DA_vector_t;      // subdomain as vector
+typedef Grid<DA_vector_t,2>                         vec_grid_t;       // grid of vectors
+
+typedef Matrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>   DA_matrix_t;      // subdomain matrix
+typedef Grid<DA_matrix_t,2>                         mat_grid_t;       // grid of matrices
+
+typedef SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> DA_sp_matrix_t;   // subdomain sparse matrix
+
+typedef Grid<Cholesky<SUB_PROBLEM_SIZE>,2>          cholesky_grid_t;  // grid of Cholesky solvers
+typedef Grid<LUdecomposition<SUB_PROBLEM_SIZE>,2>   lu_grid_t;        // grid of LU solvers
 
 //#################################################################################################
-// Utilities.
+// @Utilities.
 //#################################################################################################
 
 //-------------------------------------------------------------------------------------------------
@@ -109,33 +122,12 @@ void CreateAndCleanOutputDir(const Configuration & conf)
     cmd += dir;
     int retval = std::system(cmd.c_str());
     retval = std::system("sync");
-    retval = std::system((string("/bin/rm -fr ") + dir + "/*").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.png").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.pgm").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.jpg").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.avi").c_str());
     retval = std::system("sync");
     (void)retval;
-}
-
-//-------------------------------------------------------------------------------------------------
-// Function maps the subdomain local coordinates (sx,sy) to global ones (gx,gy)
-// inside the whole domain given subdomain's position in the grid.
-//-------------------------------------------------------------------------------------------------
-inline void Sub2Global(int & gx, int & gy, const point2d_t & subdomain, const int sx, const int sy)
-{
-    assert_true((0 <= sx) && (sx < NELEMS_X));
-    assert_true((0 <= sy) && (sy < NELEMS_Y));
-    gx = sx + subdomain[0] * NELEMS_X;
-    gy = sy + subdomain[1] * NELEMS_Y;
-}
-
-//-------------------------------------------------------------------------------------------------
-// Functor converts 2D subdomain index (x,y) into a global plain one given point's coordinates
-// in a subdomain and subdomain's position in the grid.
-//-------------------------------------------------------------------------------------------------
-inline int FlatGlobalIndex(int ix, int iy, const point2d_t & subdomain, bool flipY = false)
-{
-    int gx = 0, gy = 0;
-    Sub2Global(gx, gy, subdomain, ix, iy);
-    if (flipY) gy = GLOBAL_NELEMS_Y - 1 - gy;
-    return Matrix<GLOBAL_NELEMS_X,GLOBAL_NELEMS_Y>::sub2ind(gx, gy);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -165,6 +157,54 @@ double ReduceAbsMax(const Grid<double,2> & grid)
 }
 
 //-------------------------------------------------------------------------------------------------
+// Function reads analytic solution from a file. "Analytic solution" here is actually the
+// simulation generated by Python code that knows the "true" initial field. Analytic solution
+// represents "true" state of the nature, which we never fully observe in reality.
+//-------------------------------------------------------------------------------------------------
+void ReadAnalyticSolution(const Configuration & conf, cube_t & data, const std::string & filename)
+{
+    std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+    std::cout << "Reading analytic solution ... " << flush;
+    std::ifstream file(filename);
+    assert_true(file.good()) << "failed to open the true-solution file: " << filename << endl;
+    const int Nt = conf.asInt("Nt");
+    int debug_t = 0;                                    // debug time increments on each iteration
+    double physical_time = 0.0;
+    for (int t = 0; file >> t >> physical_time;) {      // header line contains a time stamps
+        assert_true(debug_t == t) << "missed time step: " << debug_t << endl;
+        assert_true(t <= Nt) << "too many time steps" << endl;
+        ++debug_t;
+        for (int x = 0; x < GLOBAL_NELEMS_X; ++x) {     // x,y order is prescribed by Python code
+        for (int y = 0; y < GLOBAL_NELEMS_Y; ++y) {
+            int i = 0, j = 0;
+            double val = 0;
+            file >> i >> j >> val;
+            if (!((i == x) && (j == y))) {
+                assert_true(0) << "mismatch between grid layouts" << endl;
+            }
+            data[{i,j,t}] = val;
+        }}
+    }
+    assert_true(debug_t == Nt) << "mismatch in number of time steps" << endl;
+    std::cout << "done in "
+              << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()
+              << " seconds" << endl;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function gets the observations at certain time and returns them for each subdomain.
+// Note, ordinate changes faster than abscissa (row-major stacking in 2D array "field(x,y)").
+//-------------------------------------------------------------------------------------------------
+void GetObservations(DA_subfield_t & subfield, const point2d_t & idx,
+                     const cube_t & analytic_sol, int timestep)
+{
+    for (int x = 0; x < NELEMS_X; ++x) { int xg = Sub2GloX(idx, x);     // global abscissa
+    for (int y = 0; y < NELEMS_Y; ++y) { int yg = Sub2GloY(idx, y);     // global ordinate
+        subfield(x,y) = analytic_sol[{xg,yg,timestep}];
+    }}
+}
+
+//-------------------------------------------------------------------------------------------------
 // Function writes the whole property field into a file in binary, grayscaled PGM format,
 // where all the values are adjusted to [0..255] interval.
 //-------------------------------------------------------------------------------------------------
@@ -174,7 +214,7 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
                 bool print_image = true, gnuplot::Gnuplot * gp = nullptr)
 {
     if (!print_image && (gp == nullptr)) return;
-    const bool flipY = true;
+    const bool flipY = false;
 
     const int ImageSize = GLOBAL_NELEMS_X * GLOBAL_NELEMS_Y;
     if (image_buffer.capacity() < ImageSize) { image_buffer.reserve(ImageSize); }
@@ -184,7 +224,6 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
     double lower = 0.0, upper = 0.0;
     {
         Grid<double,2> minvalues(SubDomGridSize), maxvalues(SubDomGridSize);
-        assert_true((Origin[_X_] == 0) && Origin[_Y_] == 0);
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
             minvalues[idx] = *(std::min_element(field[idx].begin(), field[idx].end()));
             maxvalues[idx] = *(std::max_element(field[idx].begin(), field[idx].end()));
@@ -197,12 +236,11 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
     // Convert the property field into one-byte-per-pixel representation.
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         const DA_subfield_t & subfield = field[idx];
-        for (int x = 0; x < NELEMS_X; ++x) {
-        for (int y = 0; y < NELEMS_Y; ++y) {
-            int i = FlatGlobalIndex(x, y, idx, flipY);   // Y-axis points upward
-            //bool ok = (i == Matrix<NELEMS_X,NELEMS_Y>::sub2ind(x,y)); assert_true(ok); // XXX
-            assert_true((0 <= i) && (i < ImageSize));
-            image_buffer[i] = static_cast<unsigned char>(
+        for (int y = 0; y < NELEMS_Y; ++y) { int yg = Sub2GloY(idx, y);
+        for (int x = 0; x < NELEMS_X; ++x) { int xg = Sub2GloX(idx, x);
+            int pos = xg + GLOBAL_NELEMS_X * (flipY ? yg : (GLOBAL_NELEMS_Y - 1 - yg));
+            if (!(static_cast<unsigned>(pos) < static_cast<unsigned>(ImageSize))) assert_true(0);
+            image_buffer[pos] = static_cast<unsigned char>(
                     Round(255.0 * (subfield(x,y) - lower) / (upper - lower)) );
         }}
     });
@@ -224,23 +262,9 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
     if (gp != nullptr) {
         char title[64];
         snprintf(title, sizeof(title)/sizeof(title[0]), "frame%05d", time_index);
-        gp->PlotGrayImage(image_buffer.data(), GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, title, flipY);
+        gp->PlotGrayImage(image_buffer.data(), GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, title, !flipY);
     }
 }
-
-//def MakeVideo(conf, filetitle):
-    //""" Function creates a single video file from a sequence of field states
-        //written into image files.
-    //"""
-    //print("\n\n\n")
-    //framerate = 24
-    //if os.system("ffmpeg -y -f image2 -framerate " + str(framerate) + " -pattern_type glob -i '" +
-                    //conf.output_dir + "/" + filetitle + "*.png' " +
-                    //conf.output_dir + "/" + filetitle + ".avi"):
-        //print("WARNING: unable to write video: ffmpeg failed")
-    //print("\n\n\n")
-
-
 
 //#################################################################################################
 // Initialization.
@@ -251,6 +275,11 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
 //-------------------------------------------------------------------------------------------------
 void InitDependentParams(Configuration & conf)
 {
+    // Check some global constants.
+    assert_true((Origin[_X_] == 0) && (Origin[_Y_] == 0)) << "origin is expected at (0,0)";
+    for (Direction dir : { Up, Down, Left, Right }) assert_true((0 <= dir) && (dir < NSIDES));
+    assert_true((NELEMS_X >= 3) && (NELEMS_Y >= 3)) << "subdomain must be at least 3x3";
+
     // Ensure integer values for certain parameters.
     assert_true(conf.asDouble("num_domains_x")      == conf.asInt("num_domains_x"));
     assert_true(conf.asDouble("num_domains_y")      == conf.asInt("num_domains_y"));
@@ -283,7 +312,7 @@ void InitDependentParams(Configuration & conf)
     const double TINY = numeric_limits<double>::min() /
                std::pow(numeric_limits<double>::epsilon(),3);
     const double dt_base = conf.asDouble("integration_period") /
-                            conf.asDouble("integration_nsteps");
+                           conf.asDouble("integration_nsteps");
     const double max_vx = conf.asDouble("flow_model_max_vx");
     const double max_vy = conf.asDouble("flow_model_max_vy");
     const double dt = std::min(dt_base,
@@ -295,59 +324,80 @@ void InitDependentParams(Configuration & conf)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Create initial ("true") field with a spike at some point and zeros elsewhere.
-// Note, the spike is not very sharp to make the field differentiable.
-// Here 'field' is used as temporary, easy-to-use container which will eventually
-// initialize the 'state'.
-// \param  state  multi-layered structure that keeps density fields of all the subdomains.
-// \param  field  temporary, easy-to-use container that takes fields of all the subdomains.
-// \param  conf   configuration parameters.
+// Function applies Dirichlet zero boundary condition at the outer border of the domain.
 //-------------------------------------------------------------------------------------------------
-void InitialField(domain_t & state, field_grid_t & field, const Configuration & conf)
+void ApplyBoundaryCondition(domain_t & state, const point2d_t & idx)
 {
-    // Global coordinates of the density spot centre.
-    const int cx = Round(conf.asDouble("spot_x") / conf.asDouble("dx"));
-    const int cy = Round(conf.asDouble("spot_y") / conf.asDouble("dy"));
-    assert_true((0 <= cx) && (cx < GLOBAL_NELEMS_X) &&
-                (0 <= cy) && (cy < GLOBAL_NELEMS_Y))
-                << "high-concentration spot is not inside the domain" << endl;
+    const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];  const int Sx = NELEMS_X;
+    const int Oy = Origin[_Y_];  const int Ny = SubDomGridSize[_Y_];  const int Sy = NELEMS_Y;
 
-    // Parameters of the global 2D Gaussian model of the spike.
-    const double sigma = 1.0;                           // in logical units (point indices)
-    const double a = conf.asDouble("spot_density") / (std::pow(sigma,2) * 2.0 * M_PI);
-    const double b = 1.0 / (2.0 * std::pow(sigma,2));
+    auto & subfield = state[idx].getLayer<ACTIVE_LAYER>();
 
-    // For all the subdomains initialize the spike distribution by parts.
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        DA_subfield_t & subfield = field[idx];
-        FillMatrix(subfield, 0.0);
-        int gx = 0, gy = 0;
-        for (int x = 0; x < NELEMS_X; ++x) {
-        for (int y = 0; y < NELEMS_Y; ++y) {
-            Sub2Global(gx, gy, idx, x, y);      // get global point indices
-            int dx = gx - cx;
-            int dy = gy - cy;
-            if ((std::abs(dx) <= 4*sigma) && (std::abs(dy) <= 4*sigma)) {
-                subfield(x,y) += a * std::exp(-b * (dx*dx + dy*dy));
-            }
-        }}
+    if (idx[_X_] == Ox)   { for (int y = 0; y < Sy; ++y) subfield[{   0,y}] = 0.0; } // leftmost
+    if (idx[_X_] == Nx-1) { for (int y = 0; y < Sy; ++y) subfield[{Sx-1,y}] = 0.0; } // rightmost
 
-        // Initialize all cells on the 100m resolution.
-        state[idx].setActiveLayer(L_100m);
-        AllscaleFromMatrix(state[idx].getLayer<L_100m>(), field[idx]);
-    });
+    if (idx[_Y_] == Oy)   { for (int x = 0; x < Sx; ++x) subfield[{x,   0}] = 0.0; } // bottommost
+    if (idx[_Y_] == Ny-1) { for (int x = 0; x < Sx; ++x) subfield[{x,Sy-1}] = 0.0; } // topmost
 }
 
+//-------------------------------------------------------------------------------------------------
+// Function initializes and fills up initial field of density distribution. It is either
+// all zeros or a spike at some point and zeros elsewhere. Note, the spike is not very sharp
+// to make the field differentiable.
+// \param  state       multi-layered structure that keeps density fields of all the subdomains.
+// \param  conf        configuration parameters.
+// \param  field_type  initial field type is one of: {"zero", "gauss"}.
+//-------------------------------------------------------------------------------------------------
+void InitialField(domain_t & state, const Configuration & conf, const char * field_type)
+{
+    if (std::strcmp(field_type, "zero") == 0)
+    {
+        std::cout << "Initializing field to all zeros" << endl;
+        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+            state[idx].setActiveLayer(ACTIVE_LAYER);
+            state[idx].forAllActiveNodes([](double & value) { value = 0.0; });
+            ApplyBoundaryCondition(state, idx);
+        });
+    }
+    else if (std::strcmp(field_type, "gauss") == 0)
+    {
+        std::cout << "Initializing field to Gaussian distribution peaked at some point" << endl;
 
+        // Global coordinates of the density spot centre.
+        const int cx = Round(conf.asDouble("spot_x") / conf.asDouble("dx"));
+        const int cy = Round(conf.asDouble("spot_y") / conf.asDouble("dy"));
+        assert_true((0 <= cx) && (cx < GLOBAL_NELEMS_X) &&
+                    (0 <= cy) && (cy < GLOBAL_NELEMS_Y))
+                    << "high-concentration spot is not inside the domain" << endl;
 
+        // Parameters of the global 2D Gaussian model of the spike.
+        const double sigma = 1.0;                           // in logical units (point indices)
+        const double a = conf.asDouble("spot_density") / (std::pow(sigma,2) * 2.0 * M_PI);
+        const double b = 1.0 / (2.0 * std::pow(sigma,2));
 
-//def GlobalIndices(conf):
-    //""" Each nodal point gets a unique global index on the grid.
-        //Function initializes a 2D array of indices:  index of (x,y) = glo_idx(x,y).
-    //"""
-    //glo_idx = np.arange(int(conf.problem_size)).reshape((conf.nx, conf.ny))
-    //return glo_idx
+        // For all the subdomains initialize the spike distribution by parts.
+        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+            // Set active layer to zero at the beginning.
+            state[idx].setActiveLayer(ACTIVE_LAYER);
+            state[idx].forAllActiveNodes([](double & value) { value = 0.0; });
 
+            auto & subfield = state[idx].getLayer<ACTIVE_LAYER>();
+            for (int x = 0; x < NELEMS_X; ++x) {
+            for (int y = 0; y < NELEMS_Y; ++y) {
+                int dx = Sub2GloX(idx,x) - cx;
+                int dy = Sub2GloY(idx,y) - cy;
+                if ((std::abs(dx) <= 4*sigma) && (std::abs(dy) <= 4*sigma)) {
+                    subfield[{x,y}] += a * std::exp(-b * (dx*dx + dy*dy));
+                }
+            }}
+            ApplyBoundaryCondition(state, idx);
+        });
+    }
+    else
+    {
+        assert_true(0) << "InitialField(): unknown field type" << endl;
+    }
+}
 
 //#################################################################################################
 // Advection-diffusion PDE stuff.
@@ -355,13 +405,15 @@ void InitialField(domain_t & state, field_grid_t & field, const Configuration & 
 
 //-------------------------------------------------------------------------------------------------
 // Function computes flow components given a time.
+// \return a pair of flow components (flow_x, flow_y).
 //-------------------------------------------------------------------------------------------------
-void Flow(double & vx, double & vy, const Configuration & conf, const double t)
+flow_t Flow(const Configuration & conf, const double physical_time)
 {
     double max_vx = conf.asDouble("flow_model_max_vx");
     double max_vy = conf.asDouble("flow_model_max_vy");
-    vx = -max_vx * std::sin(0.1 * t / conf.asDouble("integration_period") - M_PI);
-    vy = -max_vy * std::sin(0.2 * t / conf.asDouble("integration_period") - M_PI);
+    return flow_t(
+        -max_vx * std::sin(0.1 * physical_time / conf.asDouble("integration_period") - M_PI),
+        -max_vy * std::sin(0.2 * physical_time / conf.asDouble("integration_period") - M_PI) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -369,8 +421,11 @@ void Flow(double & vx, double & vy, const Configuration & conf, const double t)
 // B * x_{t+1} = x_{t}, where B = A^{-1} is the matrix returned by this function.
 // The matrix must be inverted while iterating forward in time: x_{t+1} = A * x_{t}.
 // Note, the matrix we generate here is acting on a subdomain.
+// Note, the model matrix B is supposed to be a sparse one. For now, since we do not have
+// a fast utility for sparse matrix inversion, we define B as a dense one with many zeros.
 //-------------------------------------------------------------------------------------------------
-void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf, const double t)
+void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf,
+                        const Boundary & boundary, const flow_t flow)
 {
     using SF = Matrix<NELEMS_X,NELEMS_Y>;   // sub-field type
 
@@ -388,76 +443,16 @@ void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf, const doubl
     const double v0x = 2.0 * dx / dt;
     const double v0y = 2.0 * dy / dt;
 
-    double vx = 0.0, vy = 0.0;
-    Flow(vx, vy, conf, t);
-    vx = vx / v0x;
-    vy = vy / v0y;
+    const double vx = flow.first  / v0x;
+    const double vy = flow.second / v0y;
 
-    //std::cout << "rho_x: " << rho_x << ", rho_y: " << rho_y << ", v0x: " << v0x << ", v0y: " << v0y << endl;
-
-    // Matrix B is supposed to be a sparse one. For now, since we do not have a fast utility
-    // for sparse matrix inversion, we define B as a dense one with many zeros. The matrix
-    // is assembled in exactly the same way on each iteration, and there is no need to set
-    // unused entries to zero as we did it at the beginning.
-#if 0
-    // Process the internal subdomain points.
-    for (int x = 1; x < Nx-1; ++x) {
-    for (int y = 1; y < Ny-1; ++y) {
-        int i = SF::sub2ind(x,y);
-        B(i,i)                  = 1 + 2*(rho_x + rho_y);
-        B(i,SF::sub2ind(x-1,y)) = - vx - rho_x;
-        B(i,SF::sub2ind(x+1,y)) = + vx - rho_x;
-        B(i,SF::sub2ind(x,y-1)) = - vy - rho_y;
-        B(i,SF::sub2ind(x,y+1)) = + vy - rho_y;
-    }}
-
-    // Relatively expensive lambda function used to initialize matrix over the border points.
-    auto SetEntry = [Nx, Ny, vx, vy, rho_x, rho_y, &B](int x, int y) {
-        int i = SF::sub2ind(x,y);
-        B(i,i) = 1 + 2*(rho_x + rho_y);
-
-        if (x == 0) {
-            B(i,SF::sub2ind(x  ,y)) = - 2*vx - rho_x;
-            B(i,SF::sub2ind(x+1,y)) = + 2*vx - rho_x;
-        } else if (x+1 == Nx) {
-            B(i,SF::sub2ind(x-1,y)) = - 2*vx - rho_x;
-            B(i,SF::sub2ind(x  ,y)) = + 2*vx - rho_x;
-        } else {
-            B(i,SF::sub2ind(x-1,y)) = - vx - rho_x;
-            B(i,SF::sub2ind(x+1,y)) = + vx - rho_x;
-        }
-
-        if (y == 0) {
-            B(i,SF::sub2ind(x,y  )) = - 2*vy - rho_y;
-            B(i,SF::sub2ind(x,y+1)) = + 2*vy - rho_y;
-        } else if (y+1 == Ny) {
-            B(i,SF::sub2ind(x,y-1)) = - 2*vy - rho_y;
-            B(i,SF::sub2ind(x,y  )) = + 2*vy - rho_y;
-        } else {
-            B(i,SF::sub2ind(x,y-1)) = - vy - rho_y;
-            B(i,SF::sub2ind(x,y+1)) = + vy - rho_y;
-        }
-    };
-
-    // Top and bottom boundaries.
-    for (int x = 1, y =    0; x < Nx-1; ++x) SetEntry(x, y);
-    for (int x = 1, y = Ny-1; x < Nx-1; ++x) SetEntry(x, y);
-
-    // Left and right boundaries.
-    for (int x =    0, y = 1; y < Ny-1; ++y) SetEntry(x, y);
-    for (int x = Nx-1, y = 1; y < Ny-1; ++y) SetEntry(x, y);
-
-    // Corner points.
-    SetEntry(   0,    0);
-    SetEntry(Nx-1,    0);
-    SetEntry(   0, Ny-1);
-    SetEntry(Nx-1, Ny-1);
-#endif
-
-    // TODO: this operation can be avoided in case of sparse matrix.
+    // This operation can be avoided in case of sparse matrix.
     FillMatrix(B, 0.0);
 
-    // Process the internal subdomain points.
+    // Process the internal and boundary subdomain points separately.
+    // At each border we hit outside points with finite difference scheme.
+    // We choose replacing values inside subdomain in such way that if there is
+    // no incoming flow, the field derivative along the border normal is zero.
     for (int x = 0; x < Nx; ++x) {
     for (int y = 0; y < Ny; ++y) {
         int i = SF::sub2ind(x,y);
@@ -466,22 +461,26 @@ void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf, const doubl
             B(i,i) += 1 + 2*(rho_x + rho_y);
 
             if (x == 0) {
-                B(i,SF::sub2ind(x,  y)) += - 2*vx - rho_x;
+                int x_m = boundary.inflow[Left ] ? x : 1;
+                B(i,SF::sub2ind(x_m,y)) += - 2*vx - rho_x;
                 B(i,SF::sub2ind(x+1,y)) += + 2*vx - rho_x;
-            } else if (x+1 == Nx) {
+            } else if (x == Nx-1) {
+                int x_p = boundary.inflow[Right] ? x : (Nx-2);
                 B(i,SF::sub2ind(x-1,y)) += - 2*vx - rho_x;
-                B(i,SF::sub2ind(x,  y)) += + 2*vx - rho_x;
+                B(i,SF::sub2ind(x_p,y)) += + 2*vx - rho_x;
             } else {
                 B(i,SF::sub2ind(x-1,y)) += - vx - rho_x;
                 B(i,SF::sub2ind(x+1,y)) += + vx - rho_x;
             }
 
             if (y == 0) {
-                B(i,SF::sub2ind(x,y  )) += - 2*vy - rho_y;
+                int y_m = boundary.inflow[Down] ? y : 1;
+                B(i,SF::sub2ind(x,y_m)) += - 2*vy - rho_y;
                 B(i,SF::sub2ind(x,y+1)) += + 2*vy - rho_y;
-            } else if (y+1 == Ny) {
+            } else if (y == Ny-1) {
+                int y_p = boundary.inflow[ Up ] ? y : (Ny-2);
                 B(i,SF::sub2ind(x,y-1)) += - 2*vy - rho_y;
-                B(i,SF::sub2ind(x,y  )) += + 2*vy - rho_y;
+                B(i,SF::sub2ind(x,y_p)) += + 2*vy - rho_y;
             } else {
                 B(i,SF::sub2ind(x,y-1)) += - vy - rho_y;
                 B(i,SF::sub2ind(x,y+1)) += + vy - rho_y;
@@ -497,135 +496,70 @@ void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf, const doubl
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function collects remote neighboring boundaries for each subdomain skipping the global border.
-//-------------------------------------------------------------------------------------------------
-void GetRemoteBoundary(boundary_grid_t & boundary, const domain_t & domain)
-{
-    const point2d_t OR = Origin;            // short-hand alias
-    const point2d_t SZ = SubDomGridSize;    // short-hand alias
-
-    for (Direction dir : { Up, Down, Left, Right }) assert_true((0 <= dir) && (dir < 4));
-
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        std::vector<double> * side = boundary[idx].side;
-        if (idx[_Y_] < SZ[_Y_]-1) side[Up   ] = domain[idx + point2d_t{0,+1}].getBoundary(Down );
-        if (idx[_Y_] > OR[_Y_])   side[Down ] = domain[idx + point2d_t{0,-1}].getBoundary(Up   );
-        if (idx[_X_] < SZ[_X_]-1) side[Right] = domain[idx + point2d_t{+1,0}].getBoundary(Left );
-        if (idx[_X_] > OR[_X_])   side[Left ] = domain[idx + point2d_t{-1,0}].getBoundary(Right);
-
-        assert_true(side[Up   ].empty() || (static_cast<int>(side[Up   ].size()) == NELEMS_X));
-        assert_true(side[Down ].empty() || (static_cast<int>(side[Down ].size()) == NELEMS_X));
-        assert_true(side[Right].empty() || (static_cast<int>(side[Right].size()) == NELEMS_Y));
-        assert_true(side[Left ].empty() || (static_cast<int>(side[Left ].size()) == NELEMS_Y));
-
-if (idx[0]==1 && idx[1]==SZ[1]-1) {
-    bool ok = true;
-    const auto & subdomain = domain[idx].getLayer<L_100m>();
-    double mean = 0;
-    for (int x = 0; x < NELEMS_X; ++x) {
-    for (int y = 0; y < NELEMS_Y; ++y) { mean += std::fabs(subdomain[{x,y}]); }}
-
-    double up = 0, down=0, right=0, left=0;
-    ok = (side[Down].empty() || side[Down].size() == (size_t)NELEMS_X); assert_true(ok);
-    ok = (side[Up  ].empty() || side[Up  ].size() == (size_t)NELEMS_X); assert_true(ok);
-    for (int x = 0; x < NELEMS_X; ++x) {
-        if (!side[Down].empty()) {
-            //ok = (side[Down][x] == subdomain[{x,0}]);           assert_true(ok);
-            down += subdomain[{x,0}];
-        }
-        //if (!side[Up  ].empty())
-        {
-            //ok = (side[Up  ][x] == subdomain[{x,NELEMS_Y-1}]);  assert_true(ok);
-            up   += subdomain[{x,NELEMS_Y-1}];
-        }
-    }
-    ok = (side[Left ].empty() || side[Left ].size() == (size_t)NELEMS_Y); assert_true(ok);
-    ok = (side[Right].empty() || side[Right].size() == (size_t)NELEMS_Y); assert_true(ok);
-    for (int y = 0; y < NELEMS_Y; ++y) {
-        if (!side[Left ].empty()) {
-            //ok = (side[Left ][y] == subdomain[{0,y}]);          assert_true(ok);
-            left  += subdomain[{0,y}];
-        }
-        if (!side[Right].empty()) {
-            //ok = (side[Right][y] == subdomain[{NELEMS_X-1,y}]); assert_true(ok);
-            right += subdomain[{NELEMS_X-1,y}];
-        }
-    }
-
-    std::cout << "mean: " << (mean / (NELEMS_X * NELEMS_Y)) << '\n'
-              << "left: " << left/NELEMS_Y << ", right: " << right/NELEMS_Y
-              << ", down: " << down/NELEMS_X << ", up: " << up/NELEMS_X << endl << flush;
-}
-
-    });
-}
-
-//-------------------------------------------------------------------------------------------------
 // Function implements the idea of Schwartz method where the boundary values of subdomain
 // are get updated depending on flow direction.
 //-------------------------------------------------------------------------------------------------
-double SchwartzUpdate(const Configuration & conf,
-                      boundary_grid_t & boundary, domain_t & domain, double physical_time)
+double SchwarzUpdate(const Configuration & conf,
+                      Boundary & border, const point2d_t & idx,
+                      domain_t & domain, flow_t flow)
 {
-    // Collect. remote neighboring boundaries for each subdomain.
-    GetRemoteBoundary(boundary, domain);
+    // Origin and the number of subdomains in both directions.
+    const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
+    const int Oy = Origin[_Y_];  const int Ny = SubDomGridSize[_Y_];
 
-    Grid<double,2> glo_diff(SubDomGridSize);    // accumulator of differences across the domain
-    Grid<double,2> glo_mean(SubDomGridSize);    // accumulator of mean density across the domain
+    // Index increments and corresponding directions of a neighbour (remote) subdomain.
+    Direction remote_dir[NSIDES];
+    point2d_t remote_idx[NSIDES];
 
-    // For each subdomain, update its boundary by the boundary values
-    // of neighboring subdomain, if the density flow comes in.
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        const std::vector<double> * side = boundary[idx].side;
-        double                      vx = 0.0, vy = 0.0;
-        double                      diff = 0.0, mean = 0.0;
-        size_t                      diff_scale = 0;
+    remote_dir[Left ] = Right;  remote_idx[Left ] = point2d_t{-1,0};
+    remote_dir[Right] = Left;   remote_idx[Right] = point2d_t{+1,0};
+    remote_dir[Down ] = Up;     remote_idx[Down ] = point2d_t{0,-1};
+    remote_dir[Up   ] = Down;   remote_idx[Up   ] = point2d_t{0,+1};
 
-        Flow(vx, vy, conf, physical_time);
-        for (Direction dir : { Up, Down, Left, Right }) {
-            const auto & remote = side[dir];
-            if (remote.empty()) continue;               // skip external borders
+    // Function updates a boundary depending on flow direction and accumulates the difference
+    // between this and neighbour (remote) subdomain according to Schwarz method.
+    auto UpdBoundary = [&](Direction dir, bool is_outer, const point2d_t & idx,
+                           double & numer_sum, double & denom_sum)
+    {
+        border.outer[dir] = is_outer;
+        border.inflow[dir] = false;
+        if (is_outer) return;                       // nothing to do with outer border
 
-            const auto myself = domain[idx].getBoundary(dir);
-            assert_true(myself.size() == remote.size());
+        // Make a normal vector pointing outside the subdomain.
+        int normal_x = (dir == Right) ? +1 : ((dir == Left) ? -1 : 0);
+        int normal_y = (dir ==    Up) ? +1 : ((dir == Down) ? -1 : 0);
 
-            for (auto a = remote.begin(), b = myself.begin(); b != myself.end(); ++a, ++b) {
-                diff += std::fabs(*a - *b);
-                ++diff_scale;
+        // Update the boundary points if flow enters the subdomain.
+        if (normal_x * flow.first + normal_y * flow.second < 0) {
+            border.inflow[dir] = true;
+            border.myself = domain[idx].getBoundary(dir);
+            border.remote = domain[idx + remote_idx[dir]].getBoundary(remote_dir[dir]);
+            domain[idx].setBoundary(dir, border.remote);
+
+            // Compute and accumulate aggregated difference between subdomains' borders.
+            double rsum = 0.0, msum = 0.0, diff = 0.0;
+            assert_true(border.myself.size() == border.remote.size());
+            for (auto r = border.remote.begin(),
+                      m = border.myself.begin(); m != border.myself.end(); ++m, ++r) {
+                diff += std::fabs(*r - *m);
+                rsum += std::fabs(*r);
+                msum += std::fabs(*m);
             }
-
-            // Make a normal vector pointing outside the subdomain.
-            int normal_x = (dir == Right) ? +1 : ((dir == Left) ? -1 : 0);
-            int normal_y = (dir ==    Up) ? +1 : ((dir == Down) ? -1 : 0);
-
-            // Update the boundary points if flow enters the subdomain.
-            if (normal_x * vx + normal_y * vy < 0) {
-                domain[idx].setBoundary(dir, remote);
-            }
+            numer_sum += diff;
+            denom_sum += std::max(rsum, msum);
         }
-        glo_diff[idx] = (diff /= static_cast<double>(std::max(diff_scale, size_t(1))));
+    };
 
-        // Compute the average density field over the domain.
-        const auto & subdomain = domain[idx].getLayer<L_100m>();
-        for (int x = 0; x < NELEMS_X; ++x) {
-        for (int y = 0; y < NELEMS_Y; ++y) { mean += std::fabs(subdomain[{x,y}]); }}
-        glo_mean[idx] = (mean /= (NELEMS_X * NELEMS_Y));
-    });
+    // Update subdomain boundaries.
+    double numer_sum = 0.0, denom_sum = 0.0;
 
-#if 0
-{
-for (int x = 0; x < NELEMS_X; ++x) {
-for (int y = 0; y < NELEMS_Y; ++y) {
-    std::cout << "x: " << x << ", y: " << y
-        << ", diff: " << glo_diff[{x,y}] << ", mean: " <<  glo_mean[{x,y}] << endl;
-}}
-std::cout << endl << endl;
-}
-#endif
+    UpdBoundary(Left,  (idx[_X_] == Ox),   idx, numer_sum, denom_sum);
+    UpdBoundary(Right, (idx[_X_] == Nx-1), idx, numer_sum, denom_sum);
+    UpdBoundary(Down,  (idx[_Y_] == Oy),   idx, numer_sum, denom_sum);
+    UpdBoundary(Up,    (idx[_Y_] == Ny-1), idx, numer_sum, denom_sum);
 
-    double rel_error = (ReduceMean(glo_diff) / std::max(ReduceMean(glo_mean), TINY));
-    //std::cout << "rel_error: " << rel_error << endl << flush;
-    return rel_error;
+    border.rel_diff = numer_sum / std::max(denom_sum, TINY);
+    return border.rel_diff;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -635,8 +569,8 @@ std::cout << endl << endl;
 //-------------------------------------------------------------------------------------------------
 void ComputeTrueFields(const Configuration & conf)
 {
+/*
     std::cout << "Computing the observations, a.k.a 'true' density fields" << endl << flush;
-    assert_true((Origin[_X_] == 0) && (Origin[_Y_] == 0)) << "origin is expected at (0,0)";
     //true_fields = np.zeros((conf.nx, conf.ny, conf.Nt))
 
     //std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot(nullptr, "-background yellow"));
@@ -655,10 +589,6 @@ void ComputeTrueFields(const Configuration & conf)
     domain_t                   state(SubDomGridSize);       // states of the density fields
     boundary_grid_t            boundary(SubDomGridSize);    // neighboring boundary vaklues
 
-    // Clear remote boundary arrays of each subdomain.
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        for (Direction dir : { Up, Down, Left, Right }) { boundary[idx].side[dir].clear(); }
-    });
     // Generate the initial density field.
     InitialField(state, curr, conf);
 
@@ -681,11 +611,82 @@ WriteImage(conf, curr, "field", t, image_buffer, false, gp.get());
 
                 AllscaleFromMatrix(state[idx].getLayer<L_100m>(), next[idx]);
             });
-        } while (SchwartzUpdate(conf, boundary,
+        } while (SchwarzUpdate(conf, boundary,
                                 state, physical_time) > conf.asDouble("schwartz_tol"));
     }
     std::cout << endl << endl << endl;
+*/
 }
+
+//-------------------------------------------------------------------------------------------------
+// Using model matrix A, the function integrates advection-diffusion equation forward in time
+// (x_{t+1} = A * x_{t}) and records all the solutions - state fields. These fields are
+// considered as the "true" state of the nature and the source of the "true" observations.
+//-------------------------------------------------------------------------------------------------
+void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol)
+{
+    std::cout << "Running simulation with data assimilation" << endl << flush;
+
+    std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot());
+    std::vector<unsigned char>        image_buffer;                // temporary global image buffer
+
+    domain_t        state(SubDomGridSize);
+    field_grid_t    observations(SubDomGridSize);
+    boundary_grid_t boundaries(SubDomGridSize);
+
+    mat_grid_t      B(SubDomGridSize);              // inverse model matrices
+    field_grid_t    curr(SubDomGridSize);           // copy of the current subdomain states
+    field_grid_t    next(SubDomGridSize);           // copy of the next subdomain states
+    lu_grid_t       lu(SubDomGridSize);             // objects for LU decomposition
+
+    //InitialField(state, conf, "zero");
+    InitialField(state, conf, "gauss");
+
+    // Time integration forward in time.
+    for (int t = 0, Nt = conf.asInt("Nt"); t < Nt; ++t) {
+        std::cout << '.' << flush;
+
+        const double physical_time = t * conf.asDouble("dt");
+        const flow_t flow = Flow(conf, physical_time);
+
+        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+            SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
+            ApplyBoundaryCondition(state, idx);
+
+            MatrixFromAllscale(curr[idx], state[idx].getLayer<ACTIVE_LAYER>());
+
+            InverseModelMatrix(B[idx], conf, boundaries[idx], flow);  // get inverse model matrix
+            lu[idx].Init(B[idx]);                                     // decompose: B = L * U
+            lu[idx].Solve(next[idx], curr[idx]);                      // x_{t+1} = B^{-1} * x_{t}
+            curr[idx] = next[idx];                                    // update state
+
+            AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), next[idx]);
+            ApplyBoundaryCondition(state, idx);
+        });
+        WriteImage(conf, curr, "field", t, image_buffer, true, gp.get());
+
+        //GetObservations(curr[idx], idx, analytic_sol, t);
+
+        //pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+            //MatrixFromAllscale(curr[idx], state[idx].getLayer<L_100m>());
+
+            //InverseModelMatrix(B[idx], conf, physical_time);    // compute inverse model matrix
+            //lu[idx].Init(B[idx]);                               // decompose: B = L * U
+            //lu[idx].Solve(next[idx], curr[idx]);                // x_{t+1} = B^{-1} * x_{t}
+            //curr[idx] = next[idx];
+
+            //AllscaleFromMatrix(state[idx].getLayer<L_100m>(), next[idx]);
+        //});
+
+
+        //GetObservations(observations, analytic_sol, t);
+        //SchwarzUpdate(conf, boundaries, state, physical_time);
+
+        //WriteImage(conf, observations, "field", t, image_buffer, false, gp.get());
+    }
+    std::cout << endl << endl << endl;
+}
+
 
 #if 0
 {
@@ -737,9 +738,9 @@ assert(CheckNoNan(res.getLayer<L_100m>()));
 }
 #endif
 
-
-} // end namespace app
-} // end namespace allscale
+} // anonymous namespace
+} // namespace app
+} // namespace allscale
 
 int Amdados2DMain()
 {
@@ -747,18 +748,31 @@ int Amdados2DMain()
     using namespace ::amdados::app;
     using namespace ::amdados::app::utils;
 
-    // Read the primary parameters.
-    Configuration conf;
-    conf.ReadConfigFile("amdados.conf");
-    // Initialize the rest of parameters that can be deduced from the primary ones.
-    InitDependentParams(conf);
-    conf.PrintParameters();
-    // Create and clear the output directory.
-    CreateAndCleanOutputDir(conf);
-
     // Computing the observations, a.k.a 'true' density fields
-    ComputeTrueFields(conf);
+   // ComputeTrueFields(conf);
 
+    try {
+        // Read application parameters from configuration file, prepare the output directory.
+        Configuration conf;
+        conf.ReadConfigFile("amdados.conf");
+        InitDependentParams(conf);
+        conf.PrintParameters();
+        CreateAndCleanOutputDir(conf);
+
+        // Read analytic solution previously computed by the Python application "Amdados2D.py".
+        std::unique_ptr<cube_t> analytic_sol;
+        analytic_sol.reset(new cube_t(size3d_t{GLOBAL_NELEMS_X,GLOBAL_NELEMS_Y,conf.asInt("Nt")}));
+        ReadAnalyticSolution(conf, *analytic_sol,
+                    conf.asString("output_dir") + "/" + conf.asString("analytic_solution"));
+
+        RunDataAssimilation(conf, *analytic_sol);
+    } catch (std::exception & e) {
+        std::cout << endl << "exception: " << e.what() << endl << endl;
+        return EXIT_FAILURE;
+    } catch (...) {
+        std::cout << endl << "Unsupported exception" << endl << endl;
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 

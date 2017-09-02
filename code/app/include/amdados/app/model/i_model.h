@@ -44,7 +44,6 @@ public:
 // avoiding potential stack overflow.
 //-------------------------------------------------------------------------------------------------
 template<typename MODEL, typename STATE, typename COVAR>
-IBM_NOINLINE
 void UpdateState(const MODEL & M, STATE & state, COVAR & covar)
 {
 #if 1

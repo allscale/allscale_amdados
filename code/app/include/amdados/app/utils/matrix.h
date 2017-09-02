@@ -34,14 +34,14 @@ public:
     }
 
     // Indexing operator provides read only access to vector element.
-    inline const double & operator()(int i) const {
-        CheckRange1D(i,SIZE);
+    inline const double & operator()(int i) const { // TODO: discard checking in release mode
+        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(SIZE))) assert_true(0);
         return data[i];
     }
 
     // Indexing operator provides read/write access to vector element.
-    inline double & operator()(int i) {
-        CheckRange1D(i,SIZE);
+    inline double & operator()(int i) { // TODO: discard checking in release mode
+        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(SIZE))) assert_true(0);
         return data[i];
     }
 
@@ -121,20 +121,23 @@ public:
     }
 
     // Indexing operator provides read only access to matrix element.
-    inline const double & operator()(int r, int c) const {
-        CheckRange2D(r,c,NROWS,NCOLS);
+    inline const double & operator()(int r, int c) const { // TODO: discard checking in release mode
+        if (!((static_cast<unsigned>(r) < static_cast<unsigned>(NROWS)) &&
+              (static_cast<unsigned>(c) < static_cast<unsigned>(NCOLS)))) assert_true(0);
         return data[r * NCOLS + c];
     }
 
     // Indexing operator provides read/write access to matrix element.
-    inline double & operator()(int r, int c) {
-        CheckRange2D(r,c,NROWS,NCOLS);
+    inline double & operator()(int r, int c) { // TODO: discard checking in release mode
+        if (!((static_cast<unsigned>(r) < static_cast<unsigned>(NROWS)) &&
+              (static_cast<unsigned>(c) < static_cast<unsigned>(NCOLS)))) assert_true(0);
         return data[r * NCOLS + c];
     }
 
     // Function converts 2D index to a flat 1D one.
-    static inline int sub2ind(int r, int c) {
-        CheckRange2D(r,c,NROWS,NCOLS);
+    static inline int sub2ind(int r, int c) { // TODO: discard checking in release mode
+        if (!((static_cast<unsigned>(r) < static_cast<unsigned>(NROWS)) &&
+              (static_cast<unsigned>(c) < static_cast<unsigned>(NCOLS)))) assert_true(0);
         return (r * NCOLS + c);
     }
 };

@@ -79,16 +79,16 @@ const int _Y_ = 1;  // index of ordinate
 // Function maps the subdomain local abscissa to global one.
 //-------------------------------------------------------------------------------------------------
 inline int Sub2GloX(const point2d_t & subdomain, const int x)
-{
-    CheckRange1D(x, NELEMS_X);
+{ // TODO: discard checking in release mode
+    if (!(static_cast<unsigned>(x) < static_cast<unsigned>(NELEMS_X))) assert_true(0);
     return (x + subdomain[0] * NELEMS_X);
 }
 //-------------------------------------------------------------------------------------------------
 // Function maps the subdomain local ordinate to global one.
 //-------------------------------------------------------------------------------------------------
 inline int Sub2GloY(const point2d_t & subdomain, const int y)
-{
-    CheckRange1D(y, NELEMS_Y);
+{ // TODO: discard checking in release mode
+    if (!(static_cast<unsigned>(y) < static_cast<unsigned>(NELEMS_Y))) assert_true(0);
     return (y + subdomain[1] * NELEMS_Y);
 }
 

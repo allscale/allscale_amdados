@@ -3,6 +3,12 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
+#undef AMDADOS_ENABLE_GNUPLOT
+// Comment the line below to disable Gnuplot.
+#define AMDADOS_ENABLE_GNUPLOT
+
+#ifdef AMDADOS_ENABLE_GNUPLOT
+
 #include <cstdlib>
 #include <cstdio>
 #include <unistd.h>            // for access(), mkstemp()
@@ -10,15 +16,6 @@
 namespace amdados {
 namespace app {
 namespace gnuplot {
-
-#if defined(__APPLE__) || defined(__linux__) || defined(__unix__)
-#else
-#undef AMDADOS_ENABLE_GNUPLOT
-#warning Plotting with Gnuplot is not supported on this system
-#endif
-
-#ifdef AMDADOS_ENABLE_GNUPLOT
-
 namespace details {
 namespace {
 
@@ -37,25 +34,21 @@ const char * GnuplotPath[] = {"/usr/local/bin/", "/usr/bin/"};
 const char   StdTerminal[] = "x11";
 
 // Function checks if file exists and has executable permission.
-IBM_NOINLINE
 bool CheckGnuplotExists(const std::string & filename) {
     return (access(filename.c_str(), X_OK) == 0);
 }
 
 // System dependent way to open pipe.
-IBM_NOINLINE
 FILE * PipeOpen(const char * name) {
     return popen(name, "w");
 }
 
 // System dependent way to close pipe.
-IBM_NOINLINE
 bool PipeClose(FILE * p) {
     return !(pclose(p) == -1);
 }
 
 // Function checks existence of 'DISPLAY' environmental variable (and hence the display).
-IBM_NOINLINE
 bool CheckDisplayExists() {
     if (getenv("DISPLAY") != NULL) return true;
     std::cout << "WARNING: 'DISPLAY' environment variable does not exist" << std::endl;
@@ -64,7 +57,6 @@ bool CheckDisplayExists() {
 
 // Function searches (1) user specified path; (2) standard folders;
 // (3) PATH environmental variable for Gnuplot.
-IBM_NOINLINE
 std::string GetProgramPath(const char * user_specified)
 {
     std::string filename;
@@ -144,7 +136,6 @@ private:
 //-------------------------------------------------------------------------------------------------
 /** Function closes connection to Gnuplot process, clears this object and returns false. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 bool Clear()
 {
     if (mPipe != nullptr) {
@@ -166,7 +157,6 @@ public:
  *  \param  path  user-specified path to Gnuplot.
  *  \param  args  Gnuplot command-line arguments. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 explicit Gnuplot(const char * path = nullptr, const char * args = nullptr)
 : mPipe(nullptr), mValid(false), mBuffer()
 {
@@ -190,7 +180,6 @@ explicit Gnuplot(const char * path = nullptr, const char * args = nullptr)
 //-------------------------------------------------------------------------------------------------
 /** Destructor closes connection to Gnuplot process. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 virtual ~Gnuplot()
 {
     Clear();
@@ -199,7 +188,6 @@ virtual ~Gnuplot()
 //-------------------------------------------------------------------------------------------------
 /** Function sends a command to an active Gnuplot session. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & Command(const char * command)
 {
     if (mValid && (command != nullptr)) {
@@ -213,7 +201,6 @@ Gnuplot & Command(const char * command)
 // Function repeats the last 'plot' or 'splot' command. This can be useful for viewing a plot
 // with different set options or when generating the same plot for several devices,
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & Replot()
 {
     if (mValid) {
@@ -226,7 +213,6 @@ Gnuplot & Replot()
 //-------------------------------------------------------------------------------------------------
 /** Function resets a Gnuplot session and sets all variables to default. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & ResetAll()
 {
     if (mValid) {
@@ -240,7 +226,6 @@ Gnuplot & ResetAll()
 //-------------------------------------------------------------------------------------------------
 /** Function sets the standard (screen) terminal. */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & SetStdTerminal()
 {
     if (mValid) {
@@ -254,7 +239,6 @@ Gnuplot & SetStdTerminal()
 /** Function saves a Gnuplot session to a postscript file, filename without extension.
  *  Default name is "gnuplot_output". */
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & SetPostscriptTerminal(const char * filename)
 {
     if (mValid) {
@@ -271,7 +255,6 @@ Gnuplot & SetPostscriptTerminal(const char * filename)
 // i.e., ordinate changes faster then abscissa. The image is implicitly transposed upon
 // drawing, so that the "image(x,y)" looks as expected.
 //-------------------------------------------------------------------------------------------------
-IBM_NOINLINE
 Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
                         const std::string & title, bool flipY = false)
 {
@@ -311,11 +294,11 @@ Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
             // Copy image into string buffer in textual format. I use 'n+9 < N' guard to exclude
             // any possibility to overrun the buffer (actually 'n+5' would be enough).
             n = 0;
-            for (int y = 0; y < height; ++y) {  // y first, x second - this transposes the image
+            for (int y = 0; y < height; ++y) {
                 const int yy = flipY ? (height-1-y) : y;
                 for (int x = 0; x < width; ++x) {
                     if (n+9 < N) {  // convert unsigned char into up to 3-char string
-                        div_t res = div(static_cast<int>(image[x * height + yy]), 100);
+                        div_t res = div(static_cast<int>(image[x + width * yy]), 100);
                         if (res.quot > 0) {             // pixel value >= 100
                             p[n++] = '0' + res.quot;
                             res = div(res.rem, 10);
@@ -359,7 +342,15 @@ Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
 
 }; // class Gnuplot
 
+} // namespace gnuplot
+} // namespace app
+} // namespace amdados
+
 #else   // !AMDADOS_ENABLE_GNUPLOT
+
+namespace amdados {
+namespace app {
+namespace gnuplot {
 
 //=================================================================================================
 /** Stub class does nothing. */
@@ -378,9 +369,9 @@ public:
                         const std::string &, bool flipY = false) { (void)flipY; return *this; }
 };
 
-#endif  // AMDADOS_ENABLE_GNUPLOT
-
 } // namespace gnuplot
 } // namespace app
 } // namespace amdados
+
+#endif  // AMDADOS_ENABLE_GNUPLOT
 

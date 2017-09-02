@@ -44,12 +44,9 @@ int main(int argc, char ** argv)
             std::cout << "ERROR: at most 1 input argument is expected" << std::endl;
             return 1;
         }
-        int val = 0;
-        if ((std::istringstream(argv[1]) >> val) && (val >= 0)) {
-            scenario = val;
-        } else {
-            std::cout << "WARNING: scenarion ID must be non-negative value; defaults to "
-                      << scenario << std::endl;
+        if (!(std::istringstream(argv[1]) >> scenario)) {
+            std::cout << "Failed to read scenario ID" << std::endl;
+            return 1;
         }
     }
     std::cout << "Scenario: " << scenario << std::endl << std::endl << std::flush;
@@ -58,16 +55,6 @@ int main(int argc, char ** argv)
         case 0: {
             int Amdados2DMain(void);
             return Amdados2DMain();
-        }
-        break;
-        case 1: {
-            int Amdados2DMain_1(void);
-            return Amdados2DMain_1();
-        }
-        break;
-        case 2: {
-            int Amdados2DMain_2(void);
-            return Amdados2DMain_2();
         }
         break;
         default: std::cout << "ERROR: unknown scenario: " << scenario << std::endl;
