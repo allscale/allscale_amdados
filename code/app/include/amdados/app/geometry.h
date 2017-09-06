@@ -21,6 +21,10 @@ const int NUM_DOMAINS_Y = 8;
 const int NELEMS_X = 9;
 const int NELEMS_Y = 11;
 
+// Number of observation points (number of sensors) in X and Y dimensions in the whole domain.
+const int OBSERVATION_NX = 30;
+const int OBSERVATION_NY = 30;
+
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
 using sub_domain_config_t = CellConfig<
@@ -48,6 +52,11 @@ const int GLOBAL_NELEMS_Y = NELEMS_Y * NUM_DOMAINS_Y;
 
 // Number of elements (or nodal points) in a subdomain.
 const int SUB_PROBLEM_SIZE = NELEMS_X * NELEMS_Y;
+
+// Number of available observations in each subdomain: ceil((global #observations / #subdomains).
+const int NUM_SUBDOMAIN_OBSERVATIONS =
+    (OBSERVATION_NX * OBSERVATION_NY + (NUM_DOMAINS_X * NUM_DOMAINS_Y) - 1) /
+                                       (NUM_DOMAINS_X * NUM_DOMAINS_Y);
 
 // Position, index or size in 2D.
 using point2d_t = ::allscale::api::user::data::GridPoint<2>;

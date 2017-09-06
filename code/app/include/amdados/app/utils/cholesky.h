@@ -111,6 +111,31 @@ void BatchSolve(Matrix<MSIZE,NCOLS> & X, const Matrix<MSIZE,NCOLS> & B) const
     }
 }
 
+//-------------------------------------------------------------------------------------------------
+// Function solves a collection of linear systems A*X = B^t with transposed righ-hand size,
+// where A is the matrix whose Cholesky decomposition was computed by the Init() function,
+// X and B^t are the matrices of the same size.
+//-------------------------------------------------------------------------------------------------
+template<int NCOLS>
+void BatchSolveTr(Matrix<MSIZE,NCOLS> & X, const Matrix<NCOLS,MSIZE> & Bt) const
+{
+    const matrix_t & L = m_L;       // short-hand alias
+
+    for (int c = 0; c < NCOLS; c++) {
+        for (int i = 0; i < MSIZE; i++) {
+            double sum = Bt(c,i);                                           // transposed B
+            for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * X(k,c); }
+            X(i,c) = sum / L(i,i);
+        }
+
+        for (int i = MSIZE - 1; i >= 0; i--) {
+            double sum = X(i,c);
+            for (int k = i + 1; k < MSIZE; k++) { sum -= L(k,i) * X(k,c); }
+            X(i,c) = sum / L(i,i);
+        }
+    }
+}
+
 }; // class Cholesky
 
 } // end namespace utils

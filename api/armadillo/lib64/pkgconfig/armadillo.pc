@@ -1,9 +1,0 @@
-libdir=/home/fearghal/Work/Misc/BusinessPotentials/AllScale/allscale_amdados/api/armadillo/lib64
-includedir=/home/fearghal/Work/Misc/BusinessPotentials/AllScale/allscale_amdados/api/armadillo/include
-
-Name: armadillo
-Description: Fast C++ matrix library with syntax similar to MATLAB and Octave
-URL: http://arma.sourceforge.net
-Version: 7.960.1
-Cflags: -I${includedir}
-Libs: -L${libdir} -larmadillo

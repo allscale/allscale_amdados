@@ -40,6 +40,7 @@ output/
 3rd-party
 *.git
 .DS_Store
+*.gz
 
 __pycache__
 .ipynb_checkpoints

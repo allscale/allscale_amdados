@@ -128,6 +128,32 @@ void BatchSolve(Matrix<MSIZE,NCOLS> & X, const Matrix<MSIZE,NCOLS> & B) const
     }
 }
 
+//-------------------------------------------------------------------------------------------------
+// Function solves a collection of linear systems A*X = B^t with transposed right-hand size,
+// where A is the matrix whose LU decomposition was computed by the Init() function,
+// X and B^t are the matrices of the same size.
+//-------------------------------------------------------------------------------------------------
+template<int NCOLS>
+void BatchSolveTr(Matrix<MSIZE,NCOLS> & X, const Matrix<NCOLS,MSIZE> & Bt) const
+{
+	const auto & A = m_LU;                  // short-hand aliases
+	const int  * P = m_Perm.data();
+
+    for (int c = 0; c < NCOLS; ++c) {
+        for (int i = 0; i < MSIZE; ++i) {
+            const int Pi = P[i];
+            X(i,c) = Bt(c,Pi);                                              // transposed B
+            for (int k = 0; k < i; ++k) { X(i,c) -= A(Pi,k) * X(k,c); }
+        }
+
+        for (int i = MSIZE - 1; i >= 0; --i) {
+            const int Pi = P[i];
+            for (int k = i + 1; k < MSIZE; ++k) { X(i,c) -= A(Pi,k) * X(k,c); }
+            X(i,c) /= A(Pi,i);
+        }
+    }
+}
+
 }; // class LUdecomposition
 
 } // end namespace utils

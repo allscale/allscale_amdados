@@ -120,7 +120,8 @@ std::string GetProgramPath(const char * user_specified)
 } // namespace details
 
 //=================================================================================================
-/** C++ wrapper to Gnuplot command interface. */
+/** C++ wrapper to Gnuplot command interface. It opens a pipe to Gnuplot application and pushes
+ *  commands and data (image in a textual form) through the pipe. */
 //=================================================================================================
 class Gnuplot
 {
@@ -251,9 +252,8 @@ Gnuplot & SetPostscriptTerminal(const char * filename)
 
 //-------------------------------------------------------------------------------------------------
 // Function plots greyscaled image (Gnuplot 4.2+).
-// It assumed that a pixel value at (x,y) is addressed as follows: image[x*height + y],
-// i.e., ordinate changes faster then abscissa. The image is implicitly transposed upon
-// drawing, so that the "image(x,y)" looks as expected.
+// It is assumed that a pixel value at (x,y) is addressed as follows: image[x + width * y],
+// i.e., abscissa changes faster then ordinate.
 //-------------------------------------------------------------------------------------------------
 Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
                         const std::string & title, bool flipY = false)
@@ -291,7 +291,7 @@ Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
             p += n;             // advance pointer right beyond the header
             N -= n;             // reduce effective size
 
-            // Copy image into string buffer in textual format. I use 'n+9 < N' guard to exclude
+            // Copy image into string buffer in textual form. I use 'n+9 < N' guard to exclude
             // any possibility to overrun the buffer (actually 'n+5' would be enough).
             n = 0;
             for (int y = 0; y < height; ++y) {

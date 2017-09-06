@@ -12,45 +12,36 @@ namespace utils {
 //=================================================================================================
 // Class implements a Kalman filter using AllScale API grid for matrices and vectors.
 //=================================================================================================
-template<int PROBLEM_SIZE, int NUM_MEASUREMENTS>
+template<int PROBLEM_SIZE, int NUM_OBSERVATIONS>
 class KalmanFilter
 {
 public:
     using matrix_t     = Matrix<PROBLEM_SIZE, PROBLEM_SIZE>;
-    using matrix_MxN_t = Matrix<NUM_MEASUREMENTS, PROBLEM_SIZE>;
-    using matrix_NxM_t = Matrix<PROBLEM_SIZE, NUM_MEASUREMENTS>;
-    using matrix_MxM_t = Matrix<NUM_MEASUREMENTS, NUM_MEASUREMENTS>;
+    using matrix_OxN_t = Matrix<NUM_OBSERVATIONS, PROBLEM_SIZE>;
+    using matrix_NxO_t = Matrix<PROBLEM_SIZE, NUM_OBSERVATIONS>;
+    using matrix_OxO_t = Matrix<NUM_OBSERVATIONS, NUM_OBSERVATIONS>;
     using vector_t     = Vector<PROBLEM_SIZE>;
-    using vector_obs_t = Vector<NUM_MEASUREMENTS>;
+    using vector_obs_t = Vector<NUM_OBSERVATIONS>;
 
 private:
-    Cholesky<PROBLEM_SIZE> m_chol;  // object computes inverse matrix by Cholesky decomposition
+    Cholesky<PROBLEM_SIZE>        m_chol;  // Cholesky decomposition solver
+    LUdecomposition<PROBLEM_SIZE> m_lu;    // LU decomposition solver
 
     vector_t     m_x_prior;     // placeholder for the vector x_{k|k-1} = A * x
     vector_obs_t m_y;           // placeholder vector of observations
     vector_obs_t m_invSy;       // placeholder vector for S^{-1} * y
-    matrix_MxM_t m_S;           // placeholder for the matrix S = H * P_{k|k-1} * H^t + R
+    matrix_OxO_t m_S;           // placeholder for the matrix S = H * P_{k|k-1} * H^t + R
     matrix_t     m_P_prior;     // placeholder for the matrix P_{k|k-1}
-    matrix_t     m_PAt;         // placeholder for the matrix P * A^t
-    matrix_NxM_t m_PHt;         // placeholder for the matrix P_{k|k-1} * H^t
-    matrix_MxN_t m_HP;          // placeholder for the matrix H * P_{k|k-1}
-    matrix_MxN_t m_invSHP;      // placeholder for the matrix S^{-1} * H * P_{k|k-1}
+    matrix_NxO_t m_PHt;         // placeholder for the matrix P_{k|k-1} * H^t
+    matrix_OxN_t m_HP;          // placeholder for the matrix H * P_{k|k-1}
+    matrix_OxN_t m_invSHP;      // placeholder for the matrix S^{-1} * H * P_{k|k-1}
 
 public:
 //-------------------------------------------------------------------------------------------------
-// Default constructor sets all the variables to zero.
+// Constructor (by default all vector/matrix variables are initialized by zeros).
 //-------------------------------------------------------------------------------------------------
-KalmanFilter() : m_chol()
+KalmanFilter()
 {
-    FillVector(m_x_prior);
-    FillVector(m_y);
-    FillVector(m_invSy);
-    FillMatrix(m_S);
-    FillMatrix(m_P_prior);
-    FillMatrix(m_PAt);
-    FillMatrix(m_PHt);
-    FillMatrix(m_HP);
-    FillMatrix(m_invSHP);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -67,7 +58,7 @@ KalmanFilter() : m_chol()
 //-------------------------------------------------------------------------------------------------
 template<typename MODEL_MATRIX>
 void Iterate(MODEL_MATRIX & A, const matrix_t & Q,
-             const matrix_MxN_t & H, const matrix_MxM_t & R,
+             const matrix_OxN_t & H, const matrix_OxO_t & R,
              const vector_obs_t & z,
              vector_t & x, matrix_t & P)
 {
@@ -82,6 +73,42 @@ void Iterate(MODEL_MATRIX & A, const matrix_t & Q,
     PosteriorEstimation(H, R, z, x, P);
 }
 
+//-------------------------------------------------------------------------------------------------
+// Function makes an iteration of discrete-time Kalman filter which includes prediction and
+// correction phases in the case when only inverse model matrix is available. It is assumed that
+// the process model has the form: x_{t+1} = A * x_{t} + w_t, and the prior estimations of state
+// and covariance reads: x_prior = A * x, P_prior = A * P * A^t.
+// \param  x  in: current state; out: new state.
+// \param  P  in: current covariance; out: new covariance.
+// \param  B  inverse model matrix: B = A^{-1}.
+// \param  Q  process noise (w_t) covariance.
+// \param  H  observation model: z_t = H_t * x_t + v_t.
+// \param  R  measurement noise (v_t) covariance.
+// \param  z  vector of observations.
+//-------------------------------------------------------------------------------------------------
+void IterateInverse(
+          VectorView<PROBLEM_SIZE>                   & x,
+          Matrix<PROBLEM_SIZE, PROBLEM_SIZE>         & P,
+    const Matrix<PROBLEM_SIZE, PROBLEM_SIZE>         & B,
+    const Matrix<PROBLEM_SIZE, PROBLEM_SIZE>         & Q,
+    const Matrix<NUM_OBSERVATIONS, PROBLEM_SIZE>     & H,
+    const Matrix<NUM_OBSERVATIONS, NUM_OBSERVATIONS> & R,
+    const VectorView<NUM_OBSERVATIONS>               & z)
+{
+    // Propagate state and covariance one timestep ahead and obtain prior estimations:
+    // x_prior = A * x, P_prior = A * P * A^t, where A is avaliable via its inversion B = A^{-1}.
+    m_lu.Init(B);                           // decompose: B = L * U
+    m_lu.Solve(m_x_prior, x);               // x_prior = B^{-1} * x_{t}
+    m_lu.SolveBatch(m_P_prior, P);          // P_prior = B^{-1} * P  (P symmetric!)
+    P = m_P_prior;                          // use P as a temporary matrix
+    m_lu.SolveBatchTr(m_P_prior, P);        // P_prior = B^{-1} * (B^{-1} * P)^t = A * P * A^t
+    AddMatrices(m_P_prior, m_P_prior, Q);   // P_prior = A * P * A^t + Q
+    Symmetrize(m_P_prior);                  // correct loss of symmetry due to round-off errors
+
+    // Estimate posterior state and covariance.
+    PosteriorEstimation(H, R, z, x, P);
+}
+
 private:
 //-------------------------------------------------------------------------------------------------
 // Function makes an iteration of Kalman filter given already estimated "x_prior" and "P_prior".
@@ -91,7 +118,7 @@ private:
 // \param  x  out: new state.
 // \param  P  out: new covariance.
 //-------------------------------------------------------------------------------------------------
-void PosteriorEstimation(const matrix_MxN_t & H, const matrix_MxM_t & R, const vector_obs_t & z,
+void PosteriorEstimation(const matrix_OxN_t & H, const matrix_OxO_t & R, const vector_obs_t & z,
                          vector_t & x, matrix_t & P)
 {
     // y = z - H * x_prior

@@ -11,6 +11,7 @@
 #include "amdados/app/utils/matrix.h"
 #include "amdados/app/utils/sparse_matrix.h"
 #include "amdados/app/utils/cholesky.h"
+#include "amdados/app/utils/lu.h"
 #include "amdados/app/utils/configuration.h"
 #include "amdados/app/model/i_model.h"
 #include "amdados/app/utils/kalman_filter.h"
@@ -48,8 +49,8 @@ TEST(KalmanFilter, Basic)
     const char   SPACE[] = " ";
 
     using matrix_t     = KalmanFilter<DIM,DIM>::matrix_t;
-    using matrix_MxN_t = KalmanFilter<DIM,DIM>::matrix_MxN_t;
-    using matrix_MxM_t = KalmanFilter<DIM,DIM>::matrix_MxM_t;
+    using matrix_OxN_t = KalmanFilter<DIM,DIM>::matrix_OxN_t;
+    using matrix_OxO_t = KalmanFilter<DIM,DIM>::matrix_OxO_t;
     using vector_t     = KalmanFilter<DIM,DIM>::vector_t;
     using vector_obs_t = KalmanFilter<DIM,DIM>::vector_obs_t;
 
@@ -61,8 +62,8 @@ TEST(KalmanFilter, Basic)
     matrix_t     P;     MakeIdentityMatrix(P);      MatScalarMult(P, DEVIATION_MODEL);
     matrix_t     A;     MakeIdentityMatrix(A);
     matrix_t     Q;     MakeIdentityMatrix(Q);      MatScalarMult(Q, DEVIATION_MODEL);
-    matrix_MxN_t H;     MakeIdentityMatrix(H);
-    matrix_MxM_t R;     MakeIdentityMatrix(R);      MatScalarMult(R, DEVIATION_MEASUREMENT);
+    matrix_OxN_t H;     MakeIdentityMatrix(H);
+    matrix_OxO_t R;     MakeIdentityMatrix(R);      MatScalarMult(R, DEVIATION_MEASUREMENT);
     vector_obs_t z, v;
     vector_t     true_x;
     vector_t     prev_x = x;

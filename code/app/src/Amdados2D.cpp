@@ -91,6 +91,11 @@ typedef Grid<DA_vector_t,2>                         vec_grid_t;       // grid of
 typedef Matrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>   DA_matrix_t;      // subdomain matrix
 typedef Grid<DA_matrix_t,2>                         mat_grid_t;       // grid of matrices
 
+typedef Matrix<NUM_SUBDOMAIN_OBSERVATIONS,
+               SUB_PROBLEM_SIZE>                    H_matrix_t; // type of observation matrix
+typedef Matrix<NUM_SUBDOMAIN_OBSERVATIONS,
+               NUM_SUBDOMAIN_OBSERVATIONS>          R_matrix_t; // observ. noise covarariance
+
 typedef SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> DA_sp_matrix_t;   // subdomain sparse matrix
 
 typedef Grid<Cholesky<SUB_PROBLEM_SIZE>,2>          cholesky_grid_t;  // grid of Cholesky solvers
@@ -258,7 +263,7 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
         f << std::flush;
     }
 
-    // Plot image.
+    // Plot the image with Gnuplot, if available.
     if (gp != nullptr) {
         char title[64];
         snprintf(title, sizeof(title)/sizeof(title[0]), "frame%05d", time_index);
@@ -266,8 +271,40 @@ void WriteImage(const Configuration & conf, const field_grid_t & field,
     }
 }
 
+//-------------------------------------------------------------------------------------------------
+// Function writes into file the image that shows the sensor locations in the whole domain.
+//-------------------------------------------------------------------------------------------------
+void WriteImageOfSensors(const Configuration & conf,
+                         std::vector<unsigned char> & image_buffer, const Grid<H_matrix_t,2> & H)
+{
+    Grid<DA_subfield_t,2> field(SubDomGridSize);
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+        DA_subfield_t    & subfield = field[idx];
+        const H_matrix_t & subH = H[idx];
+
+        // Everything is set to black except border points painted in dark gray.
+        FillMatrix(subfield, 0.0);
+        for (int x = 0; x < NELEMS_X; ++x) { subfield(x,0) = subfield(x,NELEMS_Y-1) = 128.0; }
+        for (int y = 0; y < NELEMS_Y; ++y) { subfield(0,y) = subfield(NELEMS_X-1,y) = 128.0; }
+
+        // Sensor locations are depicted in white.
+        for (int r = 0; r < NUM_SUBDOMAIN_OBSERVATIONS; ++r) {
+        for (int c = 0; c < SUB_PROBLEM_SIZE;           ++c) {
+            if (subH(r,c) > 0.01) {                 // in fact, H is a matrix of 0/1 values
+                div_t res = div(c, NELEMS_Y);       // convert plain index into (x,y) point
+                int x = res.quot;
+                int y = res.rem;
+                bool ok = (DA_subfield_t::sub2ind(x,y) == c);
+                assert_true(ok);                                // check index convertion
+                subfield(x,y) = 255.0;
+            }
+        }}
+    });
+    WriteImage(conf, field, "sensors", 0, image_buffer, true, nullptr);
+}
+
 //#################################################################################################
-// Initialization.
+// @Initialization.
 //#################################################################################################
 
 //-------------------------------------------------------------------------------------------------
@@ -400,7 +437,179 @@ void InitialField(domain_t & state, const Configuration & conf, const char * fie
 }
 
 //#################################################################################################
-// Advection-diffusion PDE stuff.
+// @Kalman filter stuff.
+//#################################################################################################
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the initial covariance matrix as function of exponential distance.
+//-------------------------------------------------------------------------------------------------
+void InitialCovar(const Configuration & conf, DA_matrix_t & P)
+{
+    using SF = Matrix<NELEMS_X,NELEMS_Y>;   // sub-field type
+
+    // Here we express correlation distances in logical coordinates of nodal points.
+    const double variance = conf.asDouble("model_ini_var");
+    const double covar_radius = conf.asDouble("model_ini_covar_radius");
+    const double sx = std::max(NELEMS_X * covar_radius / conf.asDouble("domain_size_x"), 1.0);
+    const double sy = std::max(NELEMS_Y * covar_radius / conf.asDouble("domain_size_y"), 1.0);
+    const int Rx = Round(std::ceil(3.0 * sx));
+    const int Ry = Round(std::ceil(3.0 * sx));
+
+    FillMatrix(P, 0.0);
+    for (int u = 0; u < NELEMS_X; ++u) {
+    for (int v = 0; v < NELEMS_Y; ++v) {
+        int i = SF::sub2ind(u,v);
+        for (int x = u-Rx; x <= u+Rx; ++x) { if ((0 <= x) && (x < NELEMS_X)) { double dx = (u-x)/sx;
+        for (int y = v-Ry; y <= v+Ry; ++y) { if ((0 <= y) && (y < NELEMS_Y)) { double dy = (v-y)/sy;
+            int j = SF::sub2ind(x,y);
+            if (i <= j) P(i,j) = P(j,i) = variance * std::exp(-0.5 * (dx*dx + dy*dy));
+        }}}}
+    }}
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the model noise covariance matrix.
+//-------------------------------------------------------------------------------------------------
+void ComputeQ(const Configuration & conf, DA_matrix_t & Q)
+{
+    std::uniform_real_distribution<double> distrib;
+    std::mt19937                           gen(std::time(nullptr));
+    const double                           model_noise_Q = conf.asDouble("model_noise_Q");
+
+    MakeIdentityMatrix(Q);
+    for (int k = 0; k < SUB_PROBLEM_SIZE; ++k) {
+        Q(k,k) += model_noise_Q * distrib(gen);
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function computes the measurement noise covariance matrix.
+//-------------------------------------------------------------------------------------------------
+void ComputeR(const Configuration & conf, R_matrix_t & R)
+{
+    std::uniform_real_distribution<double> distrib;
+    std::mt19937                           gen(std::time(nullptr));
+    const double                           model_noise_R = conf.asDouble("model_noise_R");
+
+    MakeIdentityMatrix(R);
+    for (int k = 0; k < NUM_SUBDOMAIN_OBSERVATIONS; ++k) {
+        R(k,k) += model_noise_R * distrib(gen);
+    }
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function initializes observation matrix H. Function evenly distributes sensors in the domain.
+// It uses gradient descent to minimize objective function, which measures the mutual sensor
+// points' expulsion and their expulsion from the borders. Experiments showed that quadratic
+// distances (used here) work better than absolute values of the distances. See the Memo named
+// "Sensor Placement" for details.
+//-------------------------------------------------------------------------------------------------
+void ComputeH(const Configuration & conf, H_matrix_t & H, const point2d_t & idx)
+{
+    const int N = NUM_SUBDOMAIN_OBSERVATIONS;               // short-hand alias
+    const int NN = N * N;
+
+    // Function evaluates objective function and its gradient.
+    auto Evaluate = [](double & J, std::vector<double> & gradJ,
+                             const std::vector<double> & x,
+                             const std::vector<double> & y)
+    {
+        const double EPS = std::sqrt(numeric_limits<double>::epsilon());
+
+        J = 0.0;
+        gradJ.resize(2*N);
+        std::fill(gradJ.begin(), gradJ.end(), 0.0);
+
+        for (int i = 0; i < N; ++i) {
+            // Reciprocal distances to subdomain borders.
+            const double r_x1 = 1.0 / (std::pow(      x[i],2) + EPS);
+            const double r_x2 = 1.0 / (std::pow(1.0 - x[i],2) + EPS);
+            const double r_y1 = 1.0 / (std::pow(      y[i],2) + EPS);
+            const double r_y2 = 1.0 / (std::pow(1.0 - y[i],2) + EPS);
+
+            J += (r_x1 + r_x2 +
+                  r_y1 + r_y2);
+
+            double gx = 0.0, gy = 0.0;
+            for (int j = 0; j < N; ++j) {
+                double dx = x[i] - x[j];
+                double dy = y[i] - y[j];
+                double sqdist = dx*dx + dy*dy + EPS;
+                J  += 1.0 / sqdist;
+                gx -= dx / std::pow(sqdist,2);
+                gy -= dy / std::pow(sqdist,2);
+            }
+            gradJ[i  ] = 2.0 * (gx - x[i] * std::pow(r_x1,2) + (1.0 - x[i]) * std::pow(r_x2,2));
+            gradJ[i+N] = 2.0 * (gy - y[i] * std::pow(r_y1,2) + (1.0 - y[i]) * std::pow(r_y2,2));
+        }
+
+        J /= NN;
+        std::transform(gradJ.begin(), gradJ.end(), gradJ.begin(), [=](double x){ return x/NN; });
+    };
+
+    std::vector<double> x(N), y(N);         // sensors' abscissas and ordinates
+
+    // Generates initial space distribution of sensor points.
+    {
+        std::mt19937 gen(std::time(nullptr) + idx[_X_] * NUM_DOMAINS_Y + idx[_Y_]);
+        std::uniform_real_distribution<double> distrib(0.0, 1.0);
+        std::generate(x.begin(), x.end(), [&](){ return distrib(gen); });
+        std::generate(y.begin(), y.end(), [&](){ return distrib(gen); });
+    }
+
+    // Minimize the objective function by gradient descent.
+    {
+        const double TINY = numeric_limits<double>::min() /
+                   std::pow(numeric_limits<double>::epsilon(),3);
+
+        const double DOWNSCALE = 0.1;
+        const double INITIAL_STEP = 0.1;
+        const double TOL = numeric_limits<double>::epsilon() * std::log(N);
+
+        std::vector<double> x_new(N), y_new(N);             // sensors' abscissas and ordinates
+        std::vector<double> gradJ(2*N), gradJ_new(2*N);     // gradients of objective function
+        double              J = 0.0, J_new = 0.0;           // value of objective function
+        double              step = INITIAL_STEP;            // step in gradient descent
+
+        Evaluate(J, gradJ, x, y);
+        for (bool proceed = true; proceed && (step > TINY);) {
+            bool is_inside = true;
+            for (int k = 0; (k < N) && is_inside; ++k) {
+                x_new[k] = x[k] - step * gradJ[k  ];
+                y_new[k] = y[k] - step * gradJ[k+N];
+                is_inside = ((0.0 <= x_new[k]) && (x_new[k] <= 1.0) &&
+                             (0.0 <= y_new[k]) && (y_new[k] <= 1.0));
+            }
+            if (!is_inside) {
+                step *= DOWNSCALE;
+                continue;
+            }
+            Evaluate(J_new, gradJ_new, x_new, y_new);
+            if (J < J_new) {
+                step *= DOWNSCALE;
+                continue;
+            }
+            proceed = (J - J_new > J * TOL);
+            x = x_new;
+            y = y_new;
+            J = J_new;
+            gradJ = gradJ_new;
+            step *= 2.0;
+        }
+    }
+
+    // Now we have evenly distributed sensor locations, which will be used to initialize matrix H.
+    FillMatrix(H, 0.0);
+    for (int k = 0; k < N; ++k) {
+        int xk = std::min(std::max(static_cast<int>(std::floor(x[k] * NELEMS_X)), 0), NELEMS_X-1);
+        int yk = std::min(std::max(static_cast<int>(std::floor(y[k] * NELEMS_Y)), 0), NELEMS_Y-1);
+        int point_index = DA_subfield_t::sub2ind(xk, yk);
+        H(k,point_index) = 1.0;
+    }
+}
+
+//#################################################################################################
+// @Advection-diffusion PDE stuff.
 //#################################################################################################
 
 //-------------------------------------------------------------------------------------------------
@@ -461,26 +670,42 @@ void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf,
             B(i,i) += 1 + 2*(rho_x + rho_y);
 
             if (x == 0) {
-                int x_m = boundary.inflow[Left ] ? x : 1;
-                B(i,SF::sub2ind(x_m,y)) += - 2*vx - rho_x;
-                B(i,SF::sub2ind(x+1,y)) += + 2*vx - rho_x;
+                if (boundary.inflow[Left]) {
+                    B(i,SF::sub2ind(x  ,y)) += - 2*vx - rho_x;
+                    B(i,SF::sub2ind(x+1,y)) += + 2*vx - rho_x;
+                } else {
+                    B(i,SF::sub2ind(x+1,y)) += - vx - rho_x;
+                    B(i,SF::sub2ind(x+1,y)) += + vx - rho_x;
+                }
             } else if (x == Nx-1) {
-                int x_p = boundary.inflow[Right] ? x : (Nx-2);
-                B(i,SF::sub2ind(x-1,y)) += - 2*vx - rho_x;
-                B(i,SF::sub2ind(x_p,y)) += + 2*vx - rho_x;
+                if (boundary.inflow[Right]) {
+                    B(i,SF::sub2ind(x-1,y)) += - 2*vx - rho_x;
+                    B(i,SF::sub2ind(x  ,y)) += + 2*vx - rho_x;
+                } else {
+                    B(i,SF::sub2ind(x-1,y)) += - vx - rho_x;
+                    B(i,SF::sub2ind(x-1,y)) += + vx - rho_x;
+                }
             } else {
                 B(i,SF::sub2ind(x-1,y)) += - vx - rho_x;
                 B(i,SF::sub2ind(x+1,y)) += + vx - rho_x;
             }
 
             if (y == 0) {
-                int y_m = boundary.inflow[Down] ? y : 1;
-                B(i,SF::sub2ind(x,y_m)) += - 2*vy - rho_y;
-                B(i,SF::sub2ind(x,y+1)) += + 2*vy - rho_y;
+                if (boundary.inflow[Down]) {
+                    B(i,SF::sub2ind(x,y  )) += - 2*vy - rho_y;
+                    B(i,SF::sub2ind(x,y+1)) += + 2*vy - rho_y;
+                } else {
+                    B(i,SF::sub2ind(x,y+1)) += - vy - rho_y;
+                    B(i,SF::sub2ind(x,y+1)) += + vy - rho_y;
+                }
             } else if (y == Ny-1) {
-                int y_p = boundary.inflow[ Up ] ? y : (Ny-2);
-                B(i,SF::sub2ind(x,y-1)) += - 2*vy - rho_y;
-                B(i,SF::sub2ind(x,y_p)) += + 2*vy - rho_y;
+                if (boundary.inflow[Up]) {
+                    B(i,SF::sub2ind(x,y-1)) += - 2*vy - rho_y;
+                    B(i,SF::sub2ind(x,y  )) += + 2*vy - rho_y;
+                } else {
+                    B(i,SF::sub2ind(x,y-1)) += - vy - rho_y;
+                    B(i,SF::sub2ind(x,y-1)) += + vy - rho_y;
+                }
             } else {
                 B(i,SF::sub2ind(x,y-1)) += - vy - rho_y;
                 B(i,SF::sub2ind(x,y+1)) += + vy - rho_y;
@@ -639,8 +864,16 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
     field_grid_t    next(SubDomGridSize);           // copy of the next subdomain states
     lu_grid_t       lu(SubDomGridSize);             // objects for LU decomposition
 
+    Grid<H_matrix_t,2>  H(SubDomGridSize);  // observation matrices of all the subdomains
+    Grid<R_matrix_t,2>  R(SubDomGridSize);  // observation noise covariances of all the subdomains
+    Grid<DA_matrix_t,2> Q(SubDomGridSize);  // process noise covariances of all the subdomains
+
     //InitialField(state, conf, "zero");
     InitialField(state, conf, "gauss");
+
+    // Observation matrix is initializes once at the beginning.
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) { ComputeH(conf, H[idx], idx); });
+    WriteImageOfSensors(conf, image_buffer, H);     // visualization
 
     // Time integration forward in time.
     for (int t = 0, Nt = conf.asInt("Nt"); t < Nt; ++t) {
@@ -662,8 +895,12 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
             AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), next[idx]);
             ApplyBoundaryCondition(state, idx);
+
+            // Covariance matrices are allowed to change over time.
+            ComputeQ(conf, Q[idx]);
+            ComputeR(conf, R[idx]);
         });
-        WriteImage(conf, curr, "field", t, image_buffer, true, gp.get());
+        WriteImage(conf, curr, "field", t, image_buffer, true, gp.get());   // visualization
 
         //GetObservations(curr[idx], idx, analytic_sol, t);
 

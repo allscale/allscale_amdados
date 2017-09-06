@@ -159,9 +159,30 @@
 //// This is mainly useful for debugging of the library.
 
 
-#if !defined(ARMA_DEFAULT_OSTREAM)
-  #define ARMA_DEFAULT_OSTREAM std::cout
+#if defined(ARMA_DEFAULT_OSTREAM)
+  #pragma message ("WARNING: support for ARMA_DEFAULT_OSTREAM is deprecated and will be removed;")
+  #pragma message ("WARNING: use ARMA_COUT_STREAM and ARMA_CERR_STREAM instead")
 #endif
+
+
+#if !defined(ARMA_COUT_STREAM)
+  #if defined(ARMA_DEFAULT_OSTREAM)
+    // for compatibility with earlier versions of Armadillo
+    #define ARMA_COUT_STREAM ARMA_DEFAULT_OSTREAM
+  #else
+    #define ARMA_COUT_STREAM std::cout
+  #endif
+#endif
+
+#if !defined(ARMA_CERR_STREAM)
+  #if defined(ARMA_DEFAULT_OSTREAM)
+    // for compatibility with earlier versions of Armadillo
+    #define ARMA_CERR_STREAM ARMA_DEFAULT_OSTREAM
+  #else
+    #define ARMA_CERR_STREAM std::cerr
+  #endif
+#endif
+
 
 #if !defined(ARMA_PRINT_ERRORS)
 #define ARMA_PRINT_ERRORS
@@ -215,7 +236,7 @@
 #if defined(ARMA_USE_WRAPPER)
   #if defined(ARMA_USE_CXX11)
     #if !defined(ARMA_USE_EXTERN_CXX11_RNG)
-      #define ARMA_USE_EXTERN_CXX11_RNG
+/* #undef ARMA_USE_EXTERN_CXX11_RNG */
     #endif
   #endif
 #endif
@@ -230,6 +251,7 @@
 
 #if defined(ARMA_DONT_USE_HDF5)
   #undef ARMA_USE_HDF5
+  #undef ARMA_USE_HDF5_ALT
 #endif
 
 #if defined(ARMA_DONT_PRINT_ERRORS)
@@ -245,5 +267,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS /usr/lib64/libblas.so;/usr/lib64/liblapack.so
+#define ARMA_AUX_LIBS -framework Accelerate
 #define ARMA_AUX_INCDIRS 
