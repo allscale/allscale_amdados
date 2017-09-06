@@ -41,6 +41,10 @@ output/
 *.git
 .DS_Store
 *.gz
+*.a
+*.o
+*.so
+*.dylib
 
 __pycache__
 .ipynb_checkpoints
