@@ -15,6 +15,8 @@
 #include "amdados/app/utils/configuration.h"
 #include "amdados/app/utils/cholesky.h"
 #include "amdados/app/utils/lu.h"
+#include "amdados/app/utils/kalman_filter.h"
+#include "amdados/app/utils/image_writer.h"
 #include "gnuplot.h"
 
 #include <cstdlib>
@@ -79,87 +81,23 @@ struct Boundary {
 };
 typedef Grid<Boundary,2> boundary_grid_t;       // grid of subdomain boundaries
 
-typedef std::pair<double,double>                    flow_t;           // flow components (fx,fy)
-typedef Grid<double,3>                              cube_t;           // 3D array of doubles
-
-typedef Matrix<NELEMS_X,NELEMS_Y>                   DA_subfield_t;    // subdomain as matrix
-typedef Grid<DA_subfield_t,2>                       field_grid_t;     // grid of subdomains
-
-typedef Vector<SUB_PROBLEM_SIZE>                    DA_vector_t;      // subdomain as vector
-typedef Grid<DA_vector_t,2>                         vec_grid_t;       // grid of vectors
-
-typedef Matrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>   DA_matrix_t;      // subdomain matrix
-typedef Grid<DA_matrix_t,2>                         mat_grid_t;       // grid of matrices
-
+typedef std::pair<double,double>                    flow_t;         // flow components (fx,fy)
+typedef Grid<double,3>                              cube_t;         // 3D array of doubles
+typedef Matrix<NELEMS_X,NELEMS_Y>                   DA_subfield_t;  // subdomain as matrix
+typedef Vector<SUB_PROBLEM_SIZE>                    DA_vector_t;    // subdomain as vector
+typedef Matrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE>   DA_matrix_t;    // subdomain matrix
+typedef Vector<NUM_SUBDOMAIN_OBSERVATIONS>          z_vector_t;     // type of observation vector
 typedef Matrix<NUM_SUBDOMAIN_OBSERVATIONS,
-               SUB_PROBLEM_SIZE>                    H_matrix_t; // type of observation matrix
+               SUB_PROBLEM_SIZE>                    H_matrix_t;     // type of observation matrix
 typedef Matrix<NUM_SUBDOMAIN_OBSERVATIONS,
-               NUM_SUBDOMAIN_OBSERVATIONS>          R_matrix_t; // observ. noise covarariance
-
-typedef SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> DA_sp_matrix_t;   // subdomain sparse matrix
-
-typedef Grid<Cholesky<SUB_PROBLEM_SIZE>,2>          cholesky_grid_t;  // grid of Cholesky solvers
-typedef Grid<LUdecomposition<SUB_PROBLEM_SIZE>,2>   lu_grid_t;        // grid of LU solvers
+               NUM_SUBDOMAIN_OBSERVATIONS>          R_matrix_t;     // observ. noise covarariance
+typedef SpMatrix<SUB_PROBLEM_SIZE,SUB_PROBLEM_SIZE> DA_sp_matrix_t; // subdomain sparse matrix
+typedef KalmanFilter<SUB_PROBLEM_SIZE,
+                     NUM_SUBDOMAIN_OBSERVATIONS>    Kalman_t;       // Kalman filter over subdomain
 
 //#################################################################################################
 // @Utilities.
 //#################################################################################################
-
-//-------------------------------------------------------------------------------------------------
-// Function rounds the value to the nearest integer.
-//-------------------------------------------------------------------------------------------------
-inline int Round(double val)
-{
-    assert_true(std::fabs(val) < numeric_limits<int>::max());
-    return static_cast<int>(std::floor(val + 0.5));
-}
-
-//-------------------------------------------------------------------------------------------------
-// Function creates an output directory inside the current one, which is supposed to be the
-// project root folder. If the directory is already exist all its content will be deleted.
-// TODO: this will not work on Windows, use STL "experimental" instead.
-//-------------------------------------------------------------------------------------------------
-void CreateAndCleanOutputDir(const Configuration & conf)
-{
-    const string & dir = conf.asString("output_dir");
-    assert_true(!dir.empty());
-    string cmd("mkdir -p ");
-    cmd += dir;
-    int retval = std::system(cmd.c_str());
-    retval = std::system("sync");
-    retval = std::system((string("/bin/rm -fr ") + dir + "/*.png").c_str());
-    retval = std::system((string("/bin/rm -fr ") + dir + "/*.pgm").c_str());
-    retval = std::system((string("/bin/rm -fr ") + dir + "/*.jpg").c_str());
-    retval = std::system((string("/bin/rm -fr ") + dir + "/*.avi").c_str());
-    retval = std::system("sync");
-    (void)retval;
-}
-
-//-------------------------------------------------------------------------------------------------
-// Functions for global reduction across all the subdomains.
-// TODO: make them MPI friendly.
-//-------------------------------------------------------------------------------------------------
-double ReduceMean(const Grid<double,2> & grid)
-{
-    double sum = 0.0;
-    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
-    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { sum += grid[{x,y}]; }}
-    return (sum / static_cast<double>(SubDomGridSize[_X_] * SubDomGridSize[_Y_]));
-}
-double ReduceAbsMin(const Grid<double,2> & grid)
-{
-    double v = std::fabs(grid[{0,0}]);
-    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
-    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { v = std::min(v, std::fabs(grid[{x,y}])); }}
-    return v;
-}
-double ReduceAbsMax(const Grid<double,2> & grid)
-{
-    double v = std::fabs(grid[{0,0}]);
-    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
-    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { v = std::max(v, std::fabs(grid[{x,y}])); }}
-    return v;
-}
 
 //-------------------------------------------------------------------------------------------------
 // Function reads analytic solution from a file. "Analytic solution" here is actually the
@@ -210,72 +148,27 @@ void GetObservations(DA_subfield_t & subfield, const point2d_t & idx,
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function writes the whole property field into a file in binary, grayscaled PGM format,
-// where all the values are adjusted to [0..255] interval.
+// Function (optionally) writes the whole state field into a file in binary, grayscaled
+// "pgm" format, where all the values are adjusted to [0..255] interval. Function also
+// optionally plots the state field using Gnuplot.
 //-------------------------------------------------------------------------------------------------
-void WriteImage(const Configuration & conf, const field_grid_t & field,
-                const char * title, int time_index,
-                std::vector<unsigned char> & image_buffer,
-                bool print_image = true, gnuplot::Gnuplot * gp = nullptr)
+void ShowImage(ImageWriter & writer, const Grid<DA_subfield_t,2> & field,
+               const char * title, int time_index,
+               bool write_image = true, gnuplot::Gnuplot * gp = nullptr)
 {
-    if (!print_image && (gp == nullptr)) return;
-    const bool flipY = false;
-
-    const int ImageSize = GLOBAL_NELEMS_X * GLOBAL_NELEMS_Y;
-    if (image_buffer.capacity() < ImageSize) { image_buffer.reserve(ImageSize); }
-    image_buffer.resize(ImageSize);
-
-    // Compute the minimum and maximum values of the property field.
-    double lower = 0.0, upper = 0.0;
-    {
-        Grid<double,2> minvalues(SubDomGridSize), maxvalues(SubDomGridSize);
-        pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-            minvalues[idx] = *(std::min_element(field[idx].begin(), field[idx].end()));
-            maxvalues[idx] = *(std::max_element(field[idx].begin(), field[idx].end()));
-        });
-        lower = ReduceAbsMin(minvalues);
-        upper = ReduceAbsMax(maxvalues);
-        assert_true(upper - lower > TINY);
-    }
-
-    // Convert the property field into one-byte-per-pixel representation.
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        const DA_subfield_t & subfield = field[idx];
-        for (int y = 0; y < NELEMS_Y; ++y) { int yg = Sub2GloY(idx, y);
-        for (int x = 0; x < NELEMS_X; ++x) { int xg = Sub2GloX(idx, x);
-            int pos = xg + GLOBAL_NELEMS_X * (flipY ? yg : (GLOBAL_NELEMS_Y - 1 - yg));
-            if (!(static_cast<unsigned>(pos) < static_cast<unsigned>(ImageSize))) assert_true(0);
-            image_buffer[pos] = static_cast<unsigned char>(
-                    Round(255.0 * (subfield(x,y) - lower) / (upper - lower)) );
-        }}
-    });
-
-    // Write a file in binary, grayscaled PGM format.
-    if (print_image) {
-        std::stringstream filename;
-        filename << conf.asString("output_dir") << "/" << title
-                 << std::setfill('0') << std::setw(5) << time_index << ".pgm";
-        std::ofstream f(filename.str(),
-                std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-        assert_true(f.good()) << "failed to open file for writing: " << filename.str() << endl;
-        f << "P5\n" << GLOBAL_NELEMS_X << " " << GLOBAL_NELEMS_Y << "\n" << int(255) << "\n";
-        f.write(reinterpret_cast<const char*>(image_buffer.data()), image_buffer.size());
-        f << std::flush;
-    }
-
-    // Plot the image with Gnuplot, if available.
-    if (gp != nullptr) {
+    if (!write_image && (gp == nullptr)) return;
+    const std::vector<unsigned char> & img = writer.Write(title, field, time_index, write_image);
+    if (gp != nullptr) { // plot the image with Gnuplot, if available
         char title[64];
         snprintf(title, sizeof(title)/sizeof(title[0]), "frame%05d", time_index);
-        gp->PlotGrayImage(image_buffer.data(), GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, title, !flipY);
+        gp->PlotGrayImage(img.data(), GLOBAL_NELEMS_X, GLOBAL_NELEMS_Y, title, true);
     }
 }
 
 //-------------------------------------------------------------------------------------------------
 // Function writes into file the image that shows the sensor locations in the whole domain.
 //-------------------------------------------------------------------------------------------------
-void WriteImageOfSensors(const Configuration & conf,
-                         std::vector<unsigned char> & image_buffer, const Grid<H_matrix_t,2> & H)
+void WriteImageOfSensors(ImageWriter & writer, const Grid<H_matrix_t,2> & H)
 {
     Grid<DA_subfield_t,2> field(SubDomGridSize);
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
@@ -300,7 +193,7 @@ void WriteImageOfSensors(const Configuration & conf,
             }
         }}
     });
-    WriteImage(conf, field, "sensors", 0, image_buffer, true, nullptr);
+    writer.Write("sensors", field, 0, true);
 }
 
 //#################################################################################################
@@ -346,8 +239,6 @@ void InitDependentParams(Configuration & conf)
     conf.SetDouble("dy", dy);
 
     // Deduce the optimal time step from the stability criteria.
-    const double TINY = numeric_limits<double>::min() /
-               std::pow(numeric_limits<double>::epsilon(),3);
     const double dt_base = conf.asDouble("integration_period") /
                            conf.asDouble("integration_nsteps");
     const double max_vx = conf.asDouble("flow_model_max_vx");
@@ -389,17 +280,15 @@ void InitialField(domain_t & state, const Configuration & conf, const char * fie
 {
     if (std::strcmp(field_type, "zero") == 0)
     {
-        std::cout << "Initializing field to all zeros" << endl;
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
             state[idx].setActiveLayer(ACTIVE_LAYER);
             state[idx].forAllActiveNodes([](double & value) { value = 0.0; });
             ApplyBoundaryCondition(state, idx);
         });
+        std::cout << "Initial state field: all zeros" << endl;
     }
     else if (std::strcmp(field_type, "gauss") == 0)
     {
-        std::cout << "Initializing field to Gaussian distribution peaked at some point" << endl;
-
         // Global coordinates of the density spot centre.
         const int cx = Round(conf.asDouble("spot_x") / conf.asDouble("dx"));
         const int cy = Round(conf.asDouble("spot_y") / conf.asDouble("dy"));
@@ -429,6 +318,7 @@ void InitialField(domain_t & state, const Configuration & conf, const char * fie
             }}
             ApplyBoundaryCondition(state, idx);
         });
+        std::cout << "Initial state field: Gaussian distribution peaked at some point" << endl;
     }
     else
     {
@@ -445,23 +335,22 @@ void InitialField(domain_t & state, const Configuration & conf, const char * fie
 //-------------------------------------------------------------------------------------------------
 void InitialCovar(const Configuration & conf, DA_matrix_t & P)
 {
-    using SF = Matrix<NELEMS_X,NELEMS_Y>;   // sub-field type
-
     // Here we express correlation distances in logical coordinates of nodal points.
     const double variance = conf.asDouble("model_ini_var");
     const double covar_radius = conf.asDouble("model_ini_covar_radius");
     const double sx = std::max(NELEMS_X * covar_radius / conf.asDouble("domain_size_x"), 1.0);
     const double sy = std::max(NELEMS_Y * covar_radius / conf.asDouble("domain_size_y"), 1.0);
     const int Rx = Round(std::ceil(3.0 * sx));
-    const int Ry = Round(std::ceil(3.0 * sx));
+    const int Ry = Round(std::ceil(3.0 * sy));
 
     FillMatrix(P, 0.0);
     for (int u = 0; u < NELEMS_X; ++u) {
     for (int v = 0; v < NELEMS_Y; ++v) {
-        int i = SF::sub2ind(u,v);
-        for (int x = u-Rx; x <= u+Rx; ++x) { if ((0 <= x) && (x < NELEMS_X)) { double dx = (u-x)/sx;
-        for (int y = v-Ry; y <= v+Ry; ++y) { if ((0 <= y) && (y < NELEMS_Y)) { double dy = (v-y)/sy;
-            int j = SF::sub2ind(x,y);
+        int i = DA_subfield_t::sub2ind(u,v);
+        double dx = 0.0, dy = 0.0;
+        for (int x = u-Rx; x <= u+Rx; ++x) { if ((0 <= x) && (x < NELEMS_X)) { dx = (u-x)/sx;
+        for (int y = v-Ry; y <= v+Ry; ++y) { if ((0 <= y) && (y < NELEMS_Y)) { dy = (v-y)/sy;
+            int j = DA_subfield_t::sub2ind(x,y);
             if (i <= j) P(i,j) = P(j,i) = variance * std::exp(-0.5 * (dx*dx + dy*dy));
         }}}}
     }}
@@ -504,7 +393,7 @@ void ComputeR(const Configuration & conf, R_matrix_t & R)
 // distances (used here) work better than absolute values of the distances. See the Memo named
 // "Sensor Placement" for details.
 //-------------------------------------------------------------------------------------------------
-void ComputeH(const Configuration & conf, H_matrix_t & H, const point2d_t & idx)
+void ComputeH(const Configuration &, H_matrix_t & H, const point2d_t & idx)
 {
     const int N = NUM_SUBDOMAIN_OBSERVATIONS;               // short-hand alias
     const int NN = N * N;
@@ -559,9 +448,6 @@ void ComputeH(const Configuration & conf, H_matrix_t & H, const point2d_t & idx)
 
     // Minimize the objective function by gradient descent.
     {
-        const double TINY = numeric_limits<double>::min() /
-                   std::pow(numeric_limits<double>::epsilon(),3);
-
         const double DOWNSCALE = 0.1;
         const double INITIAL_STEP = 0.1;
         const double TOL = numeric_limits<double>::epsilon() * std::log(N);
@@ -724,9 +610,8 @@ void InverseModelMatrix(DA_matrix_t & B, const Configuration & conf,
 // Function implements the idea of Schwartz method where the boundary values of subdomain
 // are get updated depending on flow direction.
 //-------------------------------------------------------------------------------------------------
-double SchwarzUpdate(const Configuration & conf,
-                      Boundary & border, const point2d_t & idx,
-                      domain_t & domain, flow_t flow)
+double SchwarzUpdate(const Configuration &, Boundary & border, const point2d_t & idx,
+                                            domain_t & domain, flow_t flow)
 {
     // Origin and the number of subdomains in both directions.
     const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
@@ -806,10 +691,10 @@ void ComputeTrueFields(const Configuration & conf)
     // can handle multi-resolution case and communicate with the neighbour subdomains. We copy
     // 'state[i]' to 'curr[i]' on each iteration, do processing and copy it back.
 
-    mat_grid_t                 B(SubDomGridSize);           // inverse model matrices
-    field_grid_t               curr(SubDomGridSize);        // copy of the current subdomain states
-    field_grid_t               next(SubDomGridSize);        // copy of the next subdomain states
-    lu_grid_t                  lu(SubDomGridSize);          // objects for LU decomposition
+    Grid<DA_matrix_t,2>        B(SubDomGridSize);           // inverse model matrices
+    Grid<DA_subfield_t,2>      curr(SubDomGridSize);        // copy of the current subdomain states
+    Grid<DA_subfield_t,2>      next(SubDomGridSize);        // copy of the next subdomain states
+    Grid<LUdecomposition<SUB_PROBLEM_SIZE>,2> lu(SubDomGridSize);  // objects for LU decomposition
     std::vector<unsigned char> image_buffer;                // temporary buffer
     domain_t                   state(SubDomGridSize);       // states of the density fields
     boundary_grid_t            boundary(SubDomGridSize);    // neighboring boundary vaklues
@@ -852,74 +737,67 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 {
     std::cout << "Running simulation with data assimilation" << endl << flush;
 
+	ImageWriter	                      writer(conf.asString("output_dir"));
     std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot());
-    std::vector<unsigned char>        image_buffer;                // temporary global image buffer
 
-    domain_t        state(SubDomGridSize);
-    field_grid_t    observations(SubDomGridSize);
-    boundary_grid_t boundaries(SubDomGridSize);
+    domain_t              state(SubDomGridSize);        // state field as a grid of subdomains
+    Grid<DA_subfield_t,2> field(SubDomGridSize);        // same state field as a grid of matrices
+    Grid<Boundary,2>      boundaries(SubDomGridSize);   // boundaries of each subdomain
 
-    mat_grid_t      B(SubDomGridSize);              // inverse model matrices
-    field_grid_t    curr(SubDomGridSize);           // copy of the current subdomain states
-    field_grid_t    next(SubDomGridSize);           // copy of the next subdomain states
-    lu_grid_t       lu(SubDomGridSize);             // objects for LU decomposition
+    Grid<Kalman_t,2>    Kalman(SubDomGridSize);   // Kalman filters of all the subdomains
+    Grid<DA_matrix_t,2> B(SubDomGridSize);        // inverse model matrices
 
+    Grid<DA_matrix_t,2> P(SubDomGridSize);  // process model covariances of all the subdomains
     Grid<H_matrix_t,2>  H(SubDomGridSize);  // observation matrices of all the subdomains
     Grid<R_matrix_t,2>  R(SubDomGridSize);  // observation noise covariances of all the subdomains
     Grid<DA_matrix_t,2> Q(SubDomGridSize);  // process noise covariances of all the subdomains
+    Grid<z_vector_t,2>  z(SubDomGridSize);  // observation vectors of all the subdomains
 
-    //InitialField(state, conf, "zero");
-    InitialField(state, conf, "gauss");
+    InitialField(state, conf, "zero");
+    //InitialField(state, conf, "gauss");
 
-    // Observation matrix is initializes once at the beginning.
-    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) { ComputeH(conf, H[idx], idx); });
-    WriteImageOfSensors(conf, image_buffer, H);     // visualization
+    // Initialize the observation and model covariance matrices.
+    pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
+        ComputeH(conf, H[idx], idx);
+        InitialCovar(conf, P[idx]);
+    });
+
+    WriteImageOfSensors(writer, H);     // visualization
 
     // Time integration forward in time.
     for (int t = 0, Nt = conf.asInt("Nt"); t < Nt; ++t) {
-        std::cout << '.' << flush;
+        std::cout << '+' << flush;
 
         const double physical_time = t * conf.asDouble("dt");
         const flow_t flow = Flow(conf, physical_time);
 
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-            SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
-            ApplyBoundaryCondition(state, idx);
-
-            MatrixFromAllscale(curr[idx], state[idx].getLayer<ACTIVE_LAYER>());
-
-            InverseModelMatrix(B[idx], conf, boundaries[idx], flow);  // get inverse model matrix
-            lu[idx].Init(B[idx]);                                     // decompose: B = L * U
-            lu[idx].Solve(next[idx], curr[idx]);                      // x_{t+1} = B^{-1} * x_{t}
-            curr[idx] = next[idx];                                    // update state
-
-            AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), next[idx]);
-            ApplyBoundaryCondition(state, idx);
+            // Get observations using 'field' as a temporary storage.
+            GetObservations(field[idx], idx, analytic_sol, t);
+            MatVecMult(z[idx], H[idx], field[idx]);             // z = H * observations_{t}
 
             // Covariance matrices are allowed to change over time.
             ComputeQ(conf, Q[idx]);
             ComputeR(conf, R[idx]);
+
+            for (int iter_no = 0; iter_no < 3; ++iter_no) {
+                if (idx == Origin) std::cout << '.' << flush;
+
+                SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
+                ApplyBoundaryCondition(state, idx);
+
+                MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
+
+                InverseModelMatrix(B[idx], conf, boundaries[idx], flow);
+                Kalman[idx].IterateInverse(field[idx], P[idx], B[idx], Q[idx],
+                                                               H[idx], R[idx], z[idx]);
+
+                AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
+                ApplyBoundaryCondition(state, idx);
+            }
         });
-        WriteImage(conf, curr, "field", t, image_buffer, true, gp.get());   // visualization
-
-        //GetObservations(curr[idx], idx, analytic_sol, t);
-
-        //pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-            //MatrixFromAllscale(curr[idx], state[idx].getLayer<L_100m>());
-
-            //InverseModelMatrix(B[idx], conf, physical_time);    // compute inverse model matrix
-            //lu[idx].Init(B[idx]);                               // decompose: B = L * U
-            //lu[idx].Solve(next[idx], curr[idx]);                // x_{t+1} = B^{-1} * x_{t}
-            //curr[idx] = next[idx];
-
-            //AllscaleFromMatrix(state[idx].getLayer<L_100m>(), next[idx]);
-        //});
-
-
-        //GetObservations(observations, analytic_sol, t);
-        //SchwarzUpdate(conf, boundaries, state, physical_time);
-
-        //WriteImage(conf, observations, "field", t, image_buffer, false, gp.get());
+//if (t > 10) return;
+        ShowImage(writer, field, "field", t, true, gp.get());   // visualization
     }
     std::cout << endl << endl << endl;
 }
@@ -994,7 +872,7 @@ int Amdados2DMain()
         conf.ReadConfigFile("amdados.conf");
         InitDependentParams(conf);
         conf.PrintParameters();
-        CreateAndCleanOutputDir(conf);
+        CreateAndCleanOutputDir(conf.asString("output_dir"));
 
         // Read analytic solution previously computed by the Python application "Amdados2D.py".
         std::unique_ptr<cube_t> analytic_sol;

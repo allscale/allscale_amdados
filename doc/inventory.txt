@@ -1,0 +1,78 @@
+INVENTORY OF LINEAR ALGEBRA OPERATIONS AND METHODS IMPLEMENTED
+
+(*) Dense Matrix/Vector
+
+Old design - matrices and vectors used Allscale grid structures.
+Very hard for testing and debugging. Several big matrices can easily
+cause stack overflow. The workaround is to handle matrices with
+unique_ptr<>, which makes code more complicated.
+
+New design - matrices and vectors have fixed sizes but allocated on the heap.
+At any time we can go back to the old design as soon as we are done with
+development. In the new design there is a base class VectorView<>.
+Both derived classes Vector<> and Matrix<> inherit from VectorView<>.
+The advantage is that Matrix<>, representing 2D field, can be viewed as
+a plain 1D vector in some algorithms.
+
+Both designs were devised with maximum simplicity in mind.
+TODO: elaborated concept of vector and matrix class hierarchy.
+
+(*) Dense Matrix/Vector functions and operations
+
+1) Checking two vectors or matrices are different instances.
+2) Four functions to copy between Vector/Matrix and Allscale 1D/2D grids
+	respectively.
+3) Dense times dense matrix.
+4) Dense times transposed dense matrix.
+5) Dense matrix times dense vector.
+6) Four operations adding/subtracting vectors/matrices respectively.
+7) Two functions filling up vector or matrix by specified value.
+8) Function creating identity matrix.
+9) Function returning transposed matrix.
+10) Function symmetrising a square matrix.
+11) Two functions multiplying vector or matrix by a scalar.
+12) Two functions computing L2 norm for vector and Frobenius norm for matrix
+	respectively.
+13) Two functions computing L2 norm for the difference of two vectors and
+	Frobenius norm for the difference of two matrices respectively.
+14) Function computing the trace of a square matrix.
+15) Two functions generating a random vector or matrix respectively.
+16) Two functions checking there is no NaN in a vector or matrix respectively.
+17) Two functions writing into text file a vector or matrix respectively.
+
+(*) Algorithms
+
+1) Cholesky decomposition and solver for vector A*x=b and matrix A*X=B symmetric
+	linear systems respectively. Also a special case of transposed matrix B is
+	supported: A*X = B^t.
+2) LU decomposition with partial pivoting and solver for vector A*x=b and
+  	matrix A*X=B non-symmetric linear systems respectively. Also a special
+  	case of transposed matrix B is supported: A*X = B^t.
+3) In plans: bi-conjugate solver for non-symmetric sparse linear systems.
+
+(*) Sparse Matrix
+Sparse matrices have been used in the previus versions. In the current application
+I am using all dense matrices. Howevere, the plan is get sparse matrices back on track
+because the application will be much faster.
+
+Operations:
+1) Construction from row-column-value triplets.
+2) Functions that return number of rows and columns.
+3) Sparse matrix times dense vector.
+4) Sparse matrix times dense one.
+5) Dense matrix times sparse one.
+6) Dense matrix times sparse transposed one.
+7) Generator of a random sparse matrix.
+
+There are also aliases to the above operations with names similar to that for
+dense matrices: MatVecMult(..), MatMult(..), MatMult(..) and MatMultTr(..).
+
+TODO: think about naming convention for matrix/vector operations.
+TODO: some improvements to sparse matrix design can be done, discuss.
+
+(*) Test cases
+
+Tests for vector, dense and sparse matrices against Armadillo library
+are included.
+TODO: more comprehensive tests.
+

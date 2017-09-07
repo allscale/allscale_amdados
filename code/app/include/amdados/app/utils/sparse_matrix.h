@@ -201,8 +201,8 @@ template<int NROWS, int NCOLS>
 void SparseMulVector(VectorView<NROWS> & result,
                      const SpMatrix<NROWS,NCOLS> & A, const VectorView<NCOLS> & vec)
 {
-    assert(CheckDistinctObjects(result, vec));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
+    assert_true(CheckDistinctObjects(result, vec));
+    for (int r = 0; r < NROWS; ++r) {
         double sum = 0.0;
         for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
             sum += it->val * vec(static_cast<int>(it->col));
@@ -212,18 +212,10 @@ void SparseMulVector(VectorView<NROWS> & result,
 }
 template<int NROWS, int NCOLS>
 void MatVecMult(VectorView<NROWS> & result,
-                const SpMatrix<NROWS,NCOLS> & A, const VectorView<NCOLS> & vec)
+        const SpMatrix<NROWS,NCOLS> & A, const VectorView<NCOLS> & vec)
 {
-    assert(CheckDistinctObjects(result, vec));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        double sum = 0.0;
-        for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
-            sum += it->val * vec(static_cast<int>(it->col));
-        }
-        result(r) = sum;
-    }
+    SparseMulVector(result, A, vec);
 }
-
 
 //-------------------------------------------------------------------------------------------------
 // Sparse times dense matrix multiplication: dense_result = sparse_A * dense_B.
@@ -232,31 +224,21 @@ template<int MSIZE, int NROWS, int NCOLS>
 void SparseMulDense(Matrix<NROWS,NCOLS> & result,
                     const SpMatrix<NROWS,MSIZE> & A, const Matrix<MSIZE,NCOLS> & B)
 {
-    assert(CheckDistinctObjects(result, B));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
-            double sum = 0.0;
-            for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
-                sum += it->val * B(static_cast<int>(it->col),c);
-            }
-            result(r,c) = sum;
+    assert_true(CheckDistinctObjects(result, B));
+    for (int r = 0; r < NROWS; ++r) {
+    for (int c = 0; c < NCOLS; ++c) {
+        double sum = 0.0;
+        for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
+            sum += it->val * B(static_cast<int>(it->col),c);
         }
-    }
+        result(r,c) = sum;
+    }}
 }
 template<int MSIZE, int NROWS, int NCOLS>
 void MatMult(Matrix<NROWS,NCOLS> & result,
-             const SpMatrix<NROWS,MSIZE> & A, const Matrix<MSIZE,NCOLS> & B)
+        const SpMatrix<NROWS,MSIZE> & A, const Matrix<MSIZE,NCOLS> & B)
 {
-    assert(CheckDistinctObjects(result, B));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
-            double sum = 0.0;
-            for (auto it = A.mRows[r]; it != A.mRows[r + 1]; ++it) {
-                sum += it->val * B(static_cast<int>(it->col),c);
-            }
-            result(r,c) = sum;
-        }
-    }
+    SparseMulDense(result, A, B);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -266,29 +248,20 @@ template<int MSIZE, int NROWS, int NCOLS>
 void DenseMulSparse(Matrix<NROWS,NCOLS> & result,
                     const Matrix<NROWS,MSIZE> & A, const SpMatrix<MSIZE,NCOLS> & B)
 {
-    assert(CheckDistinctObjects(result, A));
+    assert_true(CheckDistinctObjects(result, A));
     FillMatrix(result, 0.0);
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(MSIZE); ++c) {
-            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
-                result(r,static_cast<int>(it->col)) += A(r,c) * it->val;
-            }
+    for (int r = 0; r < NROWS; ++r) {
+    for (int c = 0; c < MSIZE; ++c) {
+        for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
+            result(r,static_cast<int>(it->col)) += A(r,c) * it->val;
         }
-    }
+    }}
 }
 template<int MSIZE, int NROWS, int NCOLS>
 void MatMult(Matrix<NROWS,NCOLS> & result,
-             const Matrix<NROWS,MSIZE> & A, const SpMatrix<MSIZE,NCOLS> & B)
+        const Matrix<NROWS,MSIZE> & A, const SpMatrix<MSIZE,NCOLS> & B)
 {
-    assert(CheckDistinctObjects(result, A));
-    FillMatrix(result, 0.0);
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(MSIZE); ++c) {
-            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
-                result(r,static_cast<int>(it->col)) += A(r,c) * it->val;
-            }
-        }
-    }
+    DenseMulSparse(result, A, B);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -299,31 +272,21 @@ template<int MSIZE, int NROWS, int NCOLS>
 void DenseMulSparseTr(Matrix<NROWS,NCOLS> & result,
                       const Matrix<NROWS,MSIZE> & A, const SpMatrix<NCOLS,MSIZE> & B)
 {
-    assert(CheckDistinctObjects(result, A));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
-            double sum = 0.0;
-            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
-                sum += A(r,static_cast<int>(it->col)) * it->val;
-            }
-            result(r,c) = sum;
+    assert_true(CheckDistinctObjects(result, A));
+    for (int r = 0; r < NROWS; ++r) {
+    for (int c = 0; c < NCOLS; ++c) {
+        double sum = 0.0;
+        for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
+            sum += A(r,static_cast<int>(it->col)) * it->val;
         }
-    }
+        result(r,c) = sum;
+    }}
 }
 template<int MSIZE, int NROWS, int NCOLS>
 void MatMultTr(Matrix<NROWS,NCOLS> & result,
                const Matrix<NROWS,MSIZE> & A, const SpMatrix<NCOLS,MSIZE> & B)
 {
-    assert(CheckDistinctObjects(result, A));
-    for (int r = 0; r < static_cast<int>(NROWS); ++r) {
-        for (int c = 0; c < static_cast<int>(NCOLS); ++c) {
-            double sum = 0.0;
-            for (auto it = B.mRows[c]; it != B.mRows[c + 1]; ++it) {
-                sum += A(r,static_cast<int>(it->col)) * it->val;
-            }
-            result(r,c) = sum;
-        }
-    }
+    DenseMulSparseTr(result, A, B);
 }
 
 //-------------------------------------------------------------------------------------------------

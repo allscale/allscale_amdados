@@ -7,6 +7,7 @@
 #include "amdados/app/amdados_grid.h"
 #include "allscale/utils/assert.h"
 #include "amdados/app/utils/common.h"
+#include "amdados/app/geometry.h"
 #include "amdados/app/utils/amdados_utils.h"
 #include "amdados/app/utils/matrix.h"
 #include "amdados/app/utils/lu.h"

@@ -268,15 +268,18 @@ def ComputeTrueFields(conf, glo_idx):
         vmin = np.amin(field)
         vmax = np.amax(field)
         image = np.abs((np.transpose(field) - vmin) / (vmax - vmin + np.finfo(float).eps))
-        if conf.generate_video:
-            scipy.misc.imsave(conf.output_dir + '/true_field' + format(k,'05d') + '.png', image)
         if hFigure is None:
             hFigure = plt.imshow(image)
         else:
             hFigure.set_data(image)
+        plt.ylim(0, image.shape[0])     # flip Y
         plt.title('True density, t=' + str(k), fontsize=10, fontweight='bold')
         plt.pause(0.05)
         plt.draw()
+        # Write image file.
+        if conf.generate_video:
+            image = np.flipud(image)    # flip Y
+            scipy.misc.imsave(conf.output_dir + '/true_field' + format(k,'05d') + '.png', image)
 
         t = k * conf.dt                                     # physical time
         invA = InverseModelMatrix(conf, glo_idx, t)         # note, we compute A^{-1} not A
@@ -410,16 +413,19 @@ def DataAssimilation(conf, glo_idx, true_fields):
         vmin = np.amin(image)
         vmax = np.amax(image)
         image = np.abs((image - vmin) / (vmax - vmin + np.finfo(float).eps))
-        if conf.generate_video:
-            scipy.misc.imsave(conf.output_dir + '/both_fields' + format(k,'05d') + '.png', image)
         if hFigure is None:
             hFigure = plt.imshow(image)
         else:
             hFigure.set_data(image)
+        plt.ylim(0, image.shape[0])     # flip Y
         plt.title('True density < vs. > Kalman filtering, t=' + str(k),
                     fontsize=10, fontweight='bold')
         plt.pause(0.05)
         plt.draw()
+        # Write image file.
+        if conf.generate_video:
+            image = np.flipud(image)    # flip Y
+            scipy.misc.imsave(conf.output_dir + '/both_fields' + format(k,'05d') + '.png', image)
 
         Q = ComputeQ(conf)
         R = ComputeR(conf)

@@ -48,91 +48,150 @@ T Bound(const T & v, const T & vmin, const T & vmax)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Function returns a squared value.
+// Function rounds the value to the nearest integer.
 //-------------------------------------------------------------------------------------------------
-template<typename T>
-T Square(const T & v)
+inline int Round(double val)
 {
-    return (v * v);
-}
-
-//-------------------------------------------------------------------------------------------------
-// Functor converts 2D index (x,y) into a plain one.
-//-------------------------------------------------------------------------------------------------
-template<int SizeX, int SizeY>
-struct Sub2Ind {
-    Sub2Ind() {
-        static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");
-    }
-
-    int operator()(int ix, int iy) const {
-        assert_true((0 <= ix) && (ix < SizeX));
-        assert_true((0 <= iy) && (iy < SizeY));
-        //return (x + static_cast<int>(SizeX) * y);
-        return (ix * SizeY + iy);   // TODO: we already have observations based
-    }                               // on this indexing: y changes faster, swap?
-};
-
-//-------------------------------------------------------------------------------------------------
-// Functor converts a plane index into 2D one (x,y).
-//-------------------------------------------------------------------------------------------------
-template<int SizeX, int SizeY>
-struct Ind2Sub {
-    Ind2Sub() {
-        static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");
-    }
-
-    void operator()(const int idx, int & x, int & y) const {
-        assert_true((0 <= idx) && (idx < SizeX * SizeY));
-        std::div_t divresult = std::div(idx, SizeY);    // if y is the fastest
-        x = divresult.quot;
-        y = divresult.rem;
-    }
-};
-
-//-------------------------------------------------------------------------------------------------
-// Function reshapes a vector into 2D grid structure,
-// in Matlab notation: grid = reshape(vec, [SizeX, SizeY]).
-//-------------------------------------------------------------------------------------------------
-template<int SizeX, int SizeY, typename GRID>
-void Reshape1Dto2D(GRID & grid, const allscale::utils::grid<double, SizeX * SizeY> & vec)
-{
-    // TODO: check grid sizes: must be SizeX by SizeY
-    Sub2Ind<SizeX, SizeY> sub2ind;
-    for (int i = 0; i < static_cast<int>(SizeX); i++) {
-        for (int j = 0; j < static_cast<int>(SizeY); j++) {
-            grid[{i,j}] = vec[{sub2ind(i,j)}];
-        }
-    }
-}
-
-//-------------------------------------------------------------------------------------------------
-// Function unrolls 2D grid structure into a vector, in Matlab notation: vec = grid(:).
-//-------------------------------------------------------------------------------------------------
-template<int SizeX, int SizeY, typename GRID>
-void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRID & grid)
-{
-    // TODO: check grid sizes: must be SizeX by SizeY
-    Sub2Ind<SizeX, SizeY> sub2ind;
-    for (int i = 0; i < static_cast<int>(SizeX); i++) {
-        for (int j = 0; j < static_cast<int>(SizeY); j++) {
-            vec[{sub2ind(i,j)}] = grid[{i,j}];
-        }
-    }
+    assert_true(std::fabs(val) < numeric_limits<int>::max());
+    return static_cast<int>(std::floor(val + 0.5));
 }
 
 //-------------------------------------------------------------------------------------------------
 // Function creates a new directory or does nothing if it already exists.
+// TODO: this will not work on Windows, use STL "experimental" instead.
 //-------------------------------------------------------------------------------------------------
 inline void MakeDirectory(const char * dir)
 {
     assert_true(dir != nullptr);
-    std::string cmd("mkdir -p ");   // TODO: not portable, use STL "experimental" instead
+    std::string cmd("mkdir -p ");
     cmd += dir;
-    int retval = std::system(cmd.c_str());  // TODO: mutex
+    int retval = std::system(cmd.c_str());
     retval = std::system("sync");
     (void)retval;
 }
+
+//-------------------------------------------------------------------------------------------------
+// Function creates an output directory inside the current one, which is supposed to be the
+// project root folder. If the directory is already exist all its content will be deleted.
+// TODO: this will not work on Windows, use STL "experimental" instead.
+//-------------------------------------------------------------------------------------------------
+void CreateAndCleanOutputDir(const std::string & dir)
+{
+    assert_true(!dir.empty());
+    string cmd("mkdir -p ");
+    cmd += dir;
+    int retval = std::system(cmd.c_str());
+    retval = std::system("sync");
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.png").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.pgm").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.jpg").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.avi").c_str());
+    retval = std::system("sync");
+    (void)retval;
+}
+
+//@{
+//-------------------------------------------------------------------------------------------------
+// Functions for global reduction across all the subdomains.
+// A T T E N T I O N: these functions must be used ONLY for testing, debugging or visualization.
+//-------------------------------------------------------------------------------------------------
+double ReduceMean(const ::allscale::api::user::data::Grid<double,2> & grid)
+{
+    double sum = 0.0;
+    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
+    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { sum += grid[{x,y}]; }}
+    return (sum / static_cast<double>(SubDomGridSize[_X_] * SubDomGridSize[_Y_]));
+}
+double ReduceAbsMin(const ::allscale::api::user::data::Grid<double,2> & grid)
+{
+    double v = std::fabs(grid[{0,0}]);
+    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
+    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { v = std::min(v, std::fabs(grid[{x,y}])); }}
+    return v;
+}
+double ReduceAbsMax(const ::allscale::api::user::data::Grid<double,2> & grid)
+{
+    double v = std::fabs(grid[{0,0}]);
+    for (int x = 0; x < SubDomGridSize[_X_]; ++x) {
+    for (int y = 0; y < SubDomGridSize[_Y_]; ++y) { v = std::max(v, std::fabs(grid[{x,y}])); }}
+    return v;
+}
+//@}
+
+/*//-------------------------------------------------------------------------------------------------*/
+/*// Function returns a squared value.*/
+/*//-------------------------------------------------------------------------------------------------*/
+/*template<typename T>*/
+/*T Square(const T & v)*/
+/*{*/
+/*return (v * v);*/
+/*}*/
+
+/*//-------------------------------------------------------------------------------------------------*/
+/*// Functor converts 2D index (x,y) into a plain one.*/
+/*//-------------------------------------------------------------------------------------------------*/
+/*template<int SizeX, int SizeY>*/
+/*struct Sub2Ind {*/
+/*Sub2Ind() {*/
+/*static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");*/
+/*}*/
+
+/*int operator()(int ix, int iy) const {*/
+/*assert_true((0 <= ix) && (ix < SizeX));*/
+/*assert_true((0 <= iy) && (iy < SizeY));*/
+/*//return (x + static_cast<int>(SizeX) * y);*/
+/*return (ix * SizeY + iy);   // TODO: we already have observations based*/
+/*}                               // on this indexing: y changes faster, swap?*/
+/*};*/
+
+/*//-------------------------------------------------------------------------------------------------*/
+/*// Functor converts a plane index into 2D one (x,y).*/
+/*//-------------------------------------------------------------------------------------------------*/
+/*template<int SizeX, int SizeY>*/
+/*struct Ind2Sub {*/
+/*Ind2Sub() {*/
+/*static_assert(SizeX * SizeY < static_cast<int>(numeric_limits<int>::max()), "overflow");*/
+/*}*/
+
+/*void operator()(const int idx, int & x, int & y) const {*/
+/*assert_true((0 <= idx) && (idx < SizeX * SizeY));*/
+/*std::div_t divresult = std::div(idx, SizeY);    // if y is the fastest*/
+/*x = divresult.quot;*/
+/*y = divresult.rem;*/
+/*}*/
+/*};*/
+
+/*//-------------------------------------------------------------------------------------------------*/
+/*// Function reshapes a vector into 2D grid structure,*/
+/*// in Matlab notation: grid = reshape(vec, [SizeX, SizeY]).*/
+/*//-------------------------------------------------------------------------------------------------*/
+/*template<int SizeX, int SizeY, typename GRID>*/
+/*void Reshape1Dto2D(GRID & grid, const allscale::utils::grid<double, SizeX * SizeY> & vec)*/
+/*{*/
+/*// TODO: check grid sizes: must be SizeX by SizeY*/
+/*Sub2Ind<SizeX, SizeY> sub2ind;*/
+/*for (int i = 0; i < static_cast<int>(SizeX); i++) {*/
+/*for (int j = 0; j < static_cast<int>(SizeY); j++) {*/
+/*grid[{i,j}] = vec[{sub2ind(i,j)}];*/
+/*}*/
+/*}*/
+/*}*/
+
+/*//-------------------------------------------------------------------------------------------------*/
+/*// Function unrolls 2D grid structure into a vector, in Matlab notation: vec = grid(:).*/
+/*//-------------------------------------------------------------------------------------------------*/
+/*template<int SizeX, int SizeY, typename GRID>*/
+/*void Reshape2Dto1D(allscale::utils::grid<double, SizeX * SizeY> & vec, const GRID & grid)*/
+/*{*/
+/*// TODO: check grid sizes: must be SizeX by SizeY*/
+/*Sub2Ind<SizeX, SizeY> sub2ind;*/
+/*for (int i = 0; i < static_cast<int>(SizeX); i++) {*/
+/*for (int j = 0; j < static_cast<int>(SizeY); j++) {*/
+/*vec[{sub2ind(i,j)}] = grid[{i,j}];*/
+/*}*/
+/*}*/
+/*}*/
+
 
 } // end namespace utils
 } // end namespace app

@@ -30,3 +30,5 @@ using ::std::string;
 } // end namespace app
 } // end namespace amdados
 
+// Useful message for experimentation:  "!!!!!!! B E W A R E: TEMPORARY CODE !!!!!!!"
+

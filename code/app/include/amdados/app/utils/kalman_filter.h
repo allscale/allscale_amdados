@@ -16,15 +16,15 @@ template<int PROBLEM_SIZE, int NUM_OBSERVATIONS>
 class KalmanFilter
 {
 public:
-    using matrix_t     = Matrix<PROBLEM_SIZE, PROBLEM_SIZE>;
-    using matrix_OxN_t = Matrix<NUM_OBSERVATIONS, PROBLEM_SIZE>;
-    using matrix_NxO_t = Matrix<PROBLEM_SIZE, NUM_OBSERVATIONS>;
-    using matrix_OxO_t = Matrix<NUM_OBSERVATIONS, NUM_OBSERVATIONS>;
-    using vector_t     = Vector<PROBLEM_SIZE>;
-    using vector_obs_t = Vector<NUM_OBSERVATIONS>;
+    typedef Matrix<PROBLEM_SIZE, PROBLEM_SIZE>         matrix_t;
+    typedef Matrix<NUM_OBSERVATIONS, PROBLEM_SIZE>     matrix_OxN_t;
+    typedef Matrix<PROBLEM_SIZE, NUM_OBSERVATIONS>     matrix_NxO_t;
+    typedef Matrix<NUM_OBSERVATIONS, NUM_OBSERVATIONS> matrix_OxO_t;
+    typedef Vector<PROBLEM_SIZE>                       vector_t;
+    typedef Vector<NUM_OBSERVATIONS>                   vector_obs_t;
 
 private:
-    Cholesky<PROBLEM_SIZE>        m_chol;  // Cholesky decomposition solver
+    Cholesky<NUM_OBSERVATIONS>    m_chol;  // Cholesky decomposition solver
     LUdecomposition<PROBLEM_SIZE> m_lu;    // LU decomposition solver
 
     vector_t     m_x_prior;     // placeholder for the vector x_{k|k-1} = A * x
@@ -99,14 +99,19 @@ void IterateInverse(
     // x_prior = A * x, P_prior = A * P * A^t, where A is avaliable via its inversion B = A^{-1}.
     m_lu.Init(B);                           // decompose: B = L * U
     m_lu.Solve(m_x_prior, x);               // x_prior = B^{-1} * x_{t}
-    m_lu.SolveBatch(m_P_prior, P);          // P_prior = B^{-1} * P  (P symmetric!)
+#if 1
+    m_lu.BatchSolve(m_P_prior, P);          // P_prior = B^{-1} * P  (P symmetric!)
     P = m_P_prior;                          // use P as a temporary matrix
-    m_lu.SolveBatchTr(m_P_prior, P);        // P_prior = B^{-1} * (B^{-1} * P)^t = A * P * A^t
+    m_lu.BatchSolveTr(m_P_prior, P);        // P_prior = B^{-1} * (B^{-1} * P)^t = A * P * A^t
     AddMatrices(m_P_prior, m_P_prior, Q);   // P_prior = A * P * A^t + Q
     Symmetrize(m_P_prior);                  // correct loss of symmetry due to round-off errors
 
     // Estimate posterior state and covariance.
     PosteriorEstimation(H, R, z, x, P);
+#else
+#pragma message("!!!!!!! B E W A R E: TEMPORARY CODE !!!!!!! NO KALMAN FILTERING")
+    x = m_x_prior;
+#endif
 }
 
 private:
@@ -118,8 +123,11 @@ private:
 // \param  x  out: new state.
 // \param  P  out: new covariance.
 //-------------------------------------------------------------------------------------------------
-void PosteriorEstimation(const matrix_OxN_t & H, const matrix_OxO_t & R, const vector_obs_t & z,
-                         vector_t & x, matrix_t & P)
+void PosteriorEstimation(const Matrix<NUM_OBSERVATIONS, PROBLEM_SIZE>     & H,
+                         const Matrix<NUM_OBSERVATIONS, NUM_OBSERVATIONS> & R,
+                         const VectorView<NUM_OBSERVATIONS>               & z,
+                               VectorView<PROBLEM_SIZE>                   & x,
+                               Matrix<PROBLEM_SIZE, PROBLEM_SIZE>         & P)
 {
     // y = z - H * x_prior
     MatVecMult(m_y, H, m_x_prior);
