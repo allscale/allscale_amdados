@@ -312,6 +312,13 @@ namespace data {
 			return res;
 		}
 
+		static GridBox span(const GridBox& a, const GridBox& b) {
+			return GridBox(
+				allscale::utils::elementwiseMin(a.min,b.min),
+				allscale::utils::elementwiseMax(a.max,b.max)
+			);
+		}
+
 		template<typename Lambda>
 		void scanByLines(const Lambda& body) const {
 			if (empty()) return;
@@ -397,6 +404,11 @@ namespace data {
 		GridRegion(const point_type& min, const point_type& max)
 			: regions({box_type(min,max)}) {
 			assert_true(min.dominatedBy(max));
+		}
+
+		GridRegion(const box_type& box)
+			: regions({box}) {
+			if (regions[0].empty()) regions.clear();
 		}
 
 		GridRegion(const GridRegion&) = default;
@@ -516,6 +528,16 @@ namespace data {
 			res.compress();
 
 			// done
+			return res;
+		}
+
+		static GridRegion span(const GridRegion& a, const GridRegion& b) {
+			GridRegion res;
+			for(const auto& ba : a.regions) {
+				for(const auto& bb : b.regions) {
+					res = merge(res,GridRegion(box_type::span(ba,bb)));
+				}
+			}
 			return res;
 		}
 
@@ -819,14 +841,14 @@ namespace data {
 		 * Provides read/write access to one of the values stored within this grid.
 		 */
 		T& operator[](const coordinate_type& index) {
-			return core::sema::data_item_element_access(*this, region_type(index), (*base)[index]);
+			return data_item_element_access(*this, region_type(index), (*base)[index]);
 		}
 
 		/**
 		 * Provides read access to one of the values stored within this grid.
 		 */
 		const T& operator[](const coordinate_type& index) const {
-			return core::sema::data_item_element_access(*this, region_type(index), (*base)[index]);
+			return data_item_element_access(*this, region_type(index), (*base)[index]);
 		}
 
 		/**

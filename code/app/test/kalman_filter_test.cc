@@ -4,8 +4,7 @@
 //-----------------------------------------------------------------------------
 
 #include <gtest/gtest.h>
-#include "allscale/utils/assert.h"
-#include "amdados/app/amdados_grid.h"
+#include "allscale/api/user/data/adaptive_grid.h"
 #include "amdados/app/utils/common.h"
 #include "amdados/app/geometry.h"
 #include "amdados/app/utils/amdados_utils.h"

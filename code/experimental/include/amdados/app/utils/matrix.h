@@ -155,8 +155,7 @@ inline bool CheckDistinctObjects(const A & a, const B & b)
 // Copy vector from Allscale vector.
 //-------------------------------------------------------------------------------------------------
 template<int SIZE>
-void VectorFromAllscale(VectorView<SIZE> & v,
-                        const ::allscale::utils::StaticGrid<double,size_t(SIZE)> & a)
+void VectorFromAllscale(VectorView<SIZE> & v, const allscale::utils::grid<double,SIZE> & a)
 {
     for (int i = 0; i < SIZE; ++i) { v(i) = a[{i}]; }
 }
@@ -165,8 +164,7 @@ void VectorFromAllscale(VectorView<SIZE> & v,
 // Copy Allscale vector from vector.
 //-------------------------------------------------------------------------------------------------
 template<int SIZE>
-void AllscaleFromVector(::allscale::utils::StaticGrid<double,size_t(SIZE)> & a,
-                        const VectorView<SIZE> & v)
+void AllscaleFromVector(allscale::utils::grid<double,SIZE> & a, const VectorView<SIZE> & v)
 {
     for (int i = 0; i < SIZE; ++i) { a[{i}] = v(i); }
 }
@@ -176,7 +174,7 @@ void AllscaleFromVector(::allscale::utils::StaticGrid<double,size_t(SIZE)> & a,
 //-------------------------------------------------------------------------------------------------
 template<int NROWS, int NCOLS>
 void MatrixFromAllscale(Matrix<NROWS,NCOLS> & m,
-                    const ::allscale::utils::StaticGrid<double,size_t(NROWS),size_t(NCOLS)> & a)
+                        const allscale::utils::grid<double,NROWS,NCOLS> & a)
 {
     for (int r = 0; r < NROWS; ++r) {
     for (int c = 0; c < NCOLS; ++c) { m(r,c) = a[{r,c}]; }}
@@ -186,7 +184,7 @@ void MatrixFromAllscale(Matrix<NROWS,NCOLS> & m,
 // Copy Allscale matrix from matrix.
 //-------------------------------------------------------------------------------------------------
 template<int NROWS, int NCOLS>
-void AllscaleFromMatrix(::allscale::utils::StaticGrid<double,size_t(NROWS),size_t(NCOLS)> & a,
+void AllscaleFromMatrix(allscale::utils::grid<double,NROWS,NCOLS> & a,
                         const Matrix<NROWS,NCOLS> & m)
 {
     for (int r = 0; r < NROWS; ++r) {

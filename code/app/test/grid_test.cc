@@ -4,31 +4,34 @@
 //-----------------------------------------------------------------------------
 
 #include <gtest/gtest.h>
-#include "allscale/api/user/operator/pfor.h"
-#include "allscale/utils/assert.h"
-#include "amdados/app/amdados_grid.h"
+#include "allscale/api/user/data/adaptive_grid.h"
 
 namespace amdados {
 namespace app {
 
 using namespace ::allscale::utils;
 using ::allscale::api::user::pfor;
+using ::allscale::api::user::data::Direction;
+using ::allscale::api::user::data::Direction::Up;
+using ::allscale::api::user::data::Direction::Down;
+using ::allscale::api::user::data::Direction::Left;
+using ::allscale::api::user::data::Direction::Right;
 
 // Number of subdomains in each dimension.
-const int NUM_DOMAINS_X = 12;
-const int NUM_DOMAINS_Y = 8;
+const int NUM_DOMAINS_X = 13;
+const int NUM_DOMAINS_Y = 7;
 
 // Number of elements (or nodal points) in each subdomain in each dimension.
-const int NELEMS_X = 9;
-const int NELEMS_Y = 11;
+const int NELEMS_X = 11;
+const int NELEMS_Y = 17;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = CellConfig<
-    layers<                             //  1000m x 1000m each subdomain covers
-        layer<NELEMS_X,NELEMS_Y>,       //  10 x 10  100m nodes each consisting of
-        layer<5,5>,                     //   5 x  5   20m nodes each consisting of
-        layer<5,5>                      //   5 x  5    4m nodes
+using sub_domain_config_t = ::allscale::api::user::data::CellConfig<
+    ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
+        ::allscale::api::user::data::layer<NELEMS_X,NELEMS_Y>,// 10x10 100m nodes each consisting of
+        ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
+        ::allscale::api::user::data::layer<5,5>               //  5x5    4m nodes
     >
 >;
 
@@ -49,10 +52,11 @@ using size2d_t = point2d_t;
 
 // This is more elaborated grid of all the subdomain structures.
 // These special subdomains can handle multi-resolution case.
-using domain_t = ::allscale::api::user::data::Grid< Cell<double,sub_domain_config_t>, 2 >;
+using domain_t = ::allscale::api::user::data::Grid<
+                    ::allscale::api::user::data::AdaptiveGridCell<double,sub_domain_config_t>,2>;
 
 // Subdomain is a layer in a grid cell.
-using subdomain_t = ::allscale::utils::grid<double,NELEMS_X,NELEMS_Y>;
+using subdomain_t = ::allscale::utils::StaticGrid<double,size_t(NELEMS_X),size_t(NELEMS_Y)>;
 
 // Origin and global grid size. The latter grid is the grid of subdomains,
 // where the logical coordinates give a subdomain indices in each dimension.
@@ -154,15 +158,17 @@ void TestSubdomainIndexing()
         domain[idx].setActiveLayer(L_100m);
         subdomain_t & subdom = domain[idx].getLayer<L_100m>();
 
+#if 1
         // Test rationale: out-of-bounds index checking. This test must cause
         // segmentation fault but it does not because modular arithmetic prevents
         // error checking, impossible to track down the out-of-bounds errors.
         {
-            for (int x = -10*NELEMS_X; x < 10*NELEMS_X; ++x) {
-            for (int y = -10*NELEMS_Y; y < 10*NELEMS_Y; ++y) {
+            for (int x = -100*NELEMS_X; x <= +100*NELEMS_X; ++x) {
+            for (int y = -100*NELEMS_Y; y <= +100*NELEMS_Y; ++y) {
                 subdom[{x,y}] = 1.0;
             }}
         }
+#endif
 
         // Test rationale: check the sequence of numbers is written and read correctly.
         // This passes: X first, Y second - {x,y} ordering is correct.
@@ -381,6 +387,10 @@ void TestSubdomainBorders()
 //-------------------------------------------------------------------------------------------------
 TEST(GridTest, Basic)
 {
+    using namespace amdados::app;
+    std::cout << "Grid of " << NUM_DOMAINS_X << "x" << NUM_DOMAINS_Y << " subdomains" << std::endl;
+    std::cout << "Subdomain size " << NELEMS_X << "x" << NELEMS_Y << std::endl;
+
     TestGrid();
     TestSubdomainIndexing();
     TestSubdomainBorders();

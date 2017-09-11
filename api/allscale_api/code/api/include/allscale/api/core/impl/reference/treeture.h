@@ -83,7 +83,7 @@ namespace reference {
 
 	// -- Declarations --
 
-	const bool DEBUG = false;
+	const bool REFERENCE_RUNTIME_DEBUG = false;
 
 	inline std::mutex& getLogMutex() {
 		static std::mutex m;
@@ -92,7 +92,7 @@ namespace reference {
 
 	#define LOG(MSG) \
 		{  \
-			if (DEBUG) { \
+			if (REFERENCE_RUNTIME_DEBUG) { \
 				std::thread::id this_id = std::this_thread::get_id(); \
 				std::lock_guard<std::mutex> lock(getLogMutex()); \
 				std::cerr << "Thread " << this_id << ": " << MSG << "\n"; \
@@ -178,7 +178,7 @@ namespace reference {
 				eventStack.push_back(e);
 			}
 
-			void popEvent(__unused const Event& e) {
+			void popEvent(__allscale_unused const Event& e) {
 				guard g(lock);
 				assert_eq(e,eventStack.back());
 				eventStack.pop_back();
@@ -522,6 +522,10 @@ namespace reference {
 
 		bool isDone() const {
 			return (!family || family->isComplete(path));
+		}
+
+		bool valid() const {
+			return family;
 		}
 
 		void wait() const;
@@ -2556,7 +2560,7 @@ namespace reference {
 				task.run();
 			} else {
 
-				__unused auto taskId = task.getId();
+				__allscale_unused auto taskId = task.getId();
 				logProfilerEvent(ProfileLogEntry::createTaskStartedEntry(taskId));
 
 				// check whether this run needs to be sampled

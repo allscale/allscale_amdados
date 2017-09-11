@@ -4,9 +4,7 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
-#include "allscale/api/user/operator/pfor.h"
-#include "allscale/utils/assert.h"
-#include "amdados/app/amdados_grid.h"
+#include "allscale/api/user/data/adaptive_grid.h"
 #include "amdados/app/utils/common.h"
 #include "amdados/app/geometry.h"
 #include "amdados/app/utils/amdados_utils.h"
@@ -67,6 +65,11 @@ using namespace ::amdados::app::utils;
     //using ::allscale::api::user::pfor;
 using ::allscale::api::user::data::Grid;
 using ::allscale::api::user::data::GridPoint;
+using ::allscale::api::user::data::Direction;
+using ::allscale::api::user::data::Direction::Up;
+using ::allscale::api::user::data::Direction::Down;
+using ::allscale::api::user::data::Direction::Left;
+using ::allscale::api::user::data::Direction::Right;
 
 const int NSIDES = 4;                   // number of sides any subdomain has
 const int ACTIVE_LAYER = L_100m;        // should be template a parameter eventually

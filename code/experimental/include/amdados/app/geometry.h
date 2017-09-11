@@ -21,20 +21,13 @@ const int NUM_DOMAINS_Y = 8;
 const int NELEMS_X = 9;
 const int NELEMS_Y = 11;
 
-// Number of observation points (number of sensors) in X and Y dimensions in the whole domain.
-// In C++ code we actually use the product OBSERVATION_NX*OBSERVATION_NY, see the constanst below
-// nase NUM_SUBDOMAIN_OBSERVATIONS. However, these two constant are retained for compatibility
-// with Matlab/Python code.
-const int OBSERVATION_NX = 30;
-const int OBSERVATION_NY = 30;
-
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = ::allscale::api::user::data::CellConfig<
-    ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
-        ::allscale::api::user::data::layer<NELEMS_X,NELEMS_Y>,// 10x10 100m nodes each consisting of
-        ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
-        ::allscale::api::user::data::layer<5,5>               //  5x5    4m nodes
+using sub_domain_config_t = CellConfig<
+    layers<                             //  1000m x 1000m each subdomain covers
+        layer<NELEMS_X,NELEMS_Y>,       //  10 x 10  100m nodes each consisting of
+        layer<5,5>,                     //   5 x  5   20m nodes each consisting of
+        layer<5,5>                      //   5 x  5    4m nodes
     >
 >;
 
@@ -56,11 +49,6 @@ const int GLOBAL_NELEMS_Y = NELEMS_Y * NUM_DOMAINS_Y;
 // Number of elements (or nodal points) in a subdomain.
 const int SUB_PROBLEM_SIZE = NELEMS_X * NELEMS_Y;
 
-// Number of available observations in each subdomain: ceil((global #observations / #subdomains).
-const int NUM_SUBDOMAIN_OBSERVATIONS =
-    (OBSERVATION_NX * OBSERVATION_NY + (NUM_DOMAINS_X * NUM_DOMAINS_Y) - 1) /
-                                       (NUM_DOMAINS_X * NUM_DOMAINS_Y);
-
 // Position, index or size in 2D.
 using point2d_t = ::allscale::api::user::data::GridPoint<2>;
 using size2d_t = point2d_t;
@@ -71,8 +59,7 @@ using size3d_t = point3d_t;
 
 // This is more elaborated grid of all the subdomain structures.
 // These special subdomains can handle multi-resolution case.
-using domain_t = ::allscale::api::user::data::Grid<
-                    ::allscale::api::user::data::AdaptiveGridCell<double,sub_domain_config_t>,2>;
+using domain_t = ::allscale::api::user::data::Grid< Cell<double,sub_domain_config_t>, 2 >;
 
 // Origin and global grid size. The latter grid is the grid of subdomains,
 // where the logical coordinates give a subdomain indices in each dimension.
@@ -94,7 +81,7 @@ const int _Y_ = 1;  // index of ordinate
 inline int Sub2GloX(const point2d_t & subdomain, const int x)
 { // TODO: discard checking in release mode
     if (!(static_cast<unsigned>(x) < static_cast<unsigned>(NELEMS_X))) assert_true(0);
-    return (x + subdomain[_X_] * NELEMS_X);
+    return (x + subdomain[0] * NELEMS_X);
 }
 //-------------------------------------------------------------------------------------------------
 // Function maps the subdomain local ordinate to global one.
@@ -102,7 +89,7 @@ inline int Sub2GloX(const point2d_t & subdomain, const int x)
 inline int Sub2GloY(const point2d_t & subdomain, const int y)
 { // TODO: discard checking in release mode
     if (!(static_cast<unsigned>(y) < static_cast<unsigned>(NELEMS_Y))) assert_true(0);
-    return (y + subdomain[_Y_] * NELEMS_Y);
+    return (y + subdomain[1] * NELEMS_Y);
 }
 
 } // namespace app
