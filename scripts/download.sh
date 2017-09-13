@@ -25,6 +25,7 @@ cd api
 curl -L -o gtest-1.8.0.tar.gz http://insieme-compiler.org/ext_libs/gtest-1.8.0.tar.gz
 
 # Clone the AllScale API project.
+/bin/rm -fr allscale_api
 git clone https://github.com/allscale/allscale_api
 
 cd ../

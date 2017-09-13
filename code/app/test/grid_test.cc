@@ -22,7 +22,7 @@ const int NUM_DOMAINS_X = 13;
 const int NUM_DOMAINS_Y = 7;
 
 // Number of elements (or nodal points) in each subdomain in each dimension.
-const int NELEMS_X = 11;
+const int NELEMS_X = 111;
 const int NELEMS_Y = 17;
 
 // Set up the configuration of a grid cell (static).
@@ -89,7 +89,11 @@ int GetId(point2d_t idx, Direction dir)
 //-------------------------------------------------------------------------------------------------
 void TestGrid()
 {
+    std::cout << "TestGrid() ..." << std::endl;
     using namespace amdados::app;
+    // Set to "true" for the hard test, but this can corrupt memory.
+    const bool TestOutOfBounds = false;
+    const bool TestYXOrder = false;
 
     // Origin and the number of subdomains in both directions.
     const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
@@ -97,53 +101,55 @@ void TestGrid()
 
     ::allscale::api::user::data::Grid<int,2> grid(SubDomGridSize);
 
-#if 0
     // Segmentation fault as expected.
-    for (int x = -10*SubDomGridSize[_X_]; x < 10*SubDomGridSize[_X_]; ++x) {
-    for (int y = -10*SubDomGridSize[_Y_]; y < 10*SubDomGridSize[_Y_]; ++y) {
-        grid[{x,y}] = x + y;
-    }}
-#endif
+    if (TestOutOfBounds)
+    {
+        for (int x = -10*SubDomGridSize[_X_]; x < 10*SubDomGridSize[_X_]; ++x) {
+        for (int y = -10*SubDomGridSize[_Y_]; y < 10*SubDomGridSize[_Y_]; ++y) {
+            grid[{x,y}] = x + y;
+        }}
+    }
 
-#if 1
-    // Passes - {x,y} is a correct ordering.
-    // Loop x, then y.
-    int count = 0;
-    for (int x = Ox; x < Nx; ++x) {
-    for (int y = Oy; y < Ny; ++y) {
-        grid[{x,y}] = count++;
-    }}
-    count = 0;
-    for (int x = Ox; x < Nx; ++x) {
-    for (int y = Oy; y < Ny; ++y) {
-        bool ok = (grid[{x,y}] == count++);
-        EXPECT_TRUE(ok);
-    }}
+    if (TestYXOrder)    // Fails - {y,x} is a wrong ordering; BEWARE: this test can overrun buffer.
+    {
+        int count = 0;
+        for (int x = Ox; x < Nx; ++x) {
+        for (int y = Oy; y < Ny; ++y) { grid[{y,x}] = count++; }}
+        count = 0;
+        for (int x = Ox; x < Nx; ++x) {
+        for (int y = Oy; y < Ny; ++y) {
+            bool ok = (grid[{y,x}] == count++);
+            EXPECT_TRUE(ok);
+        }}
+    }
+    else                // Passes - {x,y} is a correct ordering.
+    {
+        // Loop x, then y.
+        int count = 0;
+        for (int x = Ox; x < Nx; ++x) {
+        for (int y = Oy; y < Ny; ++y) {
+            grid[{x,y}] = count++;
+        }}
+        count = 0;
+        for (int x = Ox; x < Nx; ++x) {
+        for (int y = Oy; y < Ny; ++y) {
+            bool ok = (grid[{x,y}] == count++);
+            EXPECT_TRUE(ok);
+        }}
 
-    // Loop y, then x.
-    count = 0;
-    for (int y = Oy; y < Ny; ++y) {
-    for (int x = Ox; x < Nx; ++x) {
-        grid[{x,y}] = count++;
-    }}
-    count = 0;
-    for (int y = Oy; y < Ny; ++y) {
-    for (int x = Ox; x < Nx; ++x) {
-        bool ok = (grid[{x,y}] == count++);
-        EXPECT_TRUE(ok);
-    }}
-#else
-    // Fails - {y,x} is a wrong ordering; this test can overrun buffer, beware.
-    int count = 0;
-    for (int x = Ox; x < Nx; ++x) {
-    for (int y = Oy; y < Ny; ++y) { grid[{y,x}] = count++; }}
-    count = 0;
-    for (int x = Ox; x < Nx; ++x) {
-    for (int y = Oy; y < Ny; ++y) {
-        bool ok = (grid[{y,x}] == count++);
-        EXPECT_TRUE(ok);
-    }}
-#endif
+        // Loop y, then x.
+        count = 0;
+        for (int y = Oy; y < Ny; ++y) {
+        for (int x = Ox; x < Nx; ++x) {
+            grid[{x,y}] = count++;
+        }}
+        count = 0;
+        for (int y = Oy; y < Ny; ++y) {
+        for (int x = Ox; x < Nx; ++x) {
+            bool ok = (grid[{x,y}] == count++);
+            EXPECT_TRUE(ok);
+        }}
+    }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -151,97 +157,92 @@ void TestGrid()
 //-------------------------------------------------------------------------------------------------
 void TestSubdomainIndexing()
 {
+    std::cout << "TestSubdomainIndexing() ..." << std::endl;
     using namespace amdados::app;
+    // Set to "true" for the hard test, but this can corrupt memory.
+    const bool TestOutOfBounds = false;
+    const bool TestYXOrder = false;
 
-    domain_t domain(SubDomGridSize);
+    domain_t domain1(SubDomGridSize);
+    domain_t domain2(SubDomGridSize);
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-        domain[idx].setActiveLayer(L_100m);
-        subdomain_t & subdom = domain[idx].getLayer<L_100m>();
+        domain1[idx].setActiveLayer(L_100m);
+        domain2[idx].setActiveLayer(L_100m);
+        subdomain_t & subdom1 = domain1[idx].getLayer<L_100m>();
+        subdomain_t & subdom2 = domain2[idx].getLayer<L_100m>();
 
-#if 1
         // Test rationale: out-of-bounds index checking. This test must cause
-        // segmentation fault but it does not because modular arithmetic prevents
-        // error checking, impossible to track down the out-of-bounds errors.
+        // segmentation fault and in the new API version it does (but not in the old one).
+        if (TestOutOfBounds)
         {
             for (int x = -100*NELEMS_X; x <= +100*NELEMS_X; ++x) {
             for (int y = -100*NELEMS_Y; y <= +100*NELEMS_Y; ++y) {
-                subdom[{x,y}] = 1.0;
+                subdom1[{x,y}] = 1.0;
             }}
         }
-#endif
 
         // Test rationale: check the sequence of numbers is written and read correctly.
         // This passes: X first, Y second - {x,y} ordering is correct.
         {
             // ----- Loop x, then y.
-            int count = 0;
-            for (int x = 0; x < NELEMS_X; ++x) {
-            for (int y = 0; y < NELEMS_Y; ++y) {
-                subdom[{x,y}] = count++;
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
-            count = 0;
-            for (int x = 0; x < NELEMS_X; ++x) {
-            for (int y = 0; y < NELEMS_Y; ++y) {
-                bool ok = (subdom[{x,y}] == count++);
-                EXPECT_TRUE(ok);
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+            {
+                domain1[idx].forAllActiveNodes([](double & value) { value = 0.0; });
+                domain2[idx].forAllActiveNodes([](double & value) { value = 0.0; });
+
+                int count = 0;
+                for (int x = 0; x < NELEMS_X; ++x) {
+                for (int y = 0; y < NELEMS_Y; ++y) {
+                    subdom1[{x,y}] = count;
+ if (TestYXOrder) { subdom2[{y,x}] = count; }
+                    ++count;
+                }}
+                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+
+                bool ok1 = true, ok2 = true;
+                count = 0;
+                for (int x = 0; x < NELEMS_X; ++x) {
+                for (int y = 0; y < NELEMS_Y; ++y) {
+                    if (!(subdom1[{x,y}] == count)) ok1 = false;
+ if (TestYXOrder) { if (!(subdom2[{y,x}] == count)) ok2 = false; } else ok2 = false;
+                    ++count;
+                }}
+                EXPECT_TRUE(ok1 && !ok2);
+                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+            }
 
             // ----- Loop y, then x.
-            count = 0;
-            for (int y = 0; y < NELEMS_Y; ++y) {
-            for (int x = 0; x < NELEMS_X; ++x) {
-                subdom[{x,y}] = count++;
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
-            count = 0;
-            for (int y = 0; y < NELEMS_Y; ++y) {
-            for (int x = 0; x < NELEMS_X; ++x) {
-                bool ok = (subdom[{x,y}] == count++);
-                EXPECT_TRUE(ok);
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
-        }
+            {
+                domain1[idx].forAllActiveNodes([](double & value) { value = 0.0; });
+                domain2[idx].forAllActiveNodes([](double & value) { value = 0.0; });
 
-        // Test rationale: check the sequence of numbers is written and read correctly.
-        // This fails: Y first, X second - {y,x} ordering is wrong.
-        {
-            // ----- Loop x, then y.
-            int count = 0;
-            for (int x = 0; x < NELEMS_X; ++x) {
-            for (int y = 0; y < NELEMS_Y; ++y) {
-                subdom[{y,x}] = count++;
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
-            count = 0;
-            bool ok = true;
-            for (int x = 0; x < NELEMS_X; ++x) {
-            for (int y = 0; y < NELEMS_Y; ++y) {
-                if (subdom[{y,x}] != count) ok = false;
-                ++count;
-            }}
-            EXPECT_FALSE(ok);
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                int count = 0;
+                for (int y = 0; y < NELEMS_Y; ++y) {
+                for (int x = 0; x < NELEMS_X; ++x) {
+                    subdom1[{x,y}] = count;
+ if (TestYXOrder) { subdom2[{y,x}] = count; }
+                    ++count;
+                }}
+                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
 
-            // ----- Loop y, then x.
-            count = 0;
-            for (int y = 0; y < NELEMS_Y; ++y) {
-            for (int x = 0; x < NELEMS_X; ++x) {
-                subdom[{y,x}] = count++;
-            }}
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
-            count = 0;
-            ok = true;
-            for (int y = 0; y < NELEMS_Y; ++y) {
-            for (int x = 0; x < NELEMS_X; ++x) {
-                if (subdom[{y,x}] != count) ok = false;
-                ++count;
-            }}
-            EXPECT_FALSE(ok);
-            EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                bool ok1 = true, ok2 = true;
+                count = 0;
+                for (int y = 0; y < NELEMS_Y; ++y) {
+                for (int x = 0; x < NELEMS_X; ++x) {
+                    if (!(subdom1[{x,y}] == count)) ok1 = false;
+ if (TestYXOrder) { if (!(subdom2[{y,x}] == count)) ok2 = false; } else ok2 = false;
+                    ++count;
+                }}
+                EXPECT_TRUE(ok1 && !ok2);
+                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+            }
         }
     });
+
+    if (TestYXOrder) {
+        std::cout << "Testing the wrong Y-X indexing order can corrupt memory, so we stop here"
+                  << std::endl;
+        std::exit(0);
+    }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -249,6 +250,7 @@ void TestSubdomainIndexing()
 //-------------------------------------------------------------------------------------------------
 void TestInterSubdomain()
 {
+    std::cout << "TestInterSubdomain() ..." << std::endl;
     using namespace amdados::app;
 
     // Origin and the number of subdomains in both directions.
@@ -273,12 +275,13 @@ void TestInterSubdomain()
         subdomain_t & subdom = domain[idx].getLayer<L_100m>();
 
         // Fill up the subdomain by unique id.
-        for (int x = 0; x < NELEMS_X; ++x) {
-        for (int y = 0; y < NELEMS_Y; ++y) {
-            subdom[{x,y}] = GetId(idx);
-        }}
+        //for (int x = 0; x < NELEMS_X; ++x) {
+        //for (int y = 0; y < NELEMS_Y; ++y) {
+            //subdom[{x,y}] = GetId(idx);
+        //}}
+        domain[idx].forAllActiveNodes([&](double & value) { value = GetId(idx); });
 
-        // Fill up each subdomain border by unique id.
+        // Fill up each subdomain border by unique id, excluding (!) the corner points.
         for (int x = 1; x < NELEMS_X-1; ++x) {
             subdom[{x,0}]          = GetId(idx, Down);
             subdom[{x,NELEMS_Y-1}] = GetId(idx, Up);
@@ -293,10 +296,10 @@ void TestInterSubdomain()
         // For all the borders ...
         for (Direction dir : { Up, Down, Left, Right }) {
             // Skip global border.
-            if ((dir == Left)  && (idx[0] == Ox))   continue;
-            if ((dir == Right) && (idx[0] == Nx-1)) continue;
-            if ((dir == Down)  && (idx[1] == Oy))   continue;
-            if ((dir == Up)    && (idx[1] == Ny-1)) continue;
+            if ((dir == Left)  && (idx[_X_] == Ox))   continue;
+            if ((dir == Right) && (idx[_X_] == Nx-1)) continue;
+            if ((dir == Down)  && (idx[_Y_] == Oy))   continue;
+            if ((dir == Up)    && (idx[_Y_] == Ny-1)) continue;
 
             // Check remote border has expected values.
             int len = ((dir == Up) || (dir == Down)) ? NELEMS_X : NELEMS_Y;
@@ -304,11 +307,11 @@ void TestInterSubdomain()
             Direction neighbour_dir = remote_dir[dir];
             std::vector<double> border = domain[neighbour_idx].getBoundary(neighbour_dir);
             EXPECT_TRUE(border.size() == static_cast<size_t>(len));
-            EXPECT_TRUE(border[0] == GetId(neighbour_idx));
+            EXPECT_TRUE(border[0] == GetId(neighbour_idx));             // corner point
             for (int k = 1; k < len-1; ++k) {
                 EXPECT_TRUE(border[k] == GetId(neighbour_idx, neighbour_dir));
             }
-            EXPECT_TRUE(border[len-1] == GetId(neighbour_idx));
+            EXPECT_TRUE(border[len-1] == GetId(neighbour_idx));         // corner point
         }
     });
 }
@@ -318,6 +321,7 @@ void TestInterSubdomain()
 //-------------------------------------------------------------------------------------------------
 void TestSubdomainBorders()
 {
+    std::cout << "TestSubdomainBorders() ..." << std::endl;
     using namespace amdados::app;
 
     domain_t domain(SubDomGridSize);
@@ -337,7 +341,7 @@ void TestSubdomainBorders()
             int len = ((dir == Up) || (dir == Down)) ? NELEMS_X : NELEMS_Y;
             std::vector<double> border(len);
             for (int k = 0; k < len; ++k) {
-                border[k] = k + static_cast<int>(31*(dir + 1));
+                border[k] = k + GetId(idx, dir);
             }
             domain[idx].setBoundary(dir, border);
 
