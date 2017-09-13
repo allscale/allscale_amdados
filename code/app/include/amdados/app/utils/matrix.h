@@ -79,6 +79,9 @@ public:
     inline ~Vector() {
         delete [] data;
     }
+
+    // Use the base class assignment operator.
+    using VectorView<SIZE>::operator=;
 };
 
 //=================================================================================================

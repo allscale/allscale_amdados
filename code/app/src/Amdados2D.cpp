@@ -146,6 +146,7 @@ void GetObservations(DA_subfield_t & subfield, const point2d_t & idx,
 {
     for (int x = 0; x < NELEMS_X; ++x) { int xg = Sub2GloX(idx, x);     // global abscissa
     for (int y = 0; y < NELEMS_Y; ++y) { int yg = Sub2GloY(idx, y);     // global ordinate
+        // TODO: range checking
         subfield(x,y) = analytic_sol[{xg,yg,timestep}];
     }}
 }
@@ -341,10 +342,10 @@ void InitialCovar(const Configuration & conf, DA_matrix_t & P)
     // Here we express correlation distances in logical coordinates of nodal points.
     const double variance = conf.asDouble("model_ini_var");
     const double covar_radius = conf.asDouble("model_ini_covar_radius");
-    const double sx = std::max(NELEMS_X * covar_radius / conf.asDouble("domain_size_x"), 1.0);
-    const double sy = std::max(NELEMS_Y * covar_radius / conf.asDouble("domain_size_y"), 1.0);
-    const int Rx = Round(std::ceil(3.0 * sx));
-    const int Ry = Round(std::ceil(3.0 * sy));
+    const double sx = std::max(covar_radius / conf.asDouble("dx"), 1.0);    // in logical units now
+    const double sy = std::max(covar_radius / conf.asDouble("dy"), 1.0);    // in logical units now
+    const int Rx = Round(std::ceil(4.0 * sx));
+    const int Ry = Round(std::ceil(4.0 * sy));
 
     FillMatrix(P, 0.0);
     for (int u = 0; u < NELEMS_X; ++u) {
@@ -391,7 +392,7 @@ void ComputeR(const Configuration & conf, R_matrix_t & R)
 
 //-------------------------------------------------------------------------------------------------
 // Function initializes observation matrix H. Function evenly distributes sensors in the domain.
-// It uses gradient descent to minimize objective function, which measures the mutual sensor
+// It uses gradient descent to minimize objective function, which evaluates the mutual sensor
 // points' expulsion and their expulsion from the borders. Experiments showed that quadratic
 // distances (used here) work better than absolute values of the distances. See the Memo named
 // "Sensor Placement" for details.
@@ -636,7 +637,7 @@ double SchwarzUpdate(const Configuration &, Boundary & border, const point2d_t &
     {
         border.outer[dir] = is_outer;
         border.inflow[dir] = false;
-        if (is_outer) return;                       // nothing to do with outer border
+        if (is_outer) return;               // skip outer border where flow is never incoming
 
         // Make a normal vector pointing outside the subdomain.
         int normal_x = (dir == Right) ? +1 : ((dir == Left) ? -1 : 0);
@@ -785,7 +786,7 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
             for (int iter_no = 0; iter_no < 3; ++iter_no) {
                 if (idx == Origin) std::cout << '.' << flush;
-
+#if 0
                 SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
                 ApplyBoundaryCondition(state, idx);
 
@@ -797,6 +798,27 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
                 AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
                 ApplyBoundaryCondition(state, idx);
+#else
+                if (iter_no == 0) {
+                    MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
+
+                    InverseModelMatrix(B[idx], conf, boundaries[idx], flow);
+                    Kalman[idx].PropagateStateInverse(field[idx], P[idx], B[idx], Q[idx]);
+
+                    AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
+                    ApplyBoundaryCondition(state, idx);
+                }
+
+                SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
+                ApplyBoundaryCondition(state, idx);
+
+                MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
+
+                Kalman[idx].SolveFilter(field[idx], P[idx], H[idx], R[idx], z[idx]);
+
+                AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
+                ApplyBoundaryCondition(state, idx);
+#endif
             }
         });
 //if (t > 10) return;
@@ -804,57 +826,6 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
     }
     std::cout << endl << endl << endl;
 }
-
-
-#if 0
-{
-            // 1) update boundaries
-            for (Direction dir : { Up, Down, Left, Right }) {
-
-                // skip global boarder
-                if (dir == Up    && idx[0] == 0)         continue; // if direction == up and no neighbour to south
-                if (dir == Down  && idx[0] == size[0]-1) continue;
-                if (dir == Left  && idx[1] == 0)         continue;
-                if (dir == Right && idx[1] == size[1]-1) continue;
-
-                // obtain the local boundary
-                auto local_boundary = cur.getBoundary(dir);
-
-                // obtain the neighboring boundary
-                auto remote_boundary =
-                    (dir == Up)   ? A[idx + point2d_t{-1,0}].getBoundary(Down)  : // remote boundary is bottom strip of neighbour
-                    (dir == Down) ? A[idx + point2d_t{ 1,0}].getBoundary(Up)    : // remote boundary is top of neighbour
-                    (dir == Left) ? A[idx + point2d_t{0,-1}].getBoundary(Right) : // remote boundary is left of domain
-                                    A[idx + point2d_t{0, 1}].getBoundary(Left);
-
-                // compute local flow in domain to decide if flow in or out of domain
-                if (dir == Down) ny = -1; // flow into domain from below
-                if (dir == Left) nx = -1; // flow into domain from left
-                double flow_boundary =  nx*flowu + ny*flowv;
-                // TODO: scale the boundary vectors to the same resolution
-
-                // compute updated boundary
-                assert(local_boundary.size() == remote_boundary.size());
-                if (flow_boundary < 0) {  // then flow into domain need to update boundary with neighbour value
-                    for(size_t i = 0; i<local_boundary.size(); i++) {
-                        // for now, we just take the average
-                        // need to update this to account for flow direction (Fearghal)
-                        local_boundary[i] = remote_boundary[i];
-                    }
-                }
-
-//std::cout << "DIRECTION: "
-//<< (dir == Up ? "Up" : (dir == Down ? "Down" : (dir == Left ? "Left" : "Right"))) << std::endl;
-assert(CheckNoNan(res.getLayer<L_100m>()));
-
-                // update boundary in result
-                res.setBoundary(dir,local_boundary);
-
-assert(CheckNoNan(res.getLayer<L_100m>()));
-            }
-
-}
-#endif
 
 } // anonymous namespace
 } // namespace app
@@ -893,41 +864,4 @@ int Amdados2DMain()
     }
     return EXIT_SUCCESS;
 }
-
-//Compute(zero, size_global);
-//std::cout << "active layer: " << A[{1,1}].getLayer<L_100m>() << std::endl;  // XXX ???
-
-
-
-//long max_x = -1, max_y = -1;
-
-        //// Get the remote neighboring boundaries for each subdomain, skipping the global border.
-        //pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
-            //for (Direction dir : { Up, Down, Left, Right }) {
-                //assert_true((0 <= dir) && (dir < 4));
-                //if ((dir == Up)    && (idx[0] == Origin[0]))           continue;
-                //if ((dir == Down)  && (idx[0] == SubDomGridSize[0]-1)) continue;
-                //if ((dir == Left)  && (idx[1] == Origin[1]))           continue;
-                //if ((dir == Right) && (idx[1] == SubDomGridSize[1]-1)) continue;
-                //glo_boundary[idx].side[dir] =
-                    //(dir == Up)   ? glo_state[idx + point2d_t{-1,0}].getBoundary(Down)  :
-                    //(dir == Down) ? glo_state[idx + point2d_t{ 1,0}].getBoundary(Up)    :
-                    //(dir == Left) ? glo_state[idx + point2d_t{0,-1}].getBoundary(Right) :
-                                    //glo_state[idx + point2d_t{0, 1}].getBoundary(Left);
-            //}
-//g_mutex.lock();
-//max_x = std::max(max_x, idx[0]);
-//max_y = std::max(max_y, idx[1]);
-//g_mutex.unlock();
-        //});
-
-        ////auto & kkk = glo_state[{0,0}];
-//auto & hhh = glo_boundary[{3,4}];
-//for (Direction dir : { Up, Down, Left, Right }) {
-    //std::cout << "dir = " << dir << endl;
-    //std::cout << "size: " << hhh.side[dir].size() << endl << endl;
-//}
-//std::cout << "max_x: " << max_x << ", max_y: " << max_y << endl;
-//auto & lll = glo_state[{-100,0}]; std::cout << &lll << endl;
-//return;
 

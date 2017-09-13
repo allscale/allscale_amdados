@@ -59,6 +59,10 @@ what does it mean: Follow same structure as that implemented for Runga Kutta sol
 24) how to find min or max across the entire domain?
 
 
+My tasks:
+Memo named "Sensor Placement"
+
+
 //////////////////////////////////////////////////////////////////////////////////////
 Questions:
 1) Rationale for design?
