@@ -86,6 +86,9 @@ void CreateAndCleanOutputDir(const std::string & dir)
     retval = std::system((string("/bin/rm -fr ") + dir + "/*.pgm").c_str());
     retval = std::system((string("/bin/rm -fr ") + dir + "/*.jpg").c_str());
     retval = std::system((string("/bin/rm -fr ") + dir + "/*.avi").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.log").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*.out").c_str());
+    retval = std::system((string("/bin/rm -fr ") + dir + "/*profile*.txt").c_str());
     retval = std::system("sync");
     (void)retval;
 }

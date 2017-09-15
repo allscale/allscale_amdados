@@ -15,7 +15,11 @@
 #include "amdados/app/utils/lu.h"
 #include "amdados/app/utils/kalman_filter.h"
 #include "amdados/app/utils/image_writer.h"
+
+#define AMDADOS_ENABLE_AVERAGE_PROFILE
+
 #include "gnuplot.h"
+#include "amdados/app/utils/average_profile.h"
 
 #include <cstdlib>
 #include <unistd.h>
@@ -683,7 +687,7 @@ double SchwarzUpdate(const Configuration &, Boundary & border, const point2d_t &
 //-------------------------------------------------------------------------------------------------
 void ComputeTrueFields(const Configuration & conf)
 {
-/*
+(void)conf; /*
     std::cout << "Computing the observations, a.k.a 'true' density fields" << endl << flush;
     //true_fields = np.zeros((conf.nx, conf.ny, conf.Nt))
 
@@ -743,6 +747,7 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
 	ImageWriter	                      writer(conf.asString("output_dir"));
     std::unique_ptr<gnuplot::Gnuplot> gp(new gnuplot::Gnuplot());
+    AverageProfile                    diff_profile(conf);
 
     domain_t              state(SubDomGridSize);        // state field as a grid of subdomains
     Grid<DA_subfield_t,2> field(SubDomGridSize);        // same state field as a grid of matrices
@@ -784,7 +789,7 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
             ComputeQ(conf, Q[idx]);
             ComputeR(conf, R[idx]);
 
-            for (int iter_no = 0; iter_no < 3; ++iter_no) {
+            for (int iter_no = 0; iter_no < 7; ++iter_no) {
                 if (idx == Origin) std::cout << '.' << flush;
 #if 0
                 SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
@@ -809,8 +814,9 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
                     ApplyBoundaryCondition(state, idx);
                 }
 
-                SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
+                double diff = SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
                 ApplyBoundaryCondition(state, idx);
+                diff_profile.Accumulate(idx, diff);
 
                 MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
 
@@ -824,6 +830,7 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 //if (t > 10) return;
         ShowImage(writer, field, "field", t, true, gp.get());   // visualization
     }
+    diff_profile.PrintProfile(conf, "schwarz_diff");
     std::cout << endl << endl << endl;
 }
 

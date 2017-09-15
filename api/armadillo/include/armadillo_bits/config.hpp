@@ -37,7 +37,7 @@
 #endif
 
 #if !defined(ARMA_USE_ARPACK)
-/* #undef ARMA_USE_ARPACK */
+#define ARMA_USE_ARPACK
 //// Uncomment the above line if you have ARPACK or a high-speed replacement for ARPACK.
 //// ARPACK is required for eigen decompositions of complex sparse matrices
 #endif
@@ -267,5 +267,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS -framework Accelerate
+#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/lib/libarpack.dylib
 #define ARMA_AUX_INCDIRS 
