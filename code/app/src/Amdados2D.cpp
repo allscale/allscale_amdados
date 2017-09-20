@@ -791,19 +791,7 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
             for (int iter_no = 0; iter_no < 7; ++iter_no) {
                 if (idx == Origin) std::cout << '.' << flush;
-#if 0
-                SchwarzUpdate(conf, boundaries[idx], idx, state, flow);
-                ApplyBoundaryCondition(state, idx);
 
-                MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
-
-                InverseModelMatrix(B[idx], conf, boundaries[idx], flow);
-                Kalman[idx].IterateInverse(field[idx], P[idx], B[idx], Q[idx],
-                                                               H[idx], R[idx], z[idx]);
-
-                AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
-                ApplyBoundaryCondition(state, idx);
-#else
                 if (iter_no == 0) {
                     MatrixFromAllscale(field[idx], state[idx].getLayer<ACTIVE_LAYER>());
 
@@ -824,7 +812,6 @@ void RunDataAssimilation(const Configuration & conf, const cube_t & analytic_sol
 
                 AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(), field[idx]);
                 ApplyBoundaryCondition(state, idx);
-#endif
             }
         });
 //if (t > 10) return;
