@@ -30,12 +30,12 @@ if __name__ == '__main__':
         # ax.legend()
         ax.set_xlabel('number of time iterations')
         ax.set_ylabel('relative difference')
-        plt.title('||(true field) - (assimilation solution)|| / ||true field||')
+        plt.title('||analytic - simulation|| / ||analytic||')
         plt.savefig(os.path.splitext(filename)[0] + '.png')
         plt.show()
 
         min_i = 1000
-        max_i = 1201
+        max_i = 1035
         if data.size >= max_i:
             fig = plt.figure()
             ax = fig.gca()
