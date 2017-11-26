@@ -61,7 +61,7 @@ public:
     // Clear this object, so it can be resused.
     void Clear(const Configuration & conf)
     {
-        using ::allscale::api::user::pfor;
+        using ::allscale::api::user::algorithm::pfor;
         pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
             auto & acc = m_accums[idx];
             acc.clear();

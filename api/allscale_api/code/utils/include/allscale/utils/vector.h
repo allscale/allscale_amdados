@@ -6,6 +6,8 @@
 
 #include "allscale/utils/printer/arrays.h"
 #include "allscale/utils/assert.h"
+#include "allscale/utils/unused.h"
+#include "allscale/utils/serializer/arrays.h"
 
 namespace allscale {
 namespace utils {
@@ -23,7 +25,7 @@ namespace utils {
 		Vector() = default;
 
 		Vector(const T& e) {
-			for(std::size_t i = 0; i < Dims; i++) { data[i] = e; }
+			data.fill(e);
 		}
 
 		Vector(const Vector&) = default;
@@ -39,9 +41,15 @@ namespace utils {
 
 		template<typename R>
 		Vector(const std::initializer_list<R>& values) {
-			std::size_t pos = 0;
-			for(const auto& cur : values) { data[pos++] = cur; }
+			assert_eq(Dims,values.size());
+			init(values);
 		}
+
+		template<typename ... Rest>
+		Vector(T a, T b, Rest ... rest) : data{ {a,b,rest...} } {
+			static_assert(Dims == sizeof...(rest)+2, "Invalid number of components!");
+		}
+
 
 		Vector& operator=(const Vector& other) = default;
 		Vector& operator=(Vector&& other) = default;
@@ -102,6 +110,19 @@ namespace utils {
 		friend std::ostream& operator<<(std::ostream& out, const Vector& vec) {
 			return out << vec.data;
 		}
+
+	private:
+
+		template<typename R, std::size_t ... Index>
+		void init_internal(const std::initializer_list<R>& list, const std::integer_sequence<std::size_t,Index...>&) {
+			__allscale_unused auto bla = { data[Index] = *(list.begin() + Index) ... };
+		}
+
+		template<typename R>
+		void init(const std::initializer_list<R>& list) {
+			init_internal(list,std::make_index_sequence<Dims>());
+		}
+
 	};
 
 	template<typename T, std::size_t Dims, typename S>
@@ -229,7 +250,7 @@ namespace utils {
 		Vector(const T& e) : x(e), y(e), z(e) { }
 
 		template<typename R>
-		Vector(const R& x, const R& y, const R& z) : x(x), y(y), z(z) { }
+		Vector(R x, R y, R z) : x(x), y(y), z(z) { }
 
 		Vector(const Vector&) = default;
 		Vector(Vector&&) = default;
@@ -241,11 +262,11 @@ namespace utils {
 		Vector(const std::array<R,3>& other) : x(other[0]), y(other[1]), z(other[2]) {}
 
 		T& operator[](std::size_t i) {
-			return reinterpret_cast<std::array<T,3>&>(*this)[i];
+			return (i==0) ? x : (i==1) ? y : z;
 		}
 
 		const T& operator[](std::size_t i) const {
-			return reinterpret_cast<const std::array<T,3>&>(*this)[i];
+			return (i==0) ? x : (i==1) ? y : z;
 		}
 
 		Vector& operator=(const Vector& other) = default;
@@ -319,7 +340,7 @@ namespace utils {
 		Vector(const T& e) : x(e), y(e) { }
 
 		template<typename R>
-		Vector(const R& x, const R& y) : x(x), y(y) { }
+		Vector(R x, R y) : x(x), y(y) { }
 
 		Vector(const Vector&) = default;
 		Vector(Vector&&) = default;
@@ -331,11 +352,11 @@ namespace utils {
 		Vector(const std::array<R,2>& other) : x(other[0]), y(other[1]) {}
 
 		T& operator[](std::size_t i) {
-			return reinterpret_cast<std::array<T,2>&>(*this)[i];
+			return (i == 0) ? x : y;
 		}
 
 		const T& operator[](std::size_t i) const {
-			return reinterpret_cast<const std::array<T,2>&>(*this)[i];
+			return (i == 0) ? x : y;
 		}
 
 		Vector& operator=(const Vector& other) = default;
@@ -385,6 +406,13 @@ namespace utils {
 		}
 
 	};
+
+	/**
+	 * Add support for serializing / de-serializing Vector instances.
+	 * The implementation is simply re-using the serializing capabilities of arrays.
+	 */
+	template<typename T, std::size_t Dims>
+	struct serializer<Vector<T,Dims>,typename std::enable_if<is_serializable<T>::value,void>::type> : public serializer<std::array<T,Dims>> {};
 
 } // end namespace utils
 } // end namespace allscale

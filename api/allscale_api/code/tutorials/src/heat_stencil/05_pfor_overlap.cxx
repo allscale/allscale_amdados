@@ -3,9 +3,10 @@
 #include <utility>
 
 #include "allscale/api/user/data/static_grid.h"
-#include "allscale/api/user/operator/pfor.h"
+#include "allscale/api/user/algorithm/pfor.h"
 
 using namespace allscale::api::user;
+using namespace allscale::api::user::algorithm;
 
 
 int main() {
@@ -48,7 +49,7 @@ int main() {
 					 (*A)[{i,j+1}] +
 					 (-4)*(*A)[{i,j}]
 			);
-		}, neighborhood_sync(ref));
+		}, small_neighborhood_sync(ref));
 
 		// output gradual reduction of central temperature
 		if ((t % (T/10)) == 0) {

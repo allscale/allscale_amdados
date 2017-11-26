@@ -41,6 +41,8 @@ output/
 *.git
 .DS_Store
 *.gz
+*.tgz
+*.tar.gz
 *.a
 *.o
 *.so

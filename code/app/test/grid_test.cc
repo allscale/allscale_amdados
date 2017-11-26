@@ -10,7 +10,7 @@ namespace amdados {
 namespace app {
 
 using namespace ::allscale::utils;
-using ::allscale::api::user::pfor;
+using ::allscale::api::user::algorithm::pfor;
 using ::allscale::api::user::data::Direction;
 using ::allscale::api::user::data::Direction::Up;
 using ::allscale::api::user::data::Direction::Down;
@@ -27,7 +27,7 @@ const int NELEMS_Y = 17;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = ::allscale::api::user::data::CellConfig<
+using sub_domain_config_t = ::allscale::api::user::data::CellConfig<2,
     ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
         ::allscale::api::user::data::layer<NELEMS_X,NELEMS_Y>,// 10x10 100m nodes each consisting of
         ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of

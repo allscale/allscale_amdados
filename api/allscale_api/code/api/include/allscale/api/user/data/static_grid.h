@@ -274,14 +274,16 @@ namespace data {
 		 * Provides read/write access to one of the values stored within this grid.
 		 */
 		T& operator[](const coordinate_type& index) {
-			return data_item_element_access(*this, region_type(index), (*base)[index]);
+			allscale_check_bounds(index, (*this));
+			return data_item_element_access(*this, region_type::single(index), (*base)[index]);
 		}
 
 		/**
 		 * Provides read access to one of the values stored within this grid.
 		 */
 		const T& operator[](const coordinate_type& index) const {
-			return data_item_element_access(*this, region_type(index), (*base)[index]);
+			allscale_check_bounds(index, (*this));
+			return data_item_element_access(*this, region_type::single(index), (*base)[index]);
 		}
 
 		/**
@@ -290,7 +292,7 @@ namespace data {
 		 */
 		template<typename Op>
 		void forEach(const Op& op) const {
-			allscale::api::user::detail::forEach(
+			allscale::api::user::algorithm::detail::forEach(
 					coordinate_type(0),
 					size(),
 					[&](const auto& pos){
@@ -305,7 +307,7 @@ namespace data {
 		 */
 		template<typename Op>
 		void forEach(const Op& op) {
-			allscale::api::user::detail::forEach(
+			allscale::api::user::algorithm::detail::forEach(
 					coordinate_type(0),
 					size(),
 					[&](const auto& pos){
@@ -320,7 +322,7 @@ namespace data {
 		 */
 		template<typename Op>
 		auto pforEach(const Op& op) const {
-			return pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
+			return algorithm::pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
 		}
 
 		/**
@@ -329,7 +331,7 @@ namespace data {
 		 */
 		template<typename Op>
 		auto pforEach(const Op& op) {
-			return pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
+			return algorithm::pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
 		}
 
 	};

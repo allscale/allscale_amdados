@@ -30,7 +30,7 @@ const int OBSERVATION_NY = 30;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = ::allscale::api::user::data::CellConfig<
+using sub_domain_config_t = ::allscale::api::user::data::CellConfig<2,
     ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
         ::allscale::api::user::data::layer<NELEMS_X,NELEMS_Y>,// 10x10 100m nodes each consisting of
         ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
@@ -82,26 +82,47 @@ const size2d_t  SubDomGridSize = {NUM_DOMAINS_X, NUM_DOMAINS_Y};
 const int _X_ = 0;  // index of abscissa
 const int _Y_ = 1;  // index of ordinate
 
-#if 1
-#define SUB2IND(x, y, SizeX, SizeY) ((x) * (SizeY) + (y))       // row major
-#else
-#define SUB2IND(x, y, SizeX, SizeY) ((x) + (SizeX) * (y))       // column major
-#endif
+//#if 1
+//#define SUB2IND(x, y, SizeX, SizeY) ((x) * (SizeY) + (y))       // row major
+//#else
+//#define SUB2IND(x, y, SizeX, SizeY) ((x) + (SizeX) * (y))       // column major
+//#endif
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function converts 2D index to a flat 1D one.
+// A T T E N T I O N: ordinate changes faster than abscissa.
+//                    This is in agreement with row-major Matrix class.
+//-----------------------------------------------------------------------------
+inline int Sub2Ind(int x, int y)
+{
+#ifndef NDEBUG
+    if (!((static_cast<unsigned>(x) < static_cast<unsigned>(NELEMS_X)) &&
+          (static_cast<unsigned>(y) < static_cast<unsigned>(NELEMS_Y))))
+        assert_true(0);
+#endif
+    return (x * NELEMS_Y + y);
+}
+
+//-----------------------------------------------------------------------------
 // Function maps the subdomain local abscissa to global one.
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 inline int Sub2GloX(const point2d_t & subdomain, const int x)
-{ // TODO: discard checking in release mode
-    if (!(static_cast<unsigned>(x) < static_cast<unsigned>(NELEMS_X))) assert_true(0);
+{
+#ifndef NDEBUG
+    if (!(static_cast<unsigned>(x) < static_cast<unsigned>(NELEMS_X)))
+        assert_true(0);
+#endif
     return (x + subdomain[_X_] * NELEMS_X);
 }
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Function maps the subdomain local ordinate to global one.
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 inline int Sub2GloY(const point2d_t & subdomain, const int y)
-{ // TODO: discard checking in release mode
-    if (!(static_cast<unsigned>(y) < static_cast<unsigned>(NELEMS_Y))) assert_true(0);
+{
+#ifndef NDEBUG
+    if (!(static_cast<unsigned>(y) < static_cast<unsigned>(NELEMS_Y)))
+        assert_true(0);
+#endif
     return (y + subdomain[_Y_] * NELEMS_Y);
 }
 

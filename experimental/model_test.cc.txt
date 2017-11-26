@@ -1,0 +1,322 @@
+//-----------------------------------------------------------------------------
+// Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017
+//-----------------------------------------------------------------------------
+
+#include <gtest/gtest.h>
+#include "allscale/api/user/data/adaptive_grid.h"
+#include "amdados/app/utils/common.h"
+#include "amdados/app/geometry.h"
+#include "amdados/app/utils/amdados_utils.h"
+#include "amdados/app/utils/matrix.h"
+#include "amdados/app/utils/sparse_matrix.h"
+#include "amdados/app/utils/configuration.h"
+
+using ::std::endl;
+using ::std::flush;
+using ::std::numeric_limits;
+using ::std::string;
+
+using namespace amdados::app;
+using namespace amdados::app::utils;
+
+// Tolerance on relative error.
+const double TOL = std::sqrt(numeric_limits<double>::epsilon());
+
+//=================================================================================================
+// Explicit Euler method for advection-diffusion equation discretized
+// by finite difference approximation.
+//=================================================================================================
+template<int SizeX, int SizeY>
+class EulerFiniteDifferenceModel
+{
+public:
+    //-------------------------------------------------------------------------------------------------
+    // Flags to decide whether to keep already allocated memory or release it back to the system.
+    //-------------------------------------------------------------------------------------------------
+    enum class MemoryPolicy
+    {
+        RETAIN_MEMORY,
+        RELEASE_MEMORY
+    };
+    
+    static const int PROBLEM_SIZE = SizeX * SizeY;
+    using vector_t = utils::Vector<PROBLEM_SIZE>;
+    using matrix_t = utils::Matrix<PROBLEM_SIZE, PROBLEM_SIZE>;
+    using sp_matrix_t = utils::SpMatrix<PROBLEM_SIZE, PROBLEM_SIZE>;
+    using triplet_t = utils::Triplet;
+
+public:
+//-------------------------------------------------------------------------------------------------
+// Constructor.
+//-------------------------------------------------------------------------------------------------
+EulerFiniteDifferenceModel(const utils::Configuration & conf) : mConf(conf), mM(), mTriplets() {}
+
+//-------------------------------------------------------------------------------------------------
+// Destructor.
+//-------------------------------------------------------------------------------------------------
+virtual ~EulerFiniteDifferenceModel() {}
+
+//-------------------------------------------------------------------------------------------------
+// Function initializes and returns the model matrix, then updates the state and covariance
+// one time step ahead using the current ones and the model matrix. If 'M' is the model
+// matrix, then:  state <- M * state;  covar <- M * covar * M^T.
+// \param  flow_x       abscissa of the flow vector.
+// \param  flow_y       ordinate of the flow vector.
+// \param  time_delta   time integration step.
+// \param  space_delta  space discretization step.
+// \param  t            current time.
+//-------------------------------------------------------------------------------------------------
+virtual const sp_matrix_t & ModelMatrix(double flow_x, double flow_y,
+                                        double time_delta, double space_delta, double t)
+{
+    (void)t;
+    MakeModelMatrix(flow_x, flow_y, time_delta, space_delta);
+    return mM;
+}
+
+private:
+    using triplet_arr_t = std::vector<triplet_t>;
+
+    const utils::Configuration & mConf;     ///< reference to external parameter handler
+    sp_matrix_t                  mM;        ///< model matrix
+    triplet_arr_t                mTriplets; ///< triplets for constructing the model matrix
+
+private:
+//-------------------------------------------------------------------------------------------------
+// Function computes the model matrix, so that the transition from the field 'u_t' at time 't'
+// to the field 'u_{t+1}' at time 't+1' (both fields are unrolled into vectors) can be written
+// as follows:  u_{t+1} = mM * u_t.
+//-------------------------------------------------------------------------------------------------
+void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double space_delta)
+{
+    auto sub2ind = &(Matrix<SizeX,SizeY>::sub2ind); // convert 2D index (x,y) to plain index
+
+    mTriplets.resize(5 * PROBLEM_SIZE);
+    triplet_t * pTriplets = mTriplets.data();
+    int         count = 0;
+
+    const double c = mConf.asDouble("diffusion_coef");
+    const double diffmult = (time_delta * c) / std::pow(space_delta,2);
+    const double advmult_x = (flow_x * time_delta) / (2*space_delta);
+    const double advmult_y = (flow_y * time_delta) / (2*space_delta);
+
+    // Finite difference approximation.
+    //
+    // u_{t+1}(x,y) = u_t(x,y)
+    //      + (dt*c/ds^2) * (u_t(x+1,y) + u_t(x-1,y) + u_t(x,y+1) + u_t(x,y-1) - 4*u_t(x,y)
+    //      - (dt*flow_x/(2*ds)) * (u_t(x+1,y) - u_t(x-1,y))
+    //      - (dt*flow_y/(2*ds)) * (u_t(x,y+1) - u_t(x,y-1)).
+    //
+    for (int x = 1; x < SizeX-1; ++x) {
+    for (int y = 1; y < SizeY-1; ++y) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(x+1,y), diffmult - advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x-1,y), diffmult + advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,y+1), diffmult - advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,y-1), diffmult + advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }}
+
+    // Boundary: x == 0.
+    for (int x = 0, y = 1; y < SizeY-1; ++y) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(x+1,y), diffmult - 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x  ,y), diffmult + 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,y+1), diffmult - advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,y-1), diffmult + advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }
+
+    // Boundary: x == SizeX-1.
+    for (int x = SizeX-1, y = 1; y < SizeY-1; ++y) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(x  ,y), diffmult - 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x-1,y), diffmult + 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,y+1), diffmult - advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,y-1), diffmult + advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }
+
+    // Boundary: y == 0.
+    for (int y = 0, x = 1; x < SizeX-1; ++x) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(x+1,y), diffmult - advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x-1,y), diffmult + advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,y+1), diffmult - 2*advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,y  ), diffmult + 2*advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }
+
+    // Boundary: y == SizeY-1.
+    for (int y = SizeY-1, x = 1; x < SizeX-1; ++x) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(x+1,y), diffmult - advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x-1,y), diffmult + advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,y  ), diffmult - 2*advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,y-1), diffmult + 2*advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }
+
+    // At the corner points.
+    const int corner_x[4] = {0, 0, SizeX-1, SizeX-1};
+    const int corner_y[4] = {0, SizeY-1, SizeY-1, 0};
+    for (int k = 0; k < 4; ++k) {
+        assert_true(count + 5 <= 5 * PROBLEM_SIZE);
+        int x = corner_x[k];
+        int y = corner_y[k];
+        int r = sub2ind(x,y);
+        pTriplets[count++].Set(r, sub2ind(std::min(x+1,SizeX-1),y), diffmult - 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(std::max(x-1,      0),y), diffmult + 2*advmult_x);
+        pTriplets[count++].Set(r, sub2ind(x,std::min(y+1,SizeY-1)), diffmult - 2*advmult_y);
+        pTriplets[count++].Set(r, sub2ind(x,std::max(y-1,      0)), diffmult + 2*advmult_y);
+        pTriplets[count++].Set(r, r, 1 - 4*diffmult);
+    }
+
+    // Assemble the model matrix.
+    assert_true(count == 5 * PROBLEM_SIZE);
+    mM.SetFromTriplets(mTriplets, MemoryPolicy::RETAIN_MEMORY);
+}
+
+}; // class EulerFiniteDifferenceModel
+
+//-------------------------------------------------------------------------------------------------
+// Straightforward state propagation using finite difference discretization of advection-diffusion
+// equation and Euler time integration method.
+//-------------------------------------------------------------------------------------------------
+template<int SizeX, int SizeY>
+void EulerFiniteDifferenceDirect(const Configuration & conf, Matrix<SizeX,SizeY> & state,
+                                 double flow_x, double flow_y, double dt, double ds)
+{
+    const double c = conf.asDouble("diffusion_coef");
+    const double diffmult = (dt * c) / std::pow(ds,2);
+    const double advmult_x = (flow_x * dt) / (2*ds);
+    const double advmult_y = (flow_y * dt) / (2*ds);
+
+    Matrix<SizeX,SizeY> new_state;
+    for (int i = 0; i < SizeX; ++i) {
+    for (int j = 0; j < SizeY; ++j) {
+        double sum = state(i,j);
+
+        int ip = std::min(i+1,SizeX-1);  int jp = std::min(j+1,SizeY-1);
+        int im = std::max(i-1,0);        int jm = std::max(j-1,0);
+
+        // Diffusion term.
+        sum += (state(ip,j) +
+                state(im,j) +
+                state(i,jp) +
+                state(i,jm) - 4 * state(i,j)) * diffmult;
+
+        double coef_x = (((0 < i) && (i+1 < SizeX)) ? 1 : 2) * advmult_x;
+        double coef_y = (((0 < j) && (j+1 < SizeY)) ? 1 : 2) * advmult_y;
+
+        // Advection term.
+        sum += -coef_x * (state(ip,j) - state(im,j));
+        sum += -coef_y * (state(i,jp) - state(i,jm));
+
+        new_state(i,j) = sum;
+    }}
+    state = new_state;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function updates the state and covariance:
+//      state <- M * state
+//      covar <- M * covar * M^T
+// The function is slow (but safe) because temporary objects are allocated on the heap
+// avoiding potential stack overflow.
+//-------------------------------------------------------------------------------------------------
+template<typename MODEL, typename STATE, typename COVAR>
+void UpdateState(const MODEL & M, STATE & state, COVAR & covar)
+{
+    STATE tmp_state = state;
+    utils::MatVecMult(state, M, tmp_state);                 // state <- M * state
+    COVAR tmp_covar = covar;
+    utils::MatMultTr(tmp_covar, covar, M);
+    utils::MatMult(covar, M, tmp_covar);                    // covar <- M * old_covar * M^T
+}
+
+//-------------------------------------------------------------------------------------------------
+// Test straightforward state propagation against matrix based approach implemented in
+// EulerFiniteDifferenceModel<..> class.
+//-------------------------------------------------------------------------------------------------
+template<int SizeX, int SizeY>
+void TestEulerFiniteDifference(const Configuration & conf, double & max_rel_diff)
+{
+    std::mt19937                           gen(std::time(nullptr));
+    std::uniform_real_distribution<double> distrib(0.0, 2.0 * M_PI);
+    const double                           angle = distrib(gen);
+
+    const double flow_x = std::cos(angle);
+    const double flow_y = std::sin(angle);
+    const double time_delta = 0.1;
+    const double step_size = 0.1;
+
+    using model_t = EulerFiniteDifferenceModel<SizeX, SizeY>;
+    // using vector_t = typename model_t::vector_t;
+    using matrix_t = typename model_t::matrix_t;
+    using field_t = Matrix<SizeX, SizeY>;
+
+    model_t  model(conf);
+    matrix_t covar;
+    field_t  state;
+    field_t  state2;
+
+    MakeIdentityMatrix(covar);
+    MakeRandomVector(state, 'u');
+    state2 = state;
+
+    // Make several "iterations".
+    for (int iterNo = 0; iterNo < 3; ++iterNo) {
+        // Time integration by means of model matrix.
+        const auto & M = model.ModelMatrix(flow_x, flow_y, time_delta, step_size, 0);
+        UpdateState(M, state, covar);
+
+        // Direct time integration on the grid.
+        EulerFiniteDifferenceDirect(conf, state2, flow_x, flow_y, time_delta, step_size);
+    }
+
+    max_rel_diff = std::max(max_rel_diff, NormVecDiff(state, state2) / NormVec(state));
+    EXPECT_LT(max_rel_diff, TOL) << "Relative error of exceeded tolerance";
+}
+
+//-------------------------------------------------------------------------------------------------
+// Function tests the matrix library written by means of Allscale API.
+//-------------------------------------------------------------------------------------------------
+TEST(ModelTests, Basic)
+{
+    // Read configuration settings.
+    Configuration conf;                             // a single global configuration
+    conf.ReadConfigFile("../../amdados.conf");
+    conf.PrintParameters();
+    MakeDirectory(conf.asCString("test_output_dir"));
+
+    std::string filename = conf.asString("test_output_dir") + "/model_test.log";
+    std::fstream fout(filename, std::ios::out | std::ios::trunc);
+    assert_true(fout.good()) << "failed to oped the summary file: " << filename << std::endl;
+
+    {
+        double max_rel_err = 0.0;
+        for (int testNo = 0; testNo < 3; ++testNo) {
+            TestEulerFiniteDifference< 37, 67>(conf, max_rel_err);
+            TestEulerFiniteDifference< 43, 53>(conf, max_rel_err);
+            TestEulerFiniteDifference< 73, 11>(conf, max_rel_err);
+            TestEulerFiniteDifference< 57, 67>(conf, max_rel_err);
+            TestEulerFiniteDifference< 89, 97>(conf, max_rel_err);
+            TestEulerFiniteDifference< 97, 17>(conf, max_rel_err);
+            TestEulerFiniteDifference< 37, 67>(conf, max_rel_err);
+            TestEulerFiniteDifference< 33, 41>(conf, max_rel_err);
+            TestEulerFiniteDifference< 89, 47>(conf, max_rel_err);
+            TestEulerFiniteDifference< 97, 41>(conf, max_rel_err);
+            TestEulerFiniteDifference<100,100>(conf, max_rel_err);
+        }
+        fout << "TestEulerFiniteDifference(): max. relative error: " << max_rel_err << std::endl;
+    }
+    fout << std::endl << std::flush;
+}
+

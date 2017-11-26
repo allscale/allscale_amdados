@@ -1,3 +1,9 @@
+#pragma once
+
+#ifdef ALLSCALE_WITH_HPX
+#include <hpx/runtime/serialization/string.hpp>
+#endif
+
 #include "allscale/utils/serializer.h"
 
 #include <string>

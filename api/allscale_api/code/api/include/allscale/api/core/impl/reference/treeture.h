@@ -392,18 +392,29 @@ namespace reference {
 		// the manager of all dependencies on members of this family
 		DependencyManager dependencies;
 
+		// a flag determining whether this is a top-level task family
+		// (it is not created nested by a treeture but by the main thread)
+		bool top_level;
+
 	public:
 
 		/**
 		 * Creates a new family, using a new ID.
 		 */
-		TaskFamily() : dependencies(getNextID()) {}
+		TaskFamily(bool top_level = false) : dependencies(getNextID()), top_level(top_level) {}
 
 		/**
 		 * Obtain the family ID.
 		 */
 		std::size_t getId() const {
 			return dependencies.getEpoch();
+		}
+
+		/**
+		 * Tests whether this task family is a top-level family (not nested).
+		 */
+		bool isTopLevel() const {
+			return top_level;
 		}
 
 		/**
@@ -452,7 +463,7 @@ namespace reference {
 
 	public:
 
-		TaskFamilyPtr getFreshFamily() {
+		TaskFamilyPtr getFreshFamily(bool topLevel) {
 			std::lock_guard<SpinLock> lease(lock);
 
 			// TODO: replace this by a re-use based solution
@@ -465,7 +476,7 @@ namespace reference {
 			*/
 
 			// create a new family
-			families.push_back(std::make_unique<TaskFamily>());
+			families.push_back(std::make_unique<TaskFamily>(topLevel));
 			return families.back().get();
 		}
 
@@ -473,9 +484,9 @@ namespace reference {
 
 
 	// a factory for a new task family
-	inline TaskFamilyPtr createFamily() {
+	inline TaskFamilyPtr createFamily(bool topLevel = false) {
 		static TaskFamilyManager familyManager;
-		return familyManager.getFreshFamily();
+		return familyManager.getFreshFamily(topLevel);
 	}
 
 
@@ -605,6 +616,9 @@ namespace reference {
 	template<std::size_t Size>
 	class dependencies<fixed_sized<Size>> {
 
+		template<std::size_t A, std::size_t B>
+		friend dependencies<fixed_sized<A+B>> concat(const dependencies<fixed_sized<A>>&, const dependencies<fixed_sized<B>>&);
+
 		std::array<task_reference,Size> list;
 
 	public:
@@ -635,6 +649,21 @@ namespace reference {
 		}
 
 	};
+
+	/**
+	 * Enables the concatentation of two fixed-sized dependencies lists.
+	 */
+	template<std::size_t A, std::size_t B>
+	dependencies<fixed_sized<A+B>> concat(const dependencies<fixed_sized<A>>& a, const dependencies<fixed_sized<B>>& b) {
+		dependencies<fixed_sized<A+B>> res;
+		for(std::size_t i=0; i<A; i++) {
+			res.list[i] = a.list[i];
+		}
+		for(std::size_t i=0; i<B; i++) {
+			res.list[A+i] = b.list[i];
+		}
+		return res;
+	}
 
 	/**
 	 * A specialization for dynamically sized task dependencies.
@@ -928,6 +957,8 @@ namespace reference {
 			return state;
 		}
 
+		// each implementation is required to provide a runtime predictor
+		virtual RuntimePredictor& getRuntimePredictor() const = 0;
 
 		// -- mutators --
 
@@ -1164,7 +1195,7 @@ namespace reference {
 		virtual void aggregate() =0;
 
 		void setSplitable(bool value = true) {
-			splitable = value;
+			splitable = value && getDepth() < 60;
 		}
 
 		void setSubstitute(TaskBase* newSub) {
@@ -1624,6 +1655,10 @@ namespace reference {
 			return value;
 		};
 
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			assert_fail() << "Should not be reachable, predictions only intresting for splitable tasks!";
+			return reference::getRuntimePredictor<void>();
+		}
 	};
 
 	template<>
@@ -1672,6 +1707,10 @@ namespace reference {
 
 		virtual void computeAggregate() {};
 
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			assert_fail() << "Should not be reachable, predictions only intresting for splitable tasks!";
+			return reference::getRuntimePredictor<void>();
+		}
 	};
 
 
@@ -1690,6 +1729,10 @@ namespace reference {
 
 		R computeValue() override {
 			return task();
+		}
+
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			return reference::getRuntimePredictor<Process>();
 		}
 
 	};
@@ -1728,6 +1771,10 @@ namespace reference {
 
 		bool split() override;
 
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			return reference::getRuntimePredictor<Process>();
+		}
+
 	};
 
 	template<typename R, typename A, typename B, typename C>
@@ -1757,6 +1804,10 @@ namespace reference {
 			return merge(left.getValue(),right.getValue());
 		}
 
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			assert_fail() << "Should not be reachable, predictions only intresting for splitable tasks!";
+			return reference::getRuntimePredictor<void>();
+		}
 	};
 
 	template<typename A, typename B>
@@ -1775,6 +1826,10 @@ namespace reference {
 			// nothing to do
 		}
 
+		virtual RuntimePredictor& getRuntimePredictor() const override {
+			assert_fail() << "Should not be reachable, predictions only intresting for splitable tasks!";
+			return reference::getRuntimePredictor<void>();
+		}
 	};
 
 	template<typename Deps, typename A, typename B, typename C, typename R = std::result_of_t<C(A,B)>>
@@ -1899,6 +1954,8 @@ namespace reference {
 
 	public:
 
+		using treeture_type = treeture<T>;
+
 		treeture() {}
 
 		treeture(const T& value)
@@ -2014,6 +2071,8 @@ namespace reference {
 
 		using value_type = T;
 
+		using treeture_type = treeture<T>;
+
 		unreleased_treeture(Task<T>* task)
 			: task(task) {}
 
@@ -2127,6 +2186,12 @@ namespace reference {
 		return done(after(),value);
 	}
 
+	namespace runtime {
+
+		// determines whether this thread is running in a nested context
+		bool isNestedContext();
+
+	}
 
 	namespace detail {
 
@@ -2138,7 +2203,7 @@ namespace reference {
 
 			// create task family if requested
 			if (root) {
-				task->adopt(createFamily());
+				task->adopt(createFamily(!runtime::isNestedContext()));
 			}
 
 			// done
@@ -2312,8 +2377,6 @@ namespace reference {
 
 			std::minstd_rand randGenerator;			
 
-			RuntimePredictor predictions;
-
 		public:
 
 			Worker(WorkerPool& pool, unsigned id)
@@ -2354,7 +2417,7 @@ namespace reference {
 			bool splitTask(TaskBase& task);
 
 			duration estimateRuntime(const TaskBase& task) {
-				return predictions.predictTime(task.getDepth());
+				return task.getRuntimePredictor().predictTime(task.getDepth());
 			}
 
 		public:
@@ -2543,6 +2606,15 @@ namespace reference {
 
 		}
 
+		inline bool& getIsNestedFlag() {
+			static thread_local bool nested = false;
+			return nested;
+		}
+
+		inline bool isNestedContext() {
+			return getIsNestedFlag();
+		}
+
 		inline void Worker::runTask(TaskBase& task) {
 
 			// the splitting of a task may provide a done substitute => skip those
@@ -2556,6 +2628,12 @@ namespace reference {
 			// make sure this is a ready task
 			assert_eq(TaskBase::State::Ready,task.getState());
 
+			// mark as nested
+			bool& nestedContextFlag = getIsNestedFlag();
+			bool old = nestedContextFlag;
+			nestedContextFlag = true;
+
+			// process the task
 			if (task.isSplit()) {
 				task.run();
 			} else {
@@ -2572,17 +2650,24 @@ namespace reference {
 
 				} else {
 
+					// get predictor before task by be gone (as part of the processing)
+					RuntimePredictor& predictor = task.getRuntimePredictor();
+
 					// take the time to make predictions
 					auto start = RuntimePredictor::clock::now();
 					task.run();
 					auto time = RuntimePredictor::clock::now() - start;
-					predictions.registerTime(level,time);
+
+					predictor.registerTime(level,time);
 
 				}
 
 				logProfilerEvent(ProfileLogEntry::createTaskEndedEntry(taskId));
 
 			}
+
+			// reset old nested context state
+			nestedContextFlag = old;
 
 			LOG_SCHEDULE("Finished task " << task);
 		}
@@ -2618,7 +2703,7 @@ namespace reference {
 
 			// TODO: do the following only for top-level tasks!!
 
-			if (!task.isOrphan()) {
+			if (!task.isOrphan() && task.getTaskFamily()->isTopLevel()) {
 
 				// get the limit for initial decomposition
 				auto split_limit = pool.getInitialSplitDepthLimit();
@@ -2700,6 +2785,8 @@ namespace reference {
 
 					LOG_SCHEDULE( "Splitting tasks @ queue size: " << queue.size() );
 
+
+
 					// split task and be done
 					if (splitTask(*t)) return true;
 
@@ -2780,7 +2867,7 @@ namespace reference {
 		setState(State::Blocked);
 
 		// if below the initial split limit, split this task
-		if (!isOrphan() && isSplitable() && getDepth() < runtime::WorkerPool::getInstance().getInitialSplitDepthLimit()) {
+		if (!isOrphan() && getTaskFamily()->isTopLevel() && isSplitable() && getDepth() < runtime::WorkerPool::getInstance().getInitialSplitDepthLimit()) {
 
 			// attempt to split this task
 			split();

@@ -1,10 +1,11 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "allscale/api/user/operator/pfor.h"
+#include "allscale/api/user/algorithm/pfor.h"
 #include "allscale/api/user/data/static_grid.h"
 
 using namespace allscale::api::user;
+using namespace allscale::api::user::algorithm;
 
 const int N = 100;
 

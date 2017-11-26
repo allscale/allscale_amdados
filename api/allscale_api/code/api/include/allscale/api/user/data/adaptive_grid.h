@@ -6,7 +6,7 @@
 #include "allscale/api/core/data.h"
 
 #include "allscale/api/user/data/grid.h"
-#include "allscale/api/user/operator/pfor.h"
+#include "allscale/api/user/algorithm/pfor.h"
 
 #include "allscale/utils/assert.h"
 #include "allscale/utils/serializer.h"
@@ -49,13 +49,12 @@ namespace data {
 		};
 	};
 
-	template<unsigned ... sizes>
-	struct size;
-
 	// structures for each Cell configuration and number of layers for nesting
-	template<typename Layers>
+	template<std::size_t Dims, typename Layers>
 	struct CellConfig {
+
 		enum {
+			dims = Dims,
 			num_layers = Layers::num_layers
 		};
 	};
@@ -65,6 +64,21 @@ namespace data {
 	};
 
 	namespace detail {
+
+		template<unsigned ... sizes>
+		struct size {
+			typedef size<sizes..., 1> next;
+		};
+
+		template<std::size_t Dims>
+		struct make_size {
+			typedef typename make_size<Dims - 1>::type::next type;
+		};
+
+		template<>
+		struct make_size<0> {
+			typedef size<> type;
+		};
 
 		template<typename T, std::size_t... Sizes>
 		std::vector<T> getBoundary(const Direction& dir, const utils::StaticGrid<T,Sizes...>& data) { // returns vector of boundary data in each direction
@@ -143,9 +157,12 @@ namespace data {
 	struct GridLayerData;
 
 	template <typename T, unsigned... Sizes, unsigned... Dims, typename... Rest>
-	struct GridLayerData<T, size<Sizes...>, layers<layer<Dims...>, Rest...>> {
+	struct GridLayerData<T, detail::size<Sizes...>, layers<layer<Dims...>, Rest...>> {
+		static_assert(sizeof...(Sizes) == sizeof...(Dims), "layer dimension has to be equal to the grid dimension.");
+
 		using data_type = utils::StaticGrid<T, Sizes...>;
-		using nested_type = GridLayerData<T, size<Sizes * Dims...>, layers<Rest...>>;
+		using nested_type = GridLayerData<T, detail::size<Sizes * Dims...>, layers<Rest...>>;
+		using addr_type = allscale::utils::Vector<int64_t, sizeof...(Sizes)>;
 
 		enum { layer_number = sizeof...(Rest) + 1 };
 
@@ -177,6 +194,27 @@ namespace data {
 			return nested.template getLayer<Layer>();
 		}
 
+		T& getData(unsigned layer, const addr_type& addr) {
+			if(layer == getLayerNumber()) {
+				return data[addr];
+			}
+			return nested.getData(layer, addr);
+		}
+
+		const T& getData(unsigned layer, const addr_type& addr) const {
+			if(layer == getLayerNumber()) {
+				return data[addr];
+			}
+			return nested.getData(layer, addr);
+		}
+
+		allscale::utils::Vector<std::size_t, sizeof...(Sizes)> getLayerSize(unsigned layer) {
+			if(layer == getLayerNumber()) {
+				return data.size();
+			}
+			return nested.getLayerSize(layer);
+		}
+
 		template <typename Op>
 		void forAllOnLayer(unsigned layer, const Op& op) {
 			if(layer == getLayerNumber()) {
@@ -191,7 +229,7 @@ namespace data {
 		void refineFromLayer(unsigned layer, const Refiner& refiner) {
 			if(layer == getLayerNumber()) {
 				// iterate over cells on nested layer
-				api::user::detail::forEach({0}, nested.data.size(), [&](const auto& index) {
+				api::user::algorithm::detail::forEach({0}, nested.data.size(), [&](const auto& index) {
 					// using the index of a cell on nested layer, computes index covering cell on this layer
 					auto newIndex = utils::elementwiseDivision(index, utils::elementwiseDivision(nested.data.size(), data.size()));
 					// simply replicate data to cell on nested layer
@@ -209,11 +247,11 @@ namespace data {
 				auto indexer = [&](const auto& index) { return utils::elementwiseProduct(index, utils::elementwiseDivision(nested.data.size(), data.size())); };
 
 				// iterate over cells on this layer
-				api::user::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
+				api::user::algorithm::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
 					const auto& res = refiner(data[index]);
 					auto begin = indexer(index);
 					auto end = indexer(index + decltype(index){1});
-					api::user::detail::forEach(begin, end, [&](const auto& i) {
+					api::user::algorithm::detail::forEach(begin, end, [&](const auto& i) {
 						nested.data[i] = res[i-indexer(index)];
 					});
 				});
@@ -230,12 +268,12 @@ namespace data {
 				auto indexer = [&](const auto& index) { return utils::elementwiseProduct(index, utils::elementwiseDivision(nested.data.size(), data.size())); };
 
 				// iterate over cells on this layer
-				api::user::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
+				api::user::algorithm::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
 					T sum = T();
 					// iterate over subset of cells on nested layer, to be projected to the current cell pointed to by index
 					auto begin = indexer(index);
 					auto end = indexer(index + decltype(index){1});
-					api::user::detail::forEach(begin, end, [&](const auto& i) {
+					api::user::algorithm::detail::forEach(begin, end, [&](const auto& i) {
 						sum += coarsener(nested.data[i]);
 					});
 					// compute divisor for average
@@ -257,11 +295,11 @@ namespace data {
 
 				// iterate over cells on this layer
 				utils::StaticGrid<T, Dims...> param;
-				api::user::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
+				api::user::algorithm::detail::forEach({ 0 }, data.size(), [&](const auto& index) {
 					// iterate over subset of cells on nested layer, to be projected to the current cell pointed to by index
 					auto begin = indexer(index);
 					auto end = indexer(index + decltype(index){1});
-					api::user::detail::forEach(begin, end, [&](const decltype(index)& i) {
+					api::user::algorithm::detail::forEach(begin, end, [&](const decltype(index)& i) {
 						param[i - indexer(index)] = nested.data[i];
 					});
 					data[index] = coarsener(param);
@@ -304,8 +342,10 @@ namespace data {
 	struct GridLayerData;
 
 	template <typename T, unsigned... Sizes>
-	struct GridLayerData<T, size<Sizes...>, layers<>> {
+	struct GridLayerData<T, detail::size<Sizes...>, layers<>> {
+
 		using data_type = utils::StaticGrid<T, Sizes...>;
+		using addr_type = allscale::utils::Vector<int64_t, sizeof...(Sizes)>;
 
 		// the values to be stored on this last layer
 		data_type data;
@@ -320,6 +360,21 @@ namespace data {
 		template <unsigned Layer>
 		typename std::enable_if<Layer == 0, const data_type&>::type getLayer() const {
 			return data;
+		}
+
+		T& getData(unsigned layer, const addr_type& addr) {
+			assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
+			return data[addr];
+		}
+
+		const T& getData(unsigned layer, const addr_type& addr) const {
+			assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
+			return data[addr];
+		}
+
+		allscale::utils::Vector<std::size_t, sizeof...(Sizes)> getLayerSize(unsigned layer) {
+			assert_eq(layer, 0) << "Error: trying to access layer " << layer << " --no such layer!";
+			return data.size();
 		}
 
 		template <typename Op>
@@ -362,8 +417,8 @@ namespace data {
 			writer.write(data);
 		}
 
-		static GridLayerData<T, size<Sizes...>, layers<>> load(utils::ArchiveReader& reader) {
-			GridLayerData<T, size<Sizes...>, layers<>> grid;
+		static GridLayerData<T, detail::size<Sizes...>, layers<>> load(utils::ArchiveReader& reader) {
+			GridLayerData<T, detail::size<Sizes...>, layers<>> grid;
 			grid.data = std::move(reader.read<data_type>());
 
 			return grid;
@@ -376,8 +431,10 @@ namespace data {
 	struct AdaptiveGridCell;
 
 
-	template<typename T, typename Layers>
-	struct AdaptiveGridCell<T, CellConfig<Layers>> {
+	template<typename T, typename Layers, std::size_t Dims>
+	struct AdaptiveGridCell<T, CellConfig<Dims, Layers>> {
+		using unit_size = typename detail::make_size<Dims>::type;
+		using addr_type = allscale::utils::Vector<int64_t, Dims>;
 
 		AdaptiveGridCell() = default;
 		AdaptiveGridCell(const AdaptiveGridCell& other) = delete;
@@ -387,13 +444,25 @@ namespace data {
 		unsigned active_layer = 0;
 
 		// the data stored in
-		GridLayerData<T, size<1, 1>, Layers> data;
+		GridLayerData<T, unit_size, Layers> data;
 
 		AdaptiveGridCell& operator=(const AdaptiveGridCell& other) {
 			if(this == &other) return *this;
 			active_layer = other.active_layer;
 			data = other.data;
 			return *this;
+		}
+
+		T& operator[](const addr_type& addr) {
+			return data.getData(active_layer, addr);
+		}
+
+		const T& operator[](const addr_type& addr) const {
+			return data.getData(active_layer, addr);
+		}
+
+		allscale::utils::Vector<std::size_t, Dims> getActiveLayerSize() {
+			return data.getLayerSize(active_layer);
 		}
 
 		void setActiveLayer(unsigned level) {
@@ -463,17 +532,17 @@ namespace data {
 		static AdaptiveGridCell load(utils::ArchiveReader& reader) {
 			AdaptiveGridCell cell;
 			cell.active_layer = std::move(reader.read<unsigned>());
-			cell.data = reader.read<GridLayerData<T, size<1, 1>, Layers>>();
+			cell.data = reader.read<GridLayerData<T, unit_size, Layers>>();
 			return cell;
 		}
 
 	};
 
 	template<typename T, typename CellConfig, std::size_t Dims = 2>
-	using AdaptiveGridFragment = GridFragment<AdaptiveGridCell<T, CellConfig>, Dims>;
+	using AdaptiveGridFragment = GridFragment<AdaptiveGridCell<T, CellConfig>, CellConfig::dims>;
 
-	template <typename T, typename CellConfig, std::size_t Dims>
-	using AdaptiveGrid = Grid<AdaptiveGridCell<T, CellConfig>, Dims>;
+	template <typename T, typename CellConfig>
+	using AdaptiveGrid = Grid<AdaptiveGridCell<T, CellConfig>, CellConfig::dims>;
 
 } // end namespace data
 } // end namespace user

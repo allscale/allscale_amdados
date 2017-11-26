@@ -5,7 +5,7 @@
 
 #include "allscale/api/core/data.h"
 
-#include "allscale/api/user/operator/pfor.h"
+#include "allscale/api/user/algorithm/pfor.h"
 
 #include "allscale/utils/assert.h"
 #include "allscale/utils/large_array.h"
@@ -203,9 +203,8 @@ namespace data {
 		point_type min;
 		point_type max;
 
-		GridBox() {}
-
 	public:
+		GridBox() {}
 
 		GridBox(coordinate_type N)
 			: min(0), max(N) {}
@@ -391,11 +390,6 @@ namespace data {
 			if (0 >= N) regions.clear();
 		}
 
-		GridRegion(coordinate_type A, coordinate_type B)
-			: regions({box_type(A,B)}) {
-			if (A >= B) regions.clear();
-		}
-
 		GridRegion(const point_type& size)
 			: regions({box_type(0,size)}) {
 			if (regions[0].empty()) regions.clear();
@@ -404,6 +398,7 @@ namespace data {
 		GridRegion(const point_type& min, const point_type& max)
 			: regions({box_type(min,max)}) {
 			assert_true(min.dominatedBy(max));
+			if (regions[0].empty()) regions.clear();
 		}
 
 		GridRegion(const box_type& box)
@@ -416,6 +411,10 @@ namespace data {
 
 		GridRegion& operator=(const GridRegion&) = default;
 		GridRegion& operator=(GridRegion&&) = default;
+
+		static GridRegion single(const point_type& p) {
+			return GridRegion(p,p+point_type(1));
+		}
 
 		box_type boundingBox() const {
 			// handle empty region
@@ -605,6 +604,9 @@ namespace data {
 		using size_type = GridPoint<Dims>;
 
 		size_type size;
+
+        GridSharedData()
+        {}
 
 		GridSharedData(const size_type& size)
 			: size(size) {}
@@ -841,14 +843,16 @@ namespace data {
 		 * Provides read/write access to one of the values stored within this grid.
 		 */
 		T& operator[](const coordinate_type& index) {
-			return data_item_element_access(*this, region_type(index), (*base)[index]);
+			allscale_check_bounds(index, (*this));
+			return data_item_element_access(*this, region_type::single(index), (*base)[index]);
 		}
 
 		/**
 		 * Provides read access to one of the values stored within this grid.
 		 */
 		const T& operator[](const coordinate_type& index) const {
-			return data_item_element_access(*this, region_type(index), (*base)[index]);
+			allscale_check_bounds(index, (*this));
+			return data_item_element_access(*this, region_type::single(index), (*base)[index]);
 		}
 
 		/**
@@ -857,7 +861,7 @@ namespace data {
 		 */
 		template<typename Op>
 		void forEach(const Op& op) const {
-			allscale::api::user::detail::forEach(
+			allscale::api::user::algorithm::detail::forEach(
 					coordinate_type(0),
 					size(),
 					[&](const auto& pos){
@@ -872,7 +876,7 @@ namespace data {
 		 */
 		template<typename Op>
 		void forEach(const Op& op) {
-			allscale::api::user::detail::forEach(
+			allscale::api::user::algorithm::detail::forEach(
 					coordinate_type(0),
 					size(),
 					[&](const auto& pos){
@@ -887,7 +891,7 @@ namespace data {
 		 */
 		template<typename Op>
 		auto pforEach(const Op& op) const {
-			return pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
+			return algorithm::pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
 		}
 
 		/**
@@ -896,7 +900,7 @@ namespace data {
 		 */
 		template<typename Op>
 		auto pforEach(const Op& op) {
-			return pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
+			return algorithm::pfor(coordinate_type(0), size(), [&](const auto& pos) { op((*this)[pos]); });
 		}
 
 	};

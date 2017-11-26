@@ -7,6 +7,7 @@
 CONF=Release
 FULL=false
 TEST=false
+TMP_DIR=/tmp/amdados
 
 # Print blank lines for better visibility.
 for i in {1..100}; do echo; done
@@ -73,14 +74,16 @@ elif ${FULL}; then
     cd ../
 fi
 
-# Generate ctags for Vim editor.
-ctags -R .
+# Generate ctags for Vim editor (ctags must exist).
+if [ -f /usr/bin/ctags ] ; then
+    ctags -R .
+fi
 
 # Building and, possibly, testing.
 cd ./build
 if $TEST; then
-    (make -j ${useNCPUs}) && (/bin/rm -fr ../output/*.log) && \
-        (ctest -j ${useNCPUs}) && (cat ../output/*.log)
+    (make -j ${useNCPUs}) && (/bin/rm -fr ${TMP_DIR}/*.log) && \
+        (ctest -j ${useNCPUs}) && (cat ${TMP_DIR}/*.log)
 else
     make -j ${useNCPUs}
 fi

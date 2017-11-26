@@ -9,7 +9,8 @@
 // Components to be included
 // 1) Grid structures specific to each subdomain
 //    Each grid structure contains information
-//    a) structures for three different layers of resolution: (100m (1) ; 20m(2); 4m(3))
+//    a) structures for three different layers of resolution:
+//       (100m (1) ; 20m(2); 4m(3))
 //    b) Solution on each layer
 //
 // 2) Mechanism to switch from layers 1, 2 & 3
@@ -20,8 +21,9 @@
 // 4) Data assimilation structures translated from api-prototype
 // 5) Matrix operation structures for DA
 // 6) Data assimilation solution
-// 7) File reads for initial conditions (simple assci format)
-// 8) File reads for flowfields and observation data (larger files in structured format)
+// 7) File reads for initial conditions (simple ascii format)
+// 8) File reads for flow fields and observation data
+//    (larger files in structured format)
 
 // Model Initialization & file read
 // Create structures here for read from file following variables:
@@ -41,7 +43,8 @@ int main(int argc, char ** argv)
     int scenario = 0;
     if (argc > 1) {
         if (argc > 2) {
-            std::cout << "ERROR: at most 1 input argument is expected" << std::endl;
+            std::cout << "ERROR: at most 1 input argument is expected"
+                      << std::endl;
             return 1;
         }
         if (!(std::istringstream(argv[1]) >> scenario)) {
@@ -49,7 +52,8 @@ int main(int argc, char ** argv)
             return 1;
         }
     }
-    std::cout << "Scenario: " << scenario << std::endl << std::endl << std::flush;
+    std::cout << "Scenario: " << scenario << std::endl
+              << std::endl << std::flush;
 
     switch (scenario) {
         case 0: {
@@ -57,7 +61,8 @@ int main(int argc, char ** argv)
             return Amdados2DMain();
         }
         break;
-        default: std::cout << "ERROR: unknown scenario: " << scenario << std::endl;
+        default: std::cout << "ERROR: unknown scenario: "
+                           << scenario << std::endl;
     }
     return 1;
 }

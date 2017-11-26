@@ -78,9 +78,11 @@ def InitDependentParams(conf):
     conf.observation_ny = round(conf.observation_ny)
     conf.integration_nsteps = round(conf.integration_nsteps)
 
+    # Diffusion coefficient must be positive float value.
     D = float(conf.diffusion_coef)
     assert D > 0
 
+    # Deduce space discretization steps.
     conf.problem_size = int(conf.nx * conf.ny)
     dx = float(conf.domain_size_x) / float(conf.nx-1)
     dy = float(conf.domain_size_y) / float(conf.ny-1)
@@ -99,6 +101,7 @@ def InitDependentParams(conf):
     conf.dt = dt
     conf.Nt = round(math.ceil(float(conf.integration_period) / dt))
 
+    # Compute coefficients that will be used in the finite-difference scheme.
     conf.rho_x = float(D * dt / dx**2)
     conf.rho_y = float(D * dt / dy**2)
 

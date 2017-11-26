@@ -9,46 +9,47 @@ namespace amdados {
 namespace app {
 namespace utils {
 
-//=================================================================================================
-// Class for computing Cholesky decomposition of a symmetric, squared, positive-definite matrix.
-// Once decomposition is done in constructor, the class instance can be used to solve linear
-// systems A*x = b and A*X = B, where x, b are vectors and X, B are matrices respectively.
-// The implementation was adopted from "Numerical Recipes" book, 3rd edition, chapter 2.9.
-//=================================================================================================
-template<int MSIZE>
+//=============================================================================
+// Class for computing Cholesky decomposition of a symmetric, squared,
+// positive-definite matrix. Once decomposition is done in constructor, the
+// class instance can be used to solve linear systems A*x = b and A*X = B,
+// where x, b are vectors and X, B are matrices respectively.
+// The implementation was adopted from "Numerical Recipes" book,
+// 3rd edition, chapter 2.9.
+//=============================================================================
 class Cholesky
 {
-public:
-    using vector_t = Vector<MSIZE>;
-    using matrix_t = Matrix<MSIZE,MSIZE>;
-
 private:
-    matrix_t m_L;               // lower triangular matrix of decomposition
+    Matrix m_L;     // lower triangular matrix of decomposition
 
 public:
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Constructor.
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 Cholesky() : m_L()
 {
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Function computes and stores Cholesky decomposition
 // of a positive-definite symmetric matrix: A = L * L^t.
-//-------------------------------------------------------------------------------------------------
-void Init(const matrix_t & A)
+//-----------------------------------------------------------------------------
+void Init(const Matrix & A)
 {
-    const double TINY = numeric_limits<double>::min() /
-		       std::pow(numeric_limits<double>::epsilon(),3);
+    const double TINY = std::numeric_limits<double>::min() /
+		       std::pow(std::numeric_limits<double>::epsilon(),3);
 
-    m_L = A;                // copy the input matrix, then carry out in-place decomposition
-    matrix_t & L = m_L;     // short-hand alias
+    assert_true(A.IsSquare());
+    const int N = A.NRows();    // problem size, A is square
+
+    m_L = A;                // copy the input matrix, then do decomposition
+    Matrix & L = m_L;       // short-hand alias
 
     // Compute the lower triangular matrix of Cholesky decomposition.
-    for (int i = 0; i < MSIZE; i++) {
-    for (int j = i; j < MSIZE; j++) {
-        assert_eq((L(j, i)), (L(i, j))) << "Cholesky expects a symmetric matrix";
+    for (int i = 0; i < N; i++) {
+    for (int j = i; j < N; j++) {
+        if (L(j, i) != L(i, j))
+            assert_true(0) << "Cholesky expects a symmetric matrix";
 
         double sum = L(i,j);
         for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * L(j,k); }
@@ -62,75 +63,86 @@ void Init(const matrix_t & A)
     }}
 
     // Put the upper triangular matrix to zero.
-    for (int i = 0; i < MSIZE; i++) {
-    for (int j = 0; j < i;     j++) { L(j,i) = 0.0; }}
+    for (int i = 0; i < N; i++) {
+    for (int j = 0; j < i; j++) { L(j,i) = 0.0; }}
 }
 
-//-------------------------------------------------------------------------------------------------
-// Function solves a linear system A*x = b, where A is the matrix whose Cholesky
-// decomposition was computed by the Init() function.
-//-------------------------------------------------------------------------------------------------
-void Solve(vector_t & x, const vector_t & b) const
+//-----------------------------------------------------------------------------
+// Function solves a linear system A*x = b, where A is the matrix whose
+// Cholesky decomposition was computed by the Init() function.
+//-----------------------------------------------------------------------------
+void Solve(Vector & x, const Vector & b) const
 {
-    const matrix_t & L = m_L;       // short-hand alias
+    const Matrix & L = m_L;         // short-hand alias
+    const int      N = L.NRows();   // problem size, L is symmetric
 
-    for (int i = 0; i < MSIZE; i++) {
+    bool ok = ((x.Size() == N) && (b.Size() == N));
+    assert_true(ok);
+
+    for (int i = 0; i < N; i++) {
         double sum = b(i);
         for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * x(k); }
         x(i) = sum / L(i,i);
     }
 
-    for (int i = MSIZE - 1; i >= 0; i--) {
+    for (int i = N - 1; i >= 0; i--) {
         double sum = x(i);
-        for (int k = i + 1; k < MSIZE; k++) { sum -= L(k,i) * x(k); }
+        for (int k = i + 1; k < N; k++) { sum -= L(k,i) * x(k); }
         x(i) = sum / L(i,i);
     }
 }
 
-//-------------------------------------------------------------------------------------------------
-// Function solves a collection of linear systems A*X = B, where A is the matrix whose Cholesky
-// decomposition was computed by the Init() function, X and B are the matrices of the same size.
-//-------------------------------------------------------------------------------------------------
-template<int NCOLS>
-void BatchSolve(Matrix<MSIZE,NCOLS> & X, const Matrix<MSIZE,NCOLS> & B) const
+//-----------------------------------------------------------------------------
+// Function solves a collection of linear systems A*X = B, where A is the
+// matrix whose Cholesky decomposition was computed by the Init() function,
+// X and B are the matrices of the same size.
+//-----------------------------------------------------------------------------
+void BatchSolve(Matrix & X, const Matrix & B) const
 {
-    const matrix_t & L = m_L;       // short-hand alias
+    const Matrix & L = m_L;         // short-hand alias
+    const int      N = L.NRows();   // problem size, L is square symmetric
+    const int      K = X.NCols();   // number of linear systems to solve
 
-    for (int c = 0; c < NCOLS; c++) {
-        for (int i = 0; i < MSIZE; i++) {
+    assert_true((N == X.NRows()) && X.SameSize(B));
+
+    for (int c = 0; c < K; c++) {
+        for (int i = 0; i < N; i++) {
             double sum = B(i,c);
             for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * X(k,c); }
             X(i,c) = sum / L(i,i);
         }
 
-        for (int i = MSIZE - 1; i >= 0; i--) {
+        for (int i = N - 1; i >= 0; i--) {
             double sum = X(i,c);
-            for (int k = i + 1; k < MSIZE; k++) { sum -= L(k,i) * X(k,c); }
+            for (int k = i + 1; k < N; k++) { sum -= L(k,i) * X(k,c); }
             X(i,c) = sum / L(i,i);
         }
     }
 }
 
-//-------------------------------------------------------------------------------------------------
-// Function solves a collection of linear systems A*X = B^t with transposed righ-hand size,
-// where A is the matrix whose Cholesky decomposition was computed by the Init() function,
-// X and B^t are the matrices of the same size.
-//-------------------------------------------------------------------------------------------------
-template<int NCOLS>
-void BatchSolveTr(Matrix<MSIZE,NCOLS> & X, const Matrix<NCOLS,MSIZE> & Bt) const
+//-----------------------------------------------------------------------------
+// Function solves a collection of linear systems A*X = B with transposed
+// right-hand size B^t, where A is the matrix whose Cholesky decomposition was
+// computed by the Init() function, X and B are the same size matrices.
+//-----------------------------------------------------------------------------
+void BatchSolveTr(Matrix & X, const Matrix & Bt) const
 {
-    const matrix_t & L = m_L;       // short-hand alias
+    const Matrix & L = m_L;         // short-hand alias
+    const int      N = L.NRows();   // problem size, L is square symmetric
+    const int      K = X.NCols();   // number of linear systems to solve
 
-    for (int c = 0; c < NCOLS; c++) {
-        for (int i = 0; i < MSIZE; i++) {
-            double sum = Bt(c,i);                                           // transposed B
+    assert_true((N == X.NRows()) && X.SameSizeTr(Bt));
+
+    for (int c = 0; c < K; c++) {
+        for (int i = 0; i < N; i++) {
+            double sum = Bt(c,i);       // transposed B
             for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * X(k,c); }
             X(i,c) = sum / L(i,i);
         }
 
-        for (int i = MSIZE - 1; i >= 0; i--) {
+        for (int i = N - 1; i >= 0; i--) {
             double sum = X(i,c);
-            for (int k = i + 1; k < MSIZE; k++) { sum -= L(k,i) * X(k,c); }
+            for (int k = i + 1; k < N; k++) { sum -= L(k,i) * X(k,c); }
             X(i,c) = sum / L(i,i);
         }
     }

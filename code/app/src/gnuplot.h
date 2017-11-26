@@ -1,3 +1,4 @@
+#pragma once
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
@@ -48,10 +49,12 @@ bool PipeClose(FILE * p) {
     return !(pclose(p) == -1);
 }
 
-// Function checks existence of 'DISPLAY' environmental variable (and hence the display).
+// Function checks existence of 'DISPLAY' environmental variable
+// (and hence the display).
 bool CheckDisplayExists() {
     if (getenv("DISPLAY") != NULL) return true;
-    std::cout << "WARNING: 'DISPLAY' environment variable does not exist" << std::endl;
+    std::cout << "WARNING: 'DISPLAY' environment variable does not exist"
+              << std::endl;
     return false;
 }
 
@@ -60,10 +63,12 @@ bool CheckDisplayExists() {
 std::string GetProgramPath(const char * user_specified)
 {
     std::string filename;
+    const int   PathLen = static_cast<int>(sizeof(GnuplotPath) /
+                                           sizeof(GnuplotPath[0]));
 
-    // First look in standard folders. Start from user supplied path to Gnuplot.
-    for (int i = -1; i < static_cast<int>(sizeof(GnuplotPath)/sizeof(GnuplotPath[0])); ++i) {
-        if (i < 0) {                            // first check the user specified location
+    // First look in standard folders starting from user supplied Gnuplot path.
+    for (int i = -1; i < PathLen; ++i) {
+        if (i < 0) {        // first check the user specified location
             if (user_specified != nullptr) {
                 filename = std::string(user_specified) + "/" +  GnuplotName;
                 if (CheckGnuplotExists(filename))
@@ -89,10 +94,10 @@ std::string GetProgramPath(const char * user_specified)
 
     // Split the path string into a list of strings.
     for (size_t i = 0; i < pathStr.size();) {
-        i = pathStr.find_first_not_of(" \t\r\n", i);         // skip leading white-spaces
+        i = pathStr.find_first_not_of(" \t\r\n", i);    // skip leading spaces
         if (i == std::string::npos)
-            break;                                           // nothing left
-        size_t e = pathStr.find_first_of(PathDelimiter, i);  // end of the token
+            break;                                          // nothing left
+        size_t e = pathStr.find_first_of(PathDelimiter, i); // end of the token
         if (e == std::string::npos) {
             ls.push_back(pathStr.substr(i));
             break;
@@ -103,14 +108,14 @@ std::string GetProgramPath(const char * user_specified)
     }
 
     // Scan list for Gnuplot program files.
-    for (std::list<std::string>::const_iterator i = ls.begin(); i != ls.end(); ++i) {
+    for (auto i = ls.cbegin(); i != ls.cend(); ++i) {
         filename = (*i) + "/" +  GnuplotName;
         if (CheckGnuplotExists(filename))
             return filename;
     }
 
-    std::cout << "WARNING: cannot find Gnuplot in PATH, standard or user-specified folder(s)"
-              << std::endl;
+    std::cout << "WARNING: cannot find Gnuplot in PATH, "
+              << "standard or user-specified folder(s)" << std::endl;
     return std::string();
 }
 
@@ -119,14 +124,15 @@ std::string GetProgramPath(const char * user_specified)
 } // anonymous namespace
 } // namespace details
 
-//=================================================================================================
-/** C++ wrapper to Gnuplot command interface. It opens a pipe to Gnuplot application and pushes
- *  commands and data (image in a textual form) through the pipe. */
-//=================================================================================================
+//=============================================================================
+/** C++ wrapper to Gnuplot command interface. It opens a pipe to Gnuplot
+ *  application and pushes commands and data (image in a textual form) through
+ *  the pipe. */
+//=============================================================================
 class Gnuplot
 {
 private:
-    FILE *            mPipe;    ///< pointer to the stream that can be used to write to the pipe
+    FILE *            mPipe;    ///< pointer to the pipe stream
     bool              mValid;   ///< validation of Gnuplot session
     std::vector<char> mBuffer;  ///< command buffer
 
@@ -134,16 +140,18 @@ private:
     Gnuplot(const Gnuplot &);
     Gnuplot & operator=(const Gnuplot &);
 
-//-------------------------------------------------------------------------------------------------
-/** Function closes connection to Gnuplot process, clears this object and returns false. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+/** Function closes connection to Gnuplot process, clears this object and
+ *  returns false. */
+//-----------------------------------------------------------------------------
 bool Clear()
 {
     if (mPipe != nullptr) {
         if (details::PipeClose(mPipe)) {
             std::cout << "Gnuplot session was closed normally" << std::endl;
         } else {
-            std::cout << "WARNING: failed to close Gnuplot session" << std::endl;
+            std::cout << "WARNING: failed to close Gnuplot session"
+                      << std::endl;
         }
     }
     mPipe = NULL;
@@ -152,12 +160,12 @@ bool Clear()
 }
 
 public:
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 /** Constructor sets the optional alternative (non-standard) Gnuplot path.
  *  \note For windows: use path with slash '/' not backslash '\' .
  *  \param  path  user-specified path to Gnuplot.
  *  \param  args  Gnuplot command-line arguments. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 explicit Gnuplot(const char * path = nullptr, const char * args = nullptr)
 : mPipe(nullptr), mValid(false), mBuffer()
 {
@@ -174,21 +182,22 @@ explicit Gnuplot(const char * path = nullptr, const char * args = nullptr)
             return;
         }
     }
-    std::cout << "WARNING: failed to open Gnuplot session, plotting is unavailable" << std::endl;
+    std::cout << "WARNING: failed to open Gnuplot session, "
+              << "plotting is unavailable" << std::endl;
     Clear();
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 /** Destructor closes connection to Gnuplot process. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 virtual ~Gnuplot()
 {
     Clear();
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 /** Function sends a command to an active Gnuplot session. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 Gnuplot & Command(const char * command)
 {
     if (mValid && (command != nullptr)) {
@@ -198,10 +207,11 @@ Gnuplot & Command(const char * command)
     return (*this);
 }
 
-//-------------------------------------------------------------------------------------------------
-// Function repeats the last 'plot' or 'splot' command. This can be useful for viewing a plot
-// with different set options or when generating the same plot for several devices,
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function repeats the last 'plot' or 'splot' command. This can be useful for
+// viewing a plot with different set options or when generating the same plot
+// for several devices.
+//-----------------------------------------------------------------------------
 Gnuplot & Replot()
 {
     if (mValid) {
@@ -211,9 +221,9 @@ Gnuplot & Replot()
     return (*this);
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 /** Function resets a Gnuplot session and sets all variables to default. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 Gnuplot & ResetAll()
 {
     if (mValid) {
@@ -224,54 +234,58 @@ Gnuplot & ResetAll()
     return (*this);
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 /** Function sets the standard (screen) terminal. */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 Gnuplot & SetStdTerminal()
 {
     if (mValid) {
-        std::fprintf(mPipe, "set output\nset terminal %s\n", details::StdTerminal);
+        std::fprintf(mPipe, "set output\nset terminal %s\n",
+                        details::StdTerminal);
         std::fflush(mPipe);
     }
     return (*this);
 }
 
-//-------------------------------------------------------------------------------------------------
-/** Function saves a Gnuplot session to a postscript file, filename without extension.
- *  Default name is "gnuplot_output". */
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+/** Function saves a Gnuplot session to a postscript file, filename without
+ *  extension. Default name is "gnuplot_output". */
+//-----------------------------------------------------------------------------
 Gnuplot & SetPostscriptTerminal(const char * filename)
 {
     if (mValid) {
         if (filename == nullptr) filename = "gnuplot_output";
-        fprintf(mPipe, "set terminal postscript color\nset output \"%s.ps\"\n", filename);
+        fprintf(mPipe, "set terminal postscript color\nset output \"%s.ps\"\n",
+                filename);
         fflush(mPipe);
     }
     return (*this);
 }
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Function plots greyscaled image (Gnuplot 4.2+).
-// It is assumed that a pixel value at (x,y) is addressed as follows: image[x + width * y],
+// It is assumed that a pixel value at (x,y) is addressed as follows:
+//      image[x + width * y],
 // i.e., abscissa changes faster then ordinate.
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
                         const std::string & title, bool flipY = false)
 {
     if (!mValid) return (*this);
     assert_true((image != nullptr) && (width > 0) && (height > 0));
 
-    const size_t expected_size = 1024 + 4*width*height; // header size + 4 bytes per pixel
+    // header size + 4 bytes per pixel
+    const size_t expected_size = 1024 + 4*width*height;
     if (mBuffer.size() < expected_size) mBuffer.resize(expected_size, '\0');
 
     while (1) {
         long   N = static_cast<long>(mBuffer.size());
         char * p = mBuffer.data();
-        std::fill(mBuffer.begin(), mBuffer.end(), 0);   // not actually necessary but just in case
+        std::fill(mBuffer.begin(), mBuffer.end(), 0); // zero-init just in case
 
         // Write the header.
         long n = snprintf(p, static_cast<size_t>(N),
-            "\t\t\t\t\t\t\t"                        // sometimes pipe "swallows" the first symbol
+            "\t\t\t\t\t\t\t"    // sometimes pipe "swallows" the first symbol
             /*"set terminal x11\n"*/
             "unset key\n"
             "set title \"%s\"\n"
@@ -282,23 +296,27 @@ Gnuplot & PlotGrayImage(const unsigned char * image, int width, int height,
             "set tics out\n"
             "set autoscale noextend\n"      // keepfix
             "unset logscale\n"
-            "plot '-' matrix with image pixels\n", title.c_str(), (width-1), (height-1));
+            "plot '-' matrix with image pixels\n",
+            title.c_str(), (width-1), (height-1));
         // Return upon error, otherwise proceed if buffer is not overwhelmed.
         if (n < 0) {
-            std::cout << "WARNING: snprintf() failed to create a Gnuplot command" << std::endl;
+            std::cout << "WARNING: snprintf() failed to create "
+                      << "a Gnuplot command" << std::endl;
             return (*this);
         } else if (n < N) {
             p += n;             // advance pointer right beyond the header
             N -= n;             // reduce effective size
 
-            // Copy image into string buffer in textual form. I use 'n+9 < N' guard to exclude
-            // any possibility to overrun the buffer (actually 'n+5' would be enough).
+            // Copy image into string buffer in textual form. I use 'n+9 < N'
+            // guard to exclude any possibility to overrun the buffer
+            // (actually 'n+5' would be enough).
             n = 0;
             for (int y = 0; y < height; ++y) {
                 const int yy = flipY ? (height-1-y) : y;
                 for (int x = 0; x < width; ++x) {
-                    if (n+9 < N) {  // convert unsigned char into up to 3-char string
-                        div_t res = div(static_cast<int>(image[x + width * yy]), 100);
+                    if (n+9 < N) {  // convert uchar into up to 3-char string
+                        div_t res = div(static_cast<int>(
+                                        image[x + width * yy]), 100);
                         if (res.quot > 0) {             // pixel value >= 100
                             p[n++] = '0' + res.quot;
                             res = div(res.rem, 10);
@@ -352,13 +370,14 @@ namespace amdados {
 namespace app {
 namespace gnuplot {
 
-//=================================================================================================
+//=============================================================================
 /** Stub Gnuplot class does nothing. */
-//=================================================================================================
+//=============================================================================
 class Gnuplot
 {
 public:
-    explicit Gnuplot(const char * a = nullptr, const char * b = nullptr) { (void)a; (void)b; }
+    explicit Gnuplot(const char * a = nullptr, const char * b = nullptr)
+                     { (void)a; (void)b; }
     virtual ~Gnuplot() {}
     Gnuplot & Command(const char *) { return *this; }
     Gnuplot & Replot() { return *this; }
@@ -366,7 +385,8 @@ public:
     Gnuplot & SetStdTerminal() { return *this; }
     Gnuplot & SetPostscriptTerminal(const char *) { return *this; }
     Gnuplot & PlotGrayImage(const unsigned char *, int, int,
-                        const std::string &, bool flipY = false) { (void)flipY; return *this; }
+                            const std::string &, bool flipY = false)
+                            { (void)flipY; return *this; }
 };
 
 } // namespace gnuplot
