@@ -1,0 +1,30 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c) 2017
+#------------------------------------------------------------------------------
+
+echo
+echo "Converting a sequence of PGM images into AVI file"
+echo "Prerequisites: (1) ImageMagick; (2) ffmpeg."
+echo
+
+# N O T E: any subsequent(*) commands which fail will cause
+# the shell script to exit immediately:
+set -e
+
+NAME=field
+sync
+for f in ./output/${NAME}*.pgm; do convert $f ${f%.*}__tmp__.png; done
+sync
+ffmpeg -y -f image2 -framerate 24 -pattern_type \
+    glob -i './output/*__tmp__.png' ./output/${NAME}.avi
+sync
+/bin/rm ./output/*__tmp__.png
+sync
+
+echo
+echo "done"
+echo
+echo
+

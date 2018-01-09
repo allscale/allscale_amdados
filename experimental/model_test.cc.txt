@@ -17,8 +17,8 @@ using ::std::flush;
 using ::std::numeric_limits;
 using ::std::string;
 
-using namespace amdados::app;
-using namespace amdados::app::utils;
+using namespace amdados;
+using namespace amdados;
 
 // Tolerance on relative error.
 const double TOL = std::sqrt(numeric_limits<double>::epsilon());

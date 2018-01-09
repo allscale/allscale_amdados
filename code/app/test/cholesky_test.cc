@@ -11,12 +11,9 @@
 #include <fstream>
 #include <string>
 #include <limits>
-#include "amdados/app/utils/amdados_utils.h"
-#include "amdados/app/utils/matrix.h"
-#include "amdados/app/utils/cholesky.h"
-
-using namespace ::amdados::app;
-using namespace ::amdados::app::utils;
+#include "../include/amdados_utils.h"
+#include "../include/matrix.h"
+#include "../include/cholesky.h"
 
 // Tolerance on relative error.
 const double TOL = std::pow(std::numeric_limits<double>::epsilon(), 0.25);
@@ -27,6 +24,7 @@ const double TOL = std::pow(std::numeric_limits<double>::epsilon(), 0.25);
 //-----------------------------------------------------------------------------
 void TestCholeskyGivenProblemSize(double & max_rel_err, const int N)
 {
+    using namespace ::amdados;
     const int K = N % 37 + 7;
 
     // Create a random, square, symmetric, positive-definite matrix A:
@@ -95,8 +93,9 @@ void TestCholeskyGivenProblemSize(double & max_rel_err, const int N)
 TEST(Cholesky, Basic)
 {
     // Open the output log-file.
-    std::fstream log_file;
-    OpenTextFileForUnitTest(log_file, "cholesky_test.log");
+    std::string fname = "cholesky_test.log";
+    std::fstream log_file(fname, std::ios::out | std::ios::trunc);
+    assert_true(log_file.good()) << "failed to open: " << fname << std::endl;
 
     double max_rel_err = 0.0;
     for (int n = 1; n < 127; ++n) {

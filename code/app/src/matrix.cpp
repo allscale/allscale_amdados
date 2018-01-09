@@ -3,18 +3,13 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
-#include <iostream>
-#include <fstream>
-#include <iomanip>
+#include "allscale/utils/assert.h"
 #include <algorithm>
 #include <random>
-#include "allscale/utils/assert.h"
-#include "amdados/app/utils/amdados_utils.h"
-#include "amdados/app/utils/matrix.h"
+#include "../include/amdados_utils.h"
+#include "../include/matrix.h"
 
 namespace amdados {
-namespace app {
-namespace utils {
 
 //-----------------------------------------------------------------------------
 // Matrix multiplication: result = A * B.
@@ -246,40 +241,5 @@ bool CheckNoNan(const VectorView & v)
     return true;
 }
 
-//-----------------------------------------------------------------------------
-// TODO: Allscale IO.
-//-----------------------------------------------------------------------------
-void WriteVector(const Vector & vec, const std::string & filename, int precision)
-{
-    std::fstream f(filename, std::ios::out | std::ios::trunc);
-    assert_true(f.good());
-    precision = std::min(std::max(precision, 2), 16);
-    for (int i = 0; i < vec.Size(); i++) {
-        f << std::setprecision(precision) << vec(i) << " ";
-    }
-    f << std::endl << std::flush;
-}
-
-//-----------------------------------------------------------------------------
-// TODO: Allscale IO.
-//-----------------------------------------------------------------------------
-void WriteMatrix(const Matrix & A, const std::string & filename, int precision)
-{
-    const int nrows = A.NRows();
-    const int ncols = A.NCols();
-    std::fstream f(filename, std::ios::out | std::ios::trunc);
-    assert_true(f.good());
-    precision = std::min(std::max(precision, 2), 16);
-    for (int r = 0; r < nrows; r++) {
-    for (int c = 0; c < ncols; c++) {
-        f << std::setprecision(precision) << A(r,c) << " ";
-    }
-        f << std::endl;
-    }
-    f << std::flush;
-}
-
-} // end namespace utils
-} // end namespace app
-} // end namespace amdados
+} // namespace amdados
 

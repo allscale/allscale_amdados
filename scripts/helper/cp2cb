@@ -1,8 +1,8 @@
 #!/bin/bash
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Albert Akhriev, albert_akhriev@ie.ibm.com
 # IBM Research Dublin (c)
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 echo "Copying the project to the blade machine ..."
 
@@ -15,7 +15,7 @@ rsync -arv \
 --exclude 'Results' --exclude 'tags' --exclude "octave-workspace" \
 --exclude '*.*.swp' --exclude '*~' --exclude '*.swo' --exclude '*.log' \
 --exclude 'documentation'  --exclude 'doc' --exclude 'experimental' \
---exclude '__pycache__' \
+--exclude '__pycache__' --exclude 'simulation_results' \
 ../allscale_amdados ${DESTIN}
 
 echo ""

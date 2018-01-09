@@ -1,42 +1,161 @@
 #!/bin/bash
-#-----------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
 # Copyright : IBM Research Ireland, 2017
-#-----------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 CONF=Release
 FULL=false
 TEST=false
-TMP_DIR=/tmp/amdados
 
-# Print blank lines for better visibility.
-for i in {1..100}; do echo; done
+TEST_DIR=app
+BUILD_DIR=build
+OUTPUT_DIR=output
 
-# Any subsequent(*) commands which fail will cause the shell script to exit immediately:
+RAMDISK=
+NO_RAMDISK=false
+RAMDISK_SIZE=128
+
+LINUX=false
+MACOS=false
+useNCPUs=1
+
+if [[ "$(uname)" == 'Linux' ]]; then
+    LINUX=true
+    # This custom script (if presents) activates a fresh
+    # g++ compiler on RedHat 7 system.
+    if [ -f ${HOME}/bin/enable-gcc6.sh ]; then
+        source ${HOME}/bin/enable-gcc6.sh
+    fi
+elif [[ "$(uname)" == 'Darwin' ]]; then
+    MACOS=true
+fi
+
+# N O T E: any subsequent(*) commands which fail will cause
+# the shell script to exit immediately:
 set -e
 
-# Print a visual separator between script runs.
-echo
-echo
-echo
-echo
-echo
-echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
-echo
+# Function retrieves the number of available CPUs on this computer.
+GetNumberCPUs()
+{
+    # Get the number of CPUs to run building and testing.
+    if ${LINUX}; then
+        NCPUs=$(grep -c ^processor /proc/cpuinfo)
+    elif ${MACOS}; then
+        NCPUs=$(sysctl -n hw.ncpu)
+    fi
+    echo "Number of available CPUs: ${NCPUs}"
+    ONE=1
+    useNCPUs=$((NCPUs-ONE))
+    echo "Number of CPUs used for building and testing: ${useNCPUs}"
+    echo
+}
 
-# Get the number of CPUs to run building and testing.
-if [[ "$(uname)" == 'Linux' ]]; then
-    NCPUs=$(grep -c ^processor /proc/cpuinfo)
-elif [[ "$(uname)" == 'Darwin' ]]; then
-    NCPUs=$(sysctl -n hw.ncpu)
-    #alias gcc="/usr/local/bin/gcc-7"
-    #alias g++="/usr/local/bin/g++-7"
-fi
-echo "Number of available CPUs: ${NCPUs}"
-ONE=1
-useNCPUs=$((NCPUs-ONE))
-echo "Number of CPUs used for building and testing: ${useNCPUs}"
+# Function creates symbolic link from $1 to $RAMDISK/$1.
+MakeSymbolicLink()
+{
+    if ${LINUX}; then
+        if [ ! -d $1 ]; then
+            mkdir -p ${RAMDISK}/$1
+            ln -svd ${RAMDISK}/$1 $1
+        fi
+    elif ${MACOS}; then
+        if [ ! -d $1 ]; then
+            mkdir -p ${RAMDISK}/$1
+            ln -sv  ${RAMDISK}/$1 $1
+        fi
+    fi
+}
+
+# Function creates the build and the output directories.
+# Folders will be created inside a ramdisk for performance.
+MakeFolders()
+{
+    if ${NO_RAMDISK}; then
+        mkdir -p ${BUILD_DIR}
+        mkdir -p ${OUTPUT_DIR}
+        sync
+    elif ${LINUX}; then
+        RAMDISK=/dev/shm/allscale
+        mkdir -p ${RAMDISK}
+        mkdir -p ${RAMDISK}/${BUILD_DIR}
+        mkdir -p ${RAMDISK}/${OUTPUT_DIR}
+        sync
+        MakeSymbolicLink ${BUILD_DIR}
+        MakeSymbolicLink ${OUTPUT_DIR}
+    elif ${MACOS}; then
+        RAMDISK=/Volumes/ramdisk
+        if [ -d ${RAMDISK} ]; then
+            echo "Ramdisk already exists: ${RAMDISK}"
+        else
+            echo "Creating a ramdisk ..."
+            /bin/rm -fr ${BUILD_DIR}
+            /bin/rm -fr ${OUTPUT_DIR}
+            sync
+            bash ./scripts/helper/ramdisk_mac.sh create ${RAMDISK_SIZE}
+            mkdir -p ${RAMDISK}/${BUILD_DIR}
+            mkdir -p ${RAMDISK}/${OUTPUT_DIR}
+            echo "Ramdisk: ${RAMDISK}"
+        fi
+        sync
+        MakeSymbolicLink ${BUILD_DIR}
+        MakeSymbolicLink ${OUTPUT_DIR}
+    else
+        echo "Unknown OS"
+        exit 1
+    fi
+
+    echo "Build directory: ${BUILD_DIR}"
+    echo "Output directory: ${OUTPUT_DIR}"
+    echo
+    echo
+}
+
+# Function invokes cmake to configure the project files.
+Configure()
+{
+    CURR_DIR=$(pwd)
+    if ${FULL}; then
+        /bin/rm -fr ${BUILD_DIR}/*
+    fi
+    cd ${BUILD_DIR}
+    cmake -DCMAKE_BUILD_TYPE=${CONF} ${CURR_DIR}/code
+    cd ${CURR_DIR}
+}
+
+# Function generate ctags for Vim editor (ctags must exist).
+GenerateCTags()
+{
+    if [ -f /usr/bin/ctags ] ; then
+        ctags -R .
+    elif [ -f /usr/local/bin/ctags ] ; then
+        ctags -R .
+    fi
+}
+
+# Function builds the application and, possibly, runs the unit tests.
+BuildAndTest()
+{
+    cd ${BUILD_DIR}
+    if $TEST ; then
+        KALMAN_PY=${CURR_DIR}/code/app/test/kalman_test_plot.py
+        KALMAN_OUT=${TEST_DIR}/kalman_test.out
+
+        (make -j ${useNCPUs}) && \
+            (/bin/rm -fr ${TEST_DIR}/*.log) && \
+            (/bin/rm -fr ${TEST_DIR}/*.out) && \
+            (ctest -j ${useNCPUs}) && \
+            (cat ${TEST_DIR}/*.log) # && (python3 ${KALMAN_PY} ${KALMAN_OUT})
+    else
+        make -j ${useNCPUs}
+    fi
+    cd ${CURR_DIR}
+}
+
+# Print blank lines and a visual separator for better visibility.
+for i in {1..100}; do echo; done
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+echo "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
 echo
 
 # Parse the command line arguments.
@@ -61,33 +180,12 @@ while getopts ":fdrt" opt; do
     esac
 done
 
-# Configure, if needed.
-if [ ! -d "build" ]; then
-    mkdir -p build
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
-    cd ../
-elif ${FULL}; then
-    /bin/rm -fr build/*
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=${CONF} ../code
-    cd ../
-fi
+GetNumberCPUs
+MakeFolders
+Configure
+GenerateCTags
+BuildAndTest
 
-# Generate ctags for Vim editor (ctags must exist).
-if [ -f /usr/bin/ctags ] ; then
-    ctags -R .
-fi
-
-# Building and, possibly, testing.
-cd ./build
-if $TEST; then
-    (make -j ${useNCPUs}) && (/bin/rm -fr ${TMP_DIR}/*.log) && \
-        (ctest -j ${useNCPUs}) && (cat ${TMP_DIR}/*.log)
-else
-    make -j ${useNCPUs}
-fi
-cd ../
 echo
 echo
 

@@ -5,18 +5,14 @@
 
 #include "allscale/utils/assert.h"
 #include <cmath>
-#include <iostream>
 #include <fstream>
 #include <sstream>
-#include <iomanip>
-#include <string>
 #include <limits>
 #include <map>
-#include "amdados/app/utils/configuration.h"
+#include "../include/debugging.h"
+#include "../include/configuration.h"
 
 namespace amdados {
-namespace app {
-namespace utils {
 
 //-----------------------------------------------------------------------------
 // Constructor.
@@ -28,7 +24,7 @@ Configuration::Configuration() : m_params()
 //-----------------------------------------------------------------------------
 // Function reads parameters from the configuration file.
 //-----------------------------------------------------------------------------
-void Configuration::ReadConfigFile(const char * filename)
+void Configuration::ReadConfigFile(const std::string & filename)
 {
     std::fstream f(filename, std::ios::in);
     assert_true(f.good()) << "ERROR: failed to open configuration file"
@@ -76,23 +72,26 @@ void Configuration::ReadConfigFile(const char * filename)
 }
 
 //-----------------------------------------------------------------------------
-// Function prints out all the parameters.
+// Function prints out all the parameters in debugging mode,
+// otherwise prints nothing.
 //-----------------------------------------------------------------------------
-void Configuration::PrintParameters(std::ostream & out) const
+void Configuration::PrintParameters() const
 {
-    out << std::endl << "Parameters:" << std::endl;
+#ifdef AMDADOS_DEBUGGING
+    std::cout << std::endl << "Parameters:" << std::endl;
     for (const auto & p : m_params) {
-        out << p.second.name << " : ";
+        std::cout << p.second.name << " : ";
         switch (p.second.type) {
-            case NUMERIC_T : out << p.second.dvalue << std::endl;
+            case NUMERIC_T : std::cout << p.second.dvalue << std::endl;
                              break;
-            case STRING_T  : out << p.second.svalue << std::endl;
+            case STRING_T  : std::cout << p.second.svalue << std::endl;
                              break;
             default        : assert_fail() << "never get here" << std::endl;
                              break;
         }
     }
-    out << std::endl;
+    std::cout << std::endl;
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -174,6 +173,14 @@ const char * Configuration::asCString(const char * param_name) const
 }
 
 //-----------------------------------------------------------------------------
+// Function returns "true" if parameter has an integer value.
+//-----------------------------------------------------------------------------
+bool Configuration::IsInteger(const char * param_name) const
+{
+    return (asDouble(param_name) == asInt(param_name));
+}
+
+//-----------------------------------------------------------------------------
 // Function initializes an integer parameter.
 //-----------------------------------------------------------------------------
 void Configuration::SetInt(const char * param_name, int value)
@@ -216,7 +223,5 @@ void Configuration::SetString(const char * param_name, const char * value)
     }
 }
 
-} // end namespace utils
-} // end namespace app
-} // end namespace allscale
+} // namespace amdados
 

@@ -1,0 +1,37 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c) 2017
+#------------------------------------------------------------------------------
+
+echo
+echo "Playing the fields from data-assimilation simulation"
+echo "along with the 'true' ones produced by Python script."
+echo "Prerequisites: mplayer"
+echo
+
+AVI1=$1
+AVI2=$2
+
+if [ ! -f ${AVI1} ]; then
+    echo "ERROR: file ${AVI1} does not exist"
+    exit 1
+fi
+if [ ! -f ${AVI2} ]; then
+    echo "ERROR: file ${AVI2} does not exist"
+    exit 1
+fi
+
+echo "Number of frames: "
+ffprobe -select_streams v -show_streams ${AVI1} \
+2>/dev/null | grep nb_frames | sed -e 's/nb_frames=//'
+ffprobe -select_streams v -show_streams ${AVI2} \
+2>/dev/null | grep nb_frames | sed -e 's/nb_frames=//'
+echo
+
+#mplayer -msglevel all=4 -nosound -x 512 -y 512 ${AVI1} &
+#mplayer -msglevel all=4 -nosound -x 512 -y 512 ${AVI2} &
+
+mplayer -nosound -x 512 -y 512 ${AVI1} &
+mplayer -nosound -x 512 -y 512 ${AVI2} &
+

@@ -24,8 +24,8 @@
 #include "amdados/app/utils/matrix.h"
 #include "amdados/app/utils/sparse_matrix.h"
 
-using namespace amdados::app;
-using namespace amdados::app::utils;
+using namespace amdados;
+using namespace amdados;
 
 static Configuration gConf;         // a single global configuration
 

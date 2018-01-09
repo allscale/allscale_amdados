@@ -11,8 +11,8 @@
 #include <fstream>
 #include <string>
 #include <limits>
-#include "amdados/app/utils/amdados_utils.h"
-#include "amdados/app/utils/matrix.h"
+#include "../include/amdados_utils.h"
+#include "../include/matrix.h"
 #define ARMA_USE_CXX11
 #define ARMA_DONT_USE_WRAPPER
 #define ARMA_DONT_USE_LAPACK
@@ -24,8 +24,7 @@
 #define ARMA_DONT_USE_OPENMP
 #include "../../../api/armadillo/include/armadillo"
 
-using namespace ::amdados::app;
-using namespace ::amdados::app::utils;
+using namespace ::amdados;
 
 // Tolerance on relative error.
 const double TOL = std::sqrt(std::numeric_limits<double>::epsilon());
@@ -119,8 +118,9 @@ void TestMatrixMulVector(double & max_rel_err, int nrows, int ncols)
 TEST(MatrixTests, Basic)
 {
     // Open the output log-file.
-    std::fstream log_file;
-    OpenTextFileForUnitTest(log_file, "matrix_test.log");
+    std::string fname = "matrix_test.log";
+    std::fstream log_file(fname, std::ios::out | std::ios::trunc);
+    assert_true(log_file.good()) << "failed to open: " << fname << std::endl;
 
     // Test dense matrix by dense matrix multiplication.
     double max_rel_err = 0.0;

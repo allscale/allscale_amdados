@@ -1,0 +1,18 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c) 2017
+#------------------------------------------------------------------------------
+
+echo
+echo "Playing the analytic solution (aka 'true field')."
+echo
+
+FILENAME=output/true_field.avi
+
+if [ -f ${FILENAME} ]; then
+    mplayer -x 512 -y 512 ${FILENAME}
+else
+    echo "ERROR: file \"${FILENAME}\" was not found"
+fi
+

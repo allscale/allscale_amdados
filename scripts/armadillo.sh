@@ -4,7 +4,7 @@
 # Copyright: IBM Research Ireland, 2014 - 2017
 #--------------------------------------------------------------------------------------------------
 
-VER=8.300.0
+VER=8.300.3
 
 FNAME="armadillo-${VER}.tar.xz"
 DNAME="armadillo-${VER}"

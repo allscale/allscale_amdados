@@ -95,7 +95,7 @@
 #if !defined(ARMA_USE_OPENMP)
 // #define ARMA_USE_OPENMP
 //// Uncomment the above line to forcefully enable use of OpenMP for parallelisation.
-//// Note that ARMA_USE_OPENMP is automatically enabled when a compiler supporting OpenMP 3.0 is detected.
+//// Note that ARMA_USE_OPENMP is automatically enabled when a compiler supporting OpenMP 3.1 is detected.
 #endif
 
 #if !defined(ARMA_64BIT_WORD)
@@ -112,12 +112,12 @@
 //// and you will need to link with the hdf5 library (eg. -lhdf5)
 #endif
 
-/* #undef ARMA_USE_HDF5_ALT */
+#define ARMA_USE_HDF5_ALT
 #if defined(ARMA_USE_HDF5_ALT) && defined(ARMA_USE_WRAPPER)
   #undef  ARMA_USE_HDF5
   #define ARMA_USE_HDF5
   
-  #define ARMA_HDF5_INCLUDE_DIR /
+  #define ARMA_HDF5_INCLUDE_DIR /usr/local/Cellar/hdf5/1.10.1_2/include/
 #endif
 
 #if !defined(ARMA_MAT_PREALLOC)
@@ -267,5 +267,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/lib/libarpack.dylib
-#define ARMA_AUX_INCDIRS 
+#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.1_2/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib
+#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.1_2/include;/usr/local/opt/szip/include

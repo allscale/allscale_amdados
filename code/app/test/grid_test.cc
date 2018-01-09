@@ -7,7 +7,6 @@
 #include "allscale/api/user/data/adaptive_grid.h"
 
 namespace amdados {
-namespace app {
 
 using namespace ::allscale::utils;
 using ::allscale::api::user::algorithm::pfor;
@@ -22,14 +21,14 @@ const int NUM_DOMAINS_X = 13;
 const int NUM_DOMAINS_Y = 7;
 
 // Number of elements (or nodal points) in each subdomain in each dimension.
-const int NELEMS_X = 111;
-const int NELEMS_Y = 17;
+const int SUBDOMAIN_X = 111;
+const int SUBDOMAIN_Y = 17;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
 using sub_domain_config_t = ::allscale::api::user::data::CellConfig<2,
     ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
-        ::allscale::api::user::data::layer<NELEMS_X,NELEMS_Y>,// 10x10 100m nodes each consisting of
+        ::allscale::api::user::data::layer<SUBDOMAIN_X,SUBDOMAIN_Y>,// 10x10 100m nodes each consisting of
         ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
         ::allscale::api::user::data::layer<5,5>               //  5x5    4m nodes
     >
@@ -42,10 +41,6 @@ enum {
     L_4m = 0,
 };
 
-// Total number of elements (or nodal points) in the entire domain in each dimension.
-const int GLOBAL_NELEMS_X = NELEMS_X * NUM_DOMAINS_X;
-const int GLOBAL_NELEMS_Y = NELEMS_Y * NUM_DOMAINS_Y;
-
 // Position, index or size in 2D.
 using point2d_t = ::allscale::api::user::data::GridPoint<2>;
 using size2d_t = point2d_t;
@@ -56,7 +51,7 @@ using domain_t = ::allscale::api::user::data::Grid<
                     ::allscale::api::user::data::AdaptiveGridCell<double,sub_domain_config_t>,2>;
 
 // Subdomain is a layer in a grid cell.
-using subdomain_t = ::allscale::utils::StaticGrid<double,size_t(NELEMS_X),size_t(NELEMS_Y)>;
+using subdomain_t = ::allscale::utils::StaticGrid<double,size_t(SUBDOMAIN_X),size_t(SUBDOMAIN_Y)>;
 
 // Origin and global grid size. The latter grid is the grid of subdomains,
 // where the logical coordinates give a subdomain indices in each dimension.
@@ -81,7 +76,6 @@ int GetId(point2d_t idx, Direction dir)
     return (GetId(idx) + (static_cast<int>(dir) + 1) * NUM_DOMAINS_X * NUM_DOMAINS_Y);
 }
 
-} // namespace app
 } // namespace amdados
 
 //-------------------------------------------------------------------------------------------------
@@ -90,7 +84,7 @@ int GetId(point2d_t idx, Direction dir)
 void TestGrid()
 {
     std::cout << "TestGrid() ..." << std::endl;
-    using namespace amdados::app;
+    using namespace amdados;
     // Set to "true" for the hard test, but this can corrupt memory.
     const bool TestOutOfBounds = false;
     const bool TestYXOrder = false;
@@ -158,7 +152,7 @@ void TestGrid()
 void TestSubdomainIndexing()
 {
     std::cout << "TestSubdomainIndexing() ..." << std::endl;
-    using namespace amdados::app;
+    using namespace amdados;
     // Set to "true" for the hard test, but this can corrupt memory.
     const bool TestOutOfBounds = false;
     const bool TestYXOrder = false;
@@ -175,8 +169,8 @@ void TestSubdomainIndexing()
         // segmentation fault and in the new API version it does (but not in the old one).
         if (TestOutOfBounds)
         {
-            for (int x = -100*NELEMS_X; x <= +100*NELEMS_X; ++x) {
-            for (int y = -100*NELEMS_Y; y <= +100*NELEMS_Y; ++y) {
+            for (int x = -100*SUBDOMAIN_X; x <= +100*SUBDOMAIN_X; ++x) {
+            for (int y = -100*SUBDOMAIN_Y; y <= +100*SUBDOMAIN_Y; ++y) {
                 subdom1[{x,y}] = 1.0;
             }}
         }
@@ -190,24 +184,24 @@ void TestSubdomainIndexing()
                 domain2[idx].forAllActiveNodes([](double & value) { value = 0.0; });
 
                 int count = 0;
-                for (int x = 0; x < NELEMS_X; ++x) {
-                for (int y = 0; y < NELEMS_Y; ++y) {
+                for (int x = 0; x < SUBDOMAIN_X; ++x) {
+                for (int y = 0; y < SUBDOMAIN_Y; ++y) {
                     subdom1[{x,y}] = count;
  if (TestYXOrder) { subdom2[{y,x}] = count; }
                     ++count;
                 }}
-                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                EXPECT_TRUE(count == SUBDOMAIN_X * SUBDOMAIN_Y);
 
                 bool ok1 = true, ok2 = true;
                 count = 0;
-                for (int x = 0; x < NELEMS_X; ++x) {
-                for (int y = 0; y < NELEMS_Y; ++y) {
+                for (int x = 0; x < SUBDOMAIN_X; ++x) {
+                for (int y = 0; y < SUBDOMAIN_Y; ++y) {
                     if (!(subdom1[{x,y}] == count)) ok1 = false;
  if (TestYXOrder) { if (!(subdom2[{y,x}] == count)) ok2 = false; } else ok2 = false;
                     ++count;
                 }}
                 EXPECT_TRUE(ok1 && !ok2);
-                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                EXPECT_TRUE(count == SUBDOMAIN_X * SUBDOMAIN_Y);
             }
 
             // ----- Loop y, then x.
@@ -216,24 +210,24 @@ void TestSubdomainIndexing()
                 domain2[idx].forAllActiveNodes([](double & value) { value = 0.0; });
 
                 int count = 0;
-                for (int y = 0; y < NELEMS_Y; ++y) {
-                for (int x = 0; x < NELEMS_X; ++x) {
+                for (int y = 0; y < SUBDOMAIN_Y; ++y) {
+                for (int x = 0; x < SUBDOMAIN_X; ++x) {
                     subdom1[{x,y}] = count;
  if (TestYXOrder) { subdom2[{y,x}] = count; }
                     ++count;
                 }}
-                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                EXPECT_TRUE(count == SUBDOMAIN_X * SUBDOMAIN_Y);
 
                 bool ok1 = true, ok2 = true;
                 count = 0;
-                for (int y = 0; y < NELEMS_Y; ++y) {
-                for (int x = 0; x < NELEMS_X; ++x) {
+                for (int y = 0; y < SUBDOMAIN_Y; ++y) {
+                for (int x = 0; x < SUBDOMAIN_X; ++x) {
                     if (!(subdom1[{x,y}] == count)) ok1 = false;
  if (TestYXOrder) { if (!(subdom2[{y,x}] == count)) ok2 = false; } else ok2 = false;
                     ++count;
                 }}
                 EXPECT_TRUE(ok1 && !ok2);
-                EXPECT_TRUE(count == NELEMS_X * NELEMS_Y);
+                EXPECT_TRUE(count == SUBDOMAIN_X * SUBDOMAIN_Y);
             }
         }
     });
@@ -251,7 +245,7 @@ void TestSubdomainIndexing()
 void TestInterSubdomain()
 {
     std::cout << "TestInterSubdomain() ..." << std::endl;
-    using namespace amdados::app;
+    using namespace amdados;
 
     // Origin and the number of subdomains in both directions.
     const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
@@ -275,20 +269,20 @@ void TestInterSubdomain()
         subdomain_t & subdom = domain[idx].getLayer<L_100m>();
 
         // Fill up the subdomain by unique id.
-        //for (int x = 0; x < NELEMS_X; ++x) {
-        //for (int y = 0; y < NELEMS_Y; ++y) {
+        //for (int x = 0; x < SUBDOMAIN_X; ++x) {
+        //for (int y = 0; y < SUBDOMAIN_Y; ++y) {
             //subdom[{x,y}] = GetId(idx);
         //}}
         domain[idx].forAllActiveNodes([&](double & value) { value = GetId(idx); });
 
         // Fill up each subdomain border by unique id, excluding (!) the corner points.
-        for (int x = 1; x < NELEMS_X-1; ++x) {
+        for (int x = 1; x < SUBDOMAIN_X-1; ++x) {
             subdom[{x,0}]          = GetId(idx, Down);
-            subdom[{x,NELEMS_Y-1}] = GetId(idx, Up);
+            subdom[{x,SUBDOMAIN_Y-1}] = GetId(idx, Up);
         }
-        for (int y = 1; y < NELEMS_Y-1; ++y) {
+        for (int y = 1; y < SUBDOMAIN_Y-1; ++y) {
             subdom[{0,y}]          = GetId(idx, Left);
-            subdom[{NELEMS_X-1,y}] = GetId(idx, Right);
+            subdom[{SUBDOMAIN_X-1,y}] = GetId(idx, Right);
         }
     });
 
@@ -302,7 +296,7 @@ void TestInterSubdomain()
             if ((dir == Up)    && (idx[_Y_] == Ny-1)) continue;
 
             // Check remote border has expected values.
-            int len = ((dir == Up) || (dir == Down)) ? NELEMS_X : NELEMS_Y;
+            int len = ((dir == Up) || (dir == Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
             point2d_t neighbour_idx = idx + remote_idx[dir];
             Direction neighbour_dir = remote_dir[dir];
             std::vector<double> border = domain[neighbour_idx].getBoundary(neighbour_dir);
@@ -322,7 +316,7 @@ void TestInterSubdomain()
 void TestSubdomainBorders()
 {
     std::cout << "TestSubdomainBorders() ..." << std::endl;
-    using namespace amdados::app;
+    using namespace amdados;
 
     domain_t domain(SubDomGridSize);
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
@@ -330,15 +324,15 @@ void TestSubdomainBorders()
         subdomain_t & subdom = domain[idx].getLayer<L_100m>();
 
         // Fill up the subdomain by zeros.
-        for (int x = 0; x < NELEMS_X; ++x) {
-        for (int y = 0; y < NELEMS_Y; ++y) {
+        for (int x = 0; x < SUBDOMAIN_X; ++x) {
+        for (int y = 0; y < SUBDOMAIN_Y; ++y) {
             subdom[{x,y}] = 0;
         }}
 
         // For all the borders ...
         for (Direction dir : { Up, Down, Left, Right }) {
             // Initialize and set border values.
-            int len = ((dir == Up) || (dir == Down)) ? NELEMS_X : NELEMS_Y;
+            int len = ((dir == Up) || (dir == Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
             std::vector<double> border(len);
             for (int k = 0; k < len; ++k) {
                 border[k] = k + GetId(idx, dir);
@@ -354,29 +348,29 @@ void TestSubdomainBorders()
             // Ckeck that border values were properly written by reading the subdomain directly.
             switch (dir) {
                 case Down: {
-                    for (int x = 0; x < NELEMS_X; ++x) {
+                    for (int x = 0; x < SUBDOMAIN_X; ++x) {
                         bool ok = (subdom[{x,0}] == border[x]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
                 case Up: {
-                    for (int x = 0; x < NELEMS_X; ++x) {
-                        bool ok = (subdom[{x,NELEMS_Y-1}] == border[x]);
+                    for (int x = 0; x < SUBDOMAIN_X; ++x) {
+                        bool ok = (subdom[{x,SUBDOMAIN_Y-1}] == border[x]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
                 case Left: {
-                    for (int y = 0; y < NELEMS_Y; ++y) {
+                    for (int y = 0; y < SUBDOMAIN_Y; ++y) {
                         bool ok = (subdom[{0,y}] == border[y]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
                 case Right: {
-                    for (int y = 0; y < NELEMS_Y; ++y) {
-                        bool ok = (subdom[{NELEMS_X-1,y}] == border[y]);
+                    for (int y = 0; y < SUBDOMAIN_Y; ++y) {
+                        bool ok = (subdom[{SUBDOMAIN_X-1,y}] == border[y]);
                         EXPECT_TRUE(ok);
                     }
                 }
@@ -391,9 +385,10 @@ void TestSubdomainBorders()
 //-------------------------------------------------------------------------------------------------
 TEST(GridTest, Basic)
 {
-    using namespace amdados::app;
-    std::cout << "Grid of " << NUM_DOMAINS_X << "x" << NUM_DOMAINS_Y << " subdomains" << std::endl;
-    std::cout << "Subdomain size " << NELEMS_X << "x" << NELEMS_Y << std::endl;
+    using namespace amdados;
+    std::cout << "Grid of " << NUM_DOMAINS_X << "x"
+                            << NUM_DOMAINS_Y << " subdomains" << std::endl;
+    std::cout << "Subdomain size " << SUBDOMAIN_X << "x" << SUBDOMAIN_Y << std::endl;
 
     TestGrid();
     TestSubdomainIndexing();

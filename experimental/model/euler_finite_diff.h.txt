@@ -61,7 +61,7 @@ private:
 //-------------------------------------------------------------------------------------------------
 void MakeModelMatrix(double flow_x, double flow_y, double time_delta, double space_delta)
 {
-    using namespace amdados::app::utils;
+    using namespace amdados;
 
     Sub2Ind<SizeX,SizeY> sub2ind;   // converts 2D index (x,y) to plain index
 

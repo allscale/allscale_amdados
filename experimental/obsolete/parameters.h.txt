@@ -22,15 +22,15 @@ namespace amdados {
 namespace app {
 
 	// need to update this section to read these parameters from input file
-		const int num_domains_x = 10;
-		const int num_domains_y = 10;
+		const int num_subdomains_x = 10;
+		const int num_subdomains_y = 10;
 
 		const int nelems_x = 10;
 		const int nelems_y = 10;
 		const int SUB_PROBLEM_SIZE = nelems_x * nelems_y;
 		const int NUM_MEASUREMENTS = nelems_x * nelems_y;
-		const int nelems_glob_x = nelems_x * num_domains_x;
-		const int nelems_glob_y = nelems_y * num_domains_y;
+		const int nelems_glob_x = nelems_x * num_subdomains_x;
+		const int nelems_glob_y = nelems_y * num_subdomains_y;
 
 		int T = 200;
 		const int timestep = T;
@@ -61,7 +61,7 @@ namespace app {
 		};
 
 		data::GridPoint<2> zero = 0;
-		data::GridPoint<2> size_global = {num_domains_x, num_domains_y };
+		data::GridPoint<2> size_global = {num_subdomains_x, num_subdomains_y };
 
 		// create the type of a grid cell
 		using sub_domain = Cell<double,sub_domain_config>;
@@ -91,7 +91,7 @@ namespace app {
 		 data::Grid<DA_vector,2> forecast(size_global);   // Projection from observation to model grid
 		 data::Grid<DA_vector,2> BLUE(size_global);   // Projection from observation to model grid
 
-		 using Kalman_t = amdados::app::utils::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
+		 using Kalman_t = amdados::KalmanFilter<SUB_PROBLEM_SIZE, NUM_MEASUREMENTS>;
 		 using Kalman_ptr_t = std::unique_ptr<Kalman_t>;
 		 data::Grid<Kalman_ptr_t,2> kalman_filters(size_global);
 
@@ -141,12 +141,12 @@ namespace app {
 			static const std::vector<char> chars({' ','.',':','o','X'});
 
 			std::cout << "T=" << t << "\n";
-			for(int i = 0; i<num_domains_x * 10; i+=1) {
-				for(int j = 0; j<num_domains_y * 10; j+=1) {
+			for(int i = 0; i<num_subdomains_x * 10; i+=1) {
+				for(int j = 0; j<num_subdomains_y * 10; j+=1) {
 
 					double value = A[{i/10,j/10}].getLayer<L_100m>()[{i%10,j%10}];
 		//          std::cout << chars[std::max(std::min<int>(((std::log(value) / std::log(100.0)) * chars.size()),chars.size()-1),0)];
-										myfile << i/10 << "  " << j/10 << "  " << " " << num_domains_x << " " << num_domains_y << "  "  << value << std::endl;
+										myfile << i/10 << "  " << j/10 << "  " << " " << num_subdomains_x << " " << num_subdomains_y << "  "  << value << std::endl;
 				}
 			//  std::cout << "\n";
 			}

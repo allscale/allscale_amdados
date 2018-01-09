@@ -55,10 +55,10 @@ auto SaveGrid2D = [](const std::string & path, const std::string & title, int t,
     stateFile << "# Layout: [1] dimensionality, [2..dim+1] sizes per dimension, [dim+2...] values"
               << std::endl;
     int dim = 2;
-    stateFile << dim << std::endl << (nelems_x * num_domains_x) << std::endl
-                                  << (nelems_y * num_domains_y) << std::endl;
-    for (int k = 0; k < nelems_x * num_domains_x; ++k) {
-    for (int j = 0; j < nelems_y * num_domains_y; ++j) {
+    stateFile << dim << std::endl << (nelems_x * num_subdomains_x) << std::endl
+                                  << (nelems_y * num_subdomains_y) << std::endl;
+    for (int k = 0; k < nelems_x * num_subdomains_x; ++k) {
+    for (int j = 0; j < nelems_y * num_subdomains_y; ++j) {
         double value = grid[{k/nelems_x, j/nelems_y}].getLayer<L_100m>()
                            [{k%nelems_x, j%nelems_y}];
         stateFile << value << std::endl;

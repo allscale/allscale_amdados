@@ -3,8 +3,9 @@
 //             Albert Akhriev, albert_akhriev@ie.ibm.com
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
+
 #include <iostream>
-#include <sstream>
+#include "../include/debugging.h"
 
 // Components to be included
 // 1) Grid structures specific to each subdomain
@@ -37,33 +38,52 @@
 // Data assimilation solver
 // File output at periodic intervals
 
+void PrintHelp()
+{
+    std::cout << "TODO: help" << std::endl;
+}
+
+namespace amdados {
+
+void ScenarioSimulation(const std::string &);
+void ScenarioSensors(const std::string &);
+
+} // namespace amdados
+
 int main(int argc, char ** argv)
 {
-    std::cout << std::endl << std::endl << std::endl;
-    int scenario = 0;
-    if (argc > 1) {
-        if (argc > 2) {
-            std::cout << "ERROR: at most 1 input argument is expected"
-                      << std::endl;
-            return 1;
-        }
-        if (!(std::istringstream(argv[1]) >> scenario)) {
-            std::cout << "Failed to read scenario ID" << std::endl;
-            return 1;
-        }
-    }
-    std::cout << "Scenario: " << scenario << std::endl
-              << std::endl << std::flush;
+    MY_TRY
+    {
+        std::string scenario;
+        std::string config_file = "amdados.conf";
 
-    switch (scenario) {
-        case 0: {
-            int Amdados2DMain(void);
-            return Amdados2DMain();
+        // Parse command-line options.
+        for (int a = 0; a < argc; ++a) {
+            std::string token = argv[a];
+            if (token == "--scenario") {
+                if (++a < argc) {
+                    scenario = argv[a];
+                }
+            } else if (token == "--config") {
+                if (++a < argc) {
+                    config_file = argv[a];
+                }
+            } else if ((token == "--help") || (token == "-h")) {
+                PrintHelp();
+                return EXIT_SUCCESS;
+            }
         }
-        break;
-        default: std::cout << "ERROR: unknown scenario: "
-                           << scenario << std::endl;
+
+        if (scenario == "sensors") {
+            MY_INFO("%s", "SCENARIO: 'sensors'")
+            amdados::ScenarioSensors(config_file);
+        } else {
+            MY_INFO("%s", "SCENARIO: 'simulation'")
+            amdados::ScenarioSimulation(config_file);
+        }
+        return EXIT_SUCCESS;
     }
-    return 1;
+    MY_CATCH
+    return EXIT_FAILURE;
 }
 

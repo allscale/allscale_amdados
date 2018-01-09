@@ -1,4 +1,4 @@
-build/
+build
 build_debug/
 build_with_allscalecc/
 third_party/
@@ -12,6 +12,7 @@ build*
 *.run
 Observation.txt
 DumpAllScale.txt
+simulation_results
 
 doc/python*
 doc/references
@@ -35,7 +36,7 @@ tags
 *.git
 verdandi
 verdandi*
-output/
+output
 3rd_party
 3rd-party
 *.git
@@ -53,3 +54,5 @@ __pycache__
 *.ipynb
 .idea
 
+/Debug/
+/Release/

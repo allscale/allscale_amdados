@@ -11,24 +11,26 @@
 #include <fstream>
 #include <string>
 #include <random>
-#include "amdados/app/utils/amdados_utils.h"
-#include "amdados/app/utils/matrix.h"
-#include "amdados/app/utils/cholesky.h"
-#include "amdados/app/utils/lu.h"
-#include "amdados/app/utils/kalman_filter.h"
-
-using namespace ::amdados::app;
-using namespace ::amdados::app::utils;
+#include "../include/amdados_utils.h"
+#include "../include/matrix.h"
+#include "../include/cholesky.h"
+#include "../include/lu.h"
+#include "../include/kalman_filter.h"
 
 //-----------------------------------------------------------------------------
 // Function for testing a Kalman filter on a toy 2D problem.
 //-----------------------------------------------------------------------------
 TEST(KalmanFilter, Basic)
 {
+    using namespace ::amdados;
+
     // Open the output log-file.
-    std::fstream log_file, track_file;
-    OpenTextFileForUnitTest(log_file, "kalman_test.log");
-    OpenTextFileForUnitTest(track_file, "kalman_test.out");
+    std::string fname = "kalman_test.log";
+    std::fstream log_file(fname, std::ios::out | std::ios::trunc);
+    assert_true(log_file.good()) << "failed to open: " << fname << std::endl;
+    fname = "kalman_test.out";
+    std::fstream track_file(fname, std::ios::out | std::ios::trunc);
+    assert_true(track_file.good()) << "failed to open: " << fname << std::endl;
 
     const int    DIM = 3;
     const int    NUM_TIME_STEPS = 5000;

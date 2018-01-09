@@ -55,7 +55,7 @@ add_library(armadillo SHARED IMPORTED)
 
 set_target_properties(armadillo PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
-  INTERFACE_LINK_LIBRARIES "-framework Accelerate;/usr/local/lib/libarpack.dylib"
+  INTERFACE_LINK_LIBRARIES "-framework Accelerate;/usr/local/Cellar/hdf5/1.10.1_2/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib"
 )
 
 if(CMAKE_VERSION VERSION_LESS 2.8.12)
