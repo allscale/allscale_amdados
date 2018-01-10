@@ -13,8 +13,8 @@ BUILD_DIR=build
 OUTPUT_DIR=output
 
 RAMDISK=
-NO_RAMDISK=false
-RAMDISK_SIZE=128
+NO_RAMDISK=true
+RAMDISK_SIZE=512
 
 LINUX=false
 MACOS=false
@@ -35,6 +35,19 @@ fi
 # the shell script to exit immediately:
 set -e
 
+# Function prints a warning regarding this script.
+function About()
+{
+    echo
+    echo
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "Please, do NOT use this script to build a production code."
+    echo "It was designed solely for the development, testing and debugging."
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo
+    echo
+}
+
 # Function retrieves the number of available CPUs on this computer.
 GetNumberCPUs()
 {
@@ -54,33 +67,56 @@ GetNumberCPUs()
 # Function creates symbolic link from $1 to $RAMDISK/$1.
 MakeSymbolicLink()
 {
+    # Remove file or folder which is not a symbolic link.
+    if [ ! -L $1 ] ; then
+        /bin/rm -fr $1
+    fi
+
+    # Create a destination folder.
+    if [ ! -e ${RAMDISK}/$1 ] ; then
+        mkdir -p ${RAMDISK}/$1
+        sync
+    fi
+
+    # Create a symbolic to the destination folder and clear it
+    # (otherwise on Mac OS we get a recursive symbolic link).
     if ${LINUX}; then
         if [ ! -d $1 ]; then
-            mkdir -p ${RAMDISK}/$1
             ln -svd ${RAMDISK}/$1 $1
+            /bin/rm -fr ${RAMDISK}/$1/*
         fi
     elif ${MACOS}; then
         if [ ! -d $1 ]; then
-            mkdir -p ${RAMDISK}/$1
             ln -sv  ${RAMDISK}/$1 $1
+            /bin/rm -fr ${RAMDISK}/$1/*
         fi
     fi
 }
 
+# Function creates a regular folder.
+MakeNormalFolder()
+{
+    # Remove symbolic link of the same name.
+    if [ -L $1 ] ; then
+        /bin/rm -f $1
+    fi
+    # Make a regular folder.
+    mkdir -p $1
+    sync
+}
+
 # Function creates the build and the output directories.
 # Folders will be created inside a ramdisk for performance.
-MakeFolders()
+MakeAllFoldersNeeded()
 {
     if ${NO_RAMDISK}; then
-        mkdir -p ${BUILD_DIR}
-        mkdir -p ${OUTPUT_DIR}
-        sync
+        if [ -e /dev/shm/allscale ] ; then
+            /bin/rm -fr /dev/shm/allscale
+        fi
+        MakeNormalFolder ${BUILD_DIR}
+        MakeNormalFolder ${OUTPUT_DIR}
     elif ${LINUX}; then
         RAMDISK=/dev/shm/allscale
-        mkdir -p ${RAMDISK}
-        mkdir -p ${RAMDISK}/${BUILD_DIR}
-        mkdir -p ${RAMDISK}/${OUTPUT_DIR}
-        sync
         MakeSymbolicLink ${BUILD_DIR}
         MakeSymbolicLink ${OUTPUT_DIR}
     elif ${MACOS}; then
@@ -89,12 +125,7 @@ MakeFolders()
             echo "Ramdisk already exists: ${RAMDISK}"
         else
             echo "Creating a ramdisk ..."
-            /bin/rm -fr ${BUILD_DIR}
-            /bin/rm -fr ${OUTPUT_DIR}
-            sync
             bash ./scripts/helper/ramdisk_mac.sh create ${RAMDISK_SIZE}
-            mkdir -p ${RAMDISK}/${BUILD_DIR}
-            mkdir -p ${RAMDISK}/${OUTPUT_DIR}
             echo "Ramdisk: ${RAMDISK}"
         fi
         sync
@@ -117,6 +148,7 @@ Configure()
     CURR_DIR=$(pwd)
     if ${FULL}; then
         /bin/rm -fr ${BUILD_DIR}/*
+        /bin/rm -fr ${OUTPUT_DIR}/*
     fi
     cd ${BUILD_DIR}
     cmake -DCMAKE_BUILD_TYPE=${CONF} ${CURR_DIR}/code
@@ -180,11 +212,13 @@ while getopts ":fdrt" opt; do
     esac
 done
 
+About
 GetNumberCPUs
-MakeFolders
+MakeAllFoldersNeeded
 Configure
 GenerateCTags
 BuildAndTest
+About
 
 echo
 echo
