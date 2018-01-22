@@ -61,6 +61,20 @@ bool EndsWith(const std::string & str, const std::string & ending)
 //}
 
 /**
+ * Function checks if the file exists and prints error message if it does not.
+ */
+void CheckFileExists(const Configuration & conf, const std::string & filename)
+{
+    (void) conf; (void) filename;
+#ifdef AMDADOS_DEBUGGING
+    if (!std::fstream(filename, std::ios::in).good()) {
+        MY_ERR("failed to open file (not existing?): %s", filename.c_str());
+        std::exit(1);
+    }
+#endif
+}
+
+/**
  * Function creates a video file from a sequence of field states written into
  * image files using 'ffmpeg' utility installed system-wide. By the end of
  * video creation, all *.pgm files are removed in order to save space.
@@ -134,8 +148,8 @@ std::string MakeFileName(const Configuration & conf,
     }
 
     if (suffix == nullptr) {
-        assert_true(entity != "field")
-                << "file suffix is always expected for the field entity";
+//        assert_true(entity != "field")
+//                << "file suffix is always expected for the field entity";
         filename << ".txt";
     } else {
         if (EndsWith(suffix, ".avi")) {

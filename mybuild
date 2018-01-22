@@ -4,7 +4,7 @@
 # Copyright : IBM Research Ireland, 2017
 #------------------------------------------------------------------------------
 
-CONF=Release
+CONF=Debug    # Release
 FULL=false
 TEST=false
 
@@ -13,7 +13,7 @@ BUILD_DIR=build
 OUTPUT_DIR=output
 
 RAMDISK=
-NO_RAMDISK=true
+NO_RAMDISK=false
 RAMDISK_SIZE=512
 
 LINUX=false
@@ -21,6 +21,7 @@ MACOS=false
 useNCPUs=1
 
 if [[ "$(uname)" == 'Linux' ]]; then
+    echo "Linux OS"
     LINUX=true
     # This custom script (if presents) activates a fresh
     # g++ compiler on RedHat 7 system.
@@ -28,7 +29,10 @@ if [[ "$(uname)" == 'Linux' ]]; then
         source ${HOME}/bin/enable-gcc6.sh
     fi
 elif [[ "$(uname)" == 'Darwin' ]]; then
+    echo "Mac OS"
     MACOS=true
+else
+    echo "Unknown OS"
 fi
 
 # N O T E: any subsequent(*) commands which fail will cause
@@ -148,7 +152,7 @@ Configure()
     CURR_DIR=$(pwd)
     if ${FULL}; then
         /bin/rm -fr ${BUILD_DIR}/*
-        /bin/rm -fr ${OUTPUT_DIR}/*
+        #/bin/rm -fr ${OUTPUT_DIR}/*
     fi
     cd ${BUILD_DIR}
     cmake -DCMAKE_BUILD_TYPE=${CONF} ${CURR_DIR}/code
@@ -213,6 +217,7 @@ while getopts ":fdrt" opt; do
 done
 
 About
+echo "Building in >>>>> ${CONF} <<<<< mode"
 GetNumberCPUs
 MakeAllFoldersNeeded
 Configure

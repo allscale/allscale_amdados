@@ -6,6 +6,7 @@
 
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
+#include "allscale/api/user/algorithm/stencil.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
 #include "../include/debugging.h"
@@ -42,7 +43,7 @@ void LoadSensorMeasurements(const Configuration         & conf,
 namespace {
 
 const int NSIDES = 4;             // number of sides any subdomain has
-const int ACTIVE_LAYER = L_100m;  // should be template a parameter eventually
+
 
 /**
  * Structure keeps information about 4-side boundary of a subdomain
@@ -59,6 +60,40 @@ struct Boundary
 };
 
 typedef std::pair<double,double> flow_t;    // flow components (flow_x, flow_y)
+
+
+
+//=============================================================================
+// Variables associated with a sub-domain.
+//=============================================================================
+struct SubdomainData
+{
+    Matrix       field;         // sub-domain represented as a matrix
+    Boundary     boundaries;    // sub-domain boundaries
+
+    KalmanFilter Kalman;        // Kalman filter
+    Matrix       B;             // inverse model matrix
+
+    Matrix       P;             // process model covariance
+    Matrix       Q;             // process noise covariance
+    Matrix       H;             // observation matrix
+    Matrix       R;             // observation noise covariance
+    Vector       z;             // observation vector
+
+    point2d_t    idx;           // subdomain's position on the grid
+    size_t       Nt;            // number of time integration steps
+    size_t       Nschwarz;      // number of Schwarz iterations
+    flow_t       flow;          // current flow vector (vel_x, vel_y)
+
+    SubdomainData()
+        : field(), boundaries()
+        , Kalman(), B()
+        , P(), Q(), H(), R(), z()
+        , idx(-1,-1), Nt(0), Nschwarz(0), flow(0.0, 0.0) {}
+};
+
+// The whole domain where instead of grid cells we place sub-domain data.
+using data_domain_t = ::allscale::api::user::data::Grid<SubdomainData, 2>;
 
 //#############################################################################
 // @Utilities.
@@ -177,7 +212,7 @@ void InitDependentParams(Configuration & conf)
                         std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
                                   1.0/(std::fabs(max_vx)/dx +
                                        std::fabs(max_vy)/dy + TINY) ));
-    assert_true(dt > 0);
+    assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(
                         std::ceil(conf.asDouble("integration_period") / dt)));
@@ -358,16 +393,16 @@ void ComputeH(const point_array_t & sensors, Matrix & H)
 //#############################################################################
 
 /**
- * Function computes flow components given a time.
+ * Function computes flow components given a discrete time.
  * \return a pair of flow components (flow_x, flow_y).
  */
-flow_t Flow(const Configuration & conf, const double physical_time)
+flow_t Flow(const Configuration & conf, const size_t discrete_time)
 {
     const double max_vx = conf.asDouble("flow_model_max_vx");
     const double max_vy = conf.asDouble("flow_model_max_vy");
-    const double T = conf.asDouble("integration_period");
-    return flow_t( -max_vx * std::sin(0.1 * physical_time / T - M_PI),
-                   -max_vy * std::sin(0.2 * physical_time / T - M_PI) );
+    const double t = static_cast<double>(discrete_time) / conf.asDouble("Nt");
+    return flow_t( -max_vx * std::sin(0.1 * t - M_PI),
+                   -max_vy * std::sin(0.2 * t - M_PI) );
 }
 
 /**
@@ -471,28 +506,32 @@ void InverseModelMatrix(Matrix & B, const Configuration & conf,
  * of subdomain are get updated depending on flow direction.
  */
 double SchwarzUpdate(const Configuration &,
-                     Boundary & border, const point2d_t & idx,
-                     domain_t & domain, const flow_t & flow)
+                     Boundary            & border,
+                     const point2d_t     & idx,
+                     const domain_t      & curr_domain,
+                     domain_t            & next_domain,
+                     const flow_t        & flow)
 {
     // Origin and the number of subdomains in both directions.
-    const int Ox = 0, Nx = domain.size()[_X_];
-    const int Oy = 0, Ny = domain.size()[_Y_];
+    const int Ox = 0, Nx = curr_domain.size()[_X_];
+    const int Oy = 0, Ny = curr_domain.size()[_Y_];
+    assert_true(Nx == next_domain.size()[_X_]);
+    assert_true(Ny == next_domain.size()[_Y_]);
 
     // Index increments and corresponding directions
-    // of a neighbour (remote) subdomain.
+    // of a neighbour subdomain (remote peer).
     Direction remote_dir[NSIDES];
     point2d_t remote_idx[NSIDES];
 
     // Given index and position of a subdomain boundary, we use lookup tables
-    // to access the neighbour (remote) subdomain.
+    // to access the neighbour subdomain (remote peer).
     remote_dir[Left ] = Right;  remote_idx[Left ] = point2d_t{-1,0};
     remote_dir[Right] = Left;   remote_idx[Right] = point2d_t{+1,0};
     remote_dir[Down ] = Up;     remote_idx[Down ] = point2d_t{0,-1};
     remote_dir[Up   ] = Down;   remote_idx[Up   ] = point2d_t{0,+1};
 
     // Function updates a boundary depending on flow direction and accumulates
-    // the difference between this and neighbour (remote) subdomain according
-    // to Schwarz method.
+    // the difference between this and peer subdomain using Schwarz method.
     auto UpdBoundary = [&](Direction dir, bool is_outer, const point2d_t & idx,
                            double & numer_sum, double & denom_sum)
     {
@@ -511,14 +550,14 @@ double SchwarzUpdate(const Configuration &,
             assert_true((0 <= peer_idx.x) && (peer_idx.x < Nx));
             assert_true((0 <= peer_idx.y) && (peer_idx.y < Ny));
 
-            // Copy values from peer's boundary to the current boundary.
-            border.inflow[dir] = true;                      // in-flow boundary
-            border.myself = domain[idx].getBoundary(dir);   // save old state
-            border.remote = domain[peer_idx].getBoundary(peer_dir);
-            domain[idx].setBoundary(dir, border.remote);
+            // Copy values from peer's boundary to this subdomain boundary.
+            border.inflow[dir] = true;          // in-flow boundary
+            border.myself = next_domain[idx].getBoundary(dir);
+            border.remote = curr_domain[peer_idx].getBoundary(peer_dir);
+            next_domain[idx].setBoundary(dir, border.remote);
 
             // Compute and accumulate aggregated difference between
-            // subdomains' borders.
+            // boundary values of this subdomain before and after update.
             double rsum = 0.0, msum = 0.0, diff = 0.0;
             assert_true(border.myself.size() == border.remote.size());
             for (size_t k = 0, n = border.remote.size(); k < n; ++k) {
@@ -544,6 +583,104 @@ double SchwarzUpdate(const Configuration &,
 }
 
 /**
+ * Function is invoked for each sub-domain during the time integration.
+ */
+const subdomain_cell_t & SubdomainRoutine(
+                            const Configuration & conf,
+                            const point_array_t & sensors,
+                            const Matrix        & observations,
+                            const bool            external,
+                            const size_t          timestamp,
+                            const domain_t      & curr_state,
+                            domain_t            & next_state,
+                            SubdomainData       & vars,
+                            AverageProfile      & diff_profile)
+{
+    // TODO !!!!!!!!!!!!!!!!!!!!! properly distinguish current and next states
+
+    assert_true(&curr_state != &next_state);
+    assert_true(curr_state.size() == next_state.size());
+
+    // Index (position) of the current subdomain.
+    const point2d_t idx = vars.idx;
+
+    // Important: synchronize active layers, otherwise when we exchange data
+    // at the borders of neighbour subdomains the size mismatch can happen.
+    next_state[idx].setActiveLayer(curr_state[idx].getActiveLayer());
+
+    // Get the discrete time (index of iteration) in the range [0..Nt) and
+    // the index of Schwarz sub-iteration in the range [0..Nschwarz).
+    assert_true(timestamp < vars.Nt * vars.Nschwarz);
+    const size_t t_discrete = timestamp / vars.Nschwarz;
+    const size_t sub_iter   = timestamp % vars.Nschwarz;
+
+    // At the beginning of a regular iteration (i.e. at the first Schwarz
+    // sub-iteration) do: (1) update the flow velocity, (2) get the new
+    // observations; (3) obtain new noise covariance matrices; (4) compute
+    // the prior estimation of the state field.
+    if (sub_iter == 0) {
+        if (idx == point2d_t(0,0)) MY_PROGRESS("+")
+
+        // Compute flow velocity vector.
+        vars.flow = Flow(conf, t_discrete);
+
+        // Get the current sensor measurements.
+        GetObservations(vars.z, observations, t_discrete, vars.H, sensors);
+
+        // Covariance matrices are allowed to change over time.
+        ComputeQ(conf, vars.Q);
+        ComputeR(conf, vars.R);
+
+        // Copy state field into the matrix object.
+        MatrixFromAllscale(vars.field,
+                           curr_state[idx].getLayer<ACTIVE_LAYER>());
+        // Prior estimation.
+        InverseModelMatrix(vars.B, conf, vars.boundaries, vars.flow);
+        vars.Kalman.PropagateStateInverse(vars.field, vars.P,
+                                              vars.B, vars.Q);
+        // Put the prior estimation back to the state field.
+        AllscaleFromMatrix(next_state[idx].getLayer<ACTIVE_LAYER>(),
+                           vars.field);
+        // Ensure boundary conditions on the outer border.
+        if (external) {
+            ApplyBoundaryCondition(next_state, idx);
+        }
+    } else {
+        if (idx == point2d_t(0,0)) MY_PROGRESS(".")
+    }
+
+    // Update subdomain boundaries according to Schwarz method.
+    double diff = SchwarzUpdate(conf, vars.boundaries, idx,
+                                curr_state, next_state, vars.flow);
+
+    // Ensure boundary conditions on the outer border.
+    if (external) {
+        ApplyBoundaryCondition(next_state, idx);
+    }
+
+    // Accumulate history of discrepancies for debugging,
+    diff_profile.Accumulate(idx, diff);
+
+    // Copy state field into more convenient matrix object.
+    MatrixFromAllscale(vars.field,
+                       next_state[idx].getLayer<ACTIVE_LAYER>());
+
+    // Filtering by Kalman filter.
+    vars.Kalman.SolveFilter(vars.field, vars.P, vars.H, vars.R, vars.z);
+
+    // Put new estimation back to the state field.
+    AllscaleFromMatrix(next_state[idx].getLayer<ACTIVE_LAYER>(),
+                       vars.field);
+
+    // Ensure boundary conditions on the outer border.
+    if (external) {
+        ApplyBoundaryCondition(next_state, idx);
+    }
+
+    return next_state[idx];
+}
+
+/**
  * Using model matrix A, the function integrates advection-diffusion equation
  * forward in time inside individual subdomains and records all the solutions
  * as the state fields. Schwarz iterations are applied in order to make the
@@ -555,113 +692,107 @@ void RunDataAssimilation(const Configuration         & conf,
                          const Grid<point_array_t,2> & sensors,
                          const Grid<Matrix,2>        & observations)
 {
+    using ::allscale::api::core::FileIOManager;
+    using ::allscale::api::core::Entry;
+    using ::allscale::api::core::Mode;
+
     MY_INFO("%s", "Running simulation with data assimilation")
 
-	Visualizer	   vis(conf.asString("output_dir"));
+	//Visualizer	   vis(conf.asString("output_dir"));
     AverageProfile diff_profile(conf);
 
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
-    const int       Nschwarz = conf.asInt("schwarz_num_iters");
+    const size_t    Nt = conf.asUInt("Nt");
+    const size_t    Nschwarz = conf.asUInt("schwarz_num_iters");
+    const size_t    Nwrite = conf.asUInt("write_num_fields");
 
-    domain_t         state(GridSize);       // grid of state fields
-    Grid<Matrix,2>   field(GridSize);       // same state field but as matrices
-    Grid<Boundary,2> boundaries(GridSize);  // grid of boundaries
+    // Visualization: image of the sensor positions in the whole domain.
+//XXX    vis.WriteImageOfSensors(H);
 
-    Grid<KalmanFilter,2> Kalman(GridSize);  // grid of Kalman filters
-    Grid<Matrix,2>       B(GridSize);       // grid of inverse model matrices
-
-    Grid<Matrix,2> P(GridSize);  // grid of process model covariances
-    Grid<Matrix,2> Q(GridSize);  // grid of process noise covariances
-    Grid<Matrix,2> H(GridSize);  // grid of observation matrices
-    Grid<Matrix,2> R(GridSize);  // grid of observation noise covariances
-    Grid<Vector,2> z(GridSize);  // grid of observation vectors
+    data_domain_t state_vars(GridSize);         // variables of each sub-domain
+    domain_t      temp_field(GridSize);         // grid if sub-domains
+    domain_t      state_field(GridSize);        // grid if sub-domains
 
     // Set up the initial field of the physical entity distribution.
-    InitialField(state, conf, "zero");      // "zero" or "gauss"
+    InitialField(state_field, conf, "zero");    // "zero" or "gauss"
 
     // Initialize the observation and model covariance matrices.
     pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
         const int Nsensors = static_cast<int>(sensors[idx].size());
-        field[idx].Resize(SUBDOMAIN_X, SUBDOMAIN_Y);
-        B[idx].Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
-        P[idx].Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
-        Q[idx].Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
-        H[idx].Resize(Nsensors, SUB_PROBLEM_SIZE);
-        R[idx].Resize(Nsensors, Nsensors);
-        z[idx].Resize(Nsensors);
-        ComputeH(sensors[idx], H[idx]);
-        InitialCovar(conf, P[idx]);
+        state_vars[idx].field.Resize(SUBDOMAIN_X, SUBDOMAIN_Y);
+        state_vars[idx].B.Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
+        state_vars[idx].P.Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
+        state_vars[idx].Q.Resize(SUB_PROBLEM_SIZE, SUB_PROBLEM_SIZE);
+        state_vars[idx].H.Resize(Nsensors, SUB_PROBLEM_SIZE);
+        state_vars[idx].R.Resize(Nsensors, Nsensors);
+        state_vars[idx].z.Resize(Nsensors);
+        state_vars[idx].idx = idx;
+        state_vars[idx].Nt = Nt;
+        state_vars[idx].Nschwarz = Nschwarz;
+        ComputeH(sensors[idx], state_vars[idx].H);
+        InitialCovar(conf, state_vars[idx].P);
+        state_field[idx].setActiveLayer(ACTIVE_LAYER);  // this is important
+        temp_field[idx].setActiveLayer(ACTIVE_LAYER);   // this is important
     });
 
-    // Visualization: image of the sensor positions in the whole domain.
-    vis.WriteImageOfSensors(H);
+    // Open file manager and the output file for writing.
+    std::string filename = MakeFileName(conf, "field");
+    FileIOManager & file_manager = FileIOManager::getInstance();
+    Entry stream_entry = file_manager.createEntry(filename, Mode::Binary);
+    auto out_stream = file_manager.openOutputStream(stream_entry);
 
-    // Time integration forward in time.
-    for (int t = 0, Nt = conf.asInt("Nt"); t < Nt; ++t) {
-        MY_PROGRESS('+')
-
-        const double physical_time = t * conf.asDouble("dt");
-        const flow_t flow = Flow(conf, physical_time);
-
-        pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
-            // Get the current sensor measurements.
-            GetObservations(z[idx], observations[idx], t,
-                            H[idx], sensors[idx]);
-
-            // Covariance matrices are allowed to change over time.
-            ComputeQ(conf, Q[idx]);
-            ComputeR(conf, R[idx]);
-
-            // Fixed number of Schwarz (sub)iterations.
-            for (int iter_no = 0; iter_no < Nschwarz; ++iter_no) {
-                if (idx == point2d_t(0,0)) MY_PROGRESS('.')
-
-                // On the first Schwarz iteration we computer prior
-                // estimation of the state field.
-                if (iter_no == 0) {
-                    // Copy state field into more convenient matrix object.
-                    MatrixFromAllscale(field[idx],
-                                       state[idx].getLayer<ACTIVE_LAYER>());
-                    // Prior estimation.
-                    InverseModelMatrix(B[idx], conf, boundaries[idx], flow);
-                    Kalman[idx].PropagateStateInverse(field[idx], P[idx],
-                                                          B[idx], Q[idx]);
-                    // Put new estimation back to the state field.
-                    AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(),
-                                       field[idx]);
-                    // Ensure boundary conditions on the outer border.
-                    ApplyBoundaryCondition(state, idx);
-                }
-
-                // Update subdomain boundaries according to Schwarz method.
-                double diff = SchwarzUpdate(conf, boundaries[idx],
-                                                             idx, state, flow);
-                // Ensure boundary conditions on the outer border.
-                ApplyBoundaryCondition(state, idx);
-                // Accumulate history of discrepancies for debugging,
-                diff_profile.Accumulate(idx, diff);
-                // Copy state field into more convenient matrix object.
-                MatrixFromAllscale(field[idx],
-                                   state[idx].getLayer<ACTIVE_LAYER>());
-                // Filtering by Kalman filter.
-                Kalman[idx].SolveFilter(field[idx], P[idx],
-                                            H[idx], R[idx], z[idx]);
-                // Put new estimation back to the state field.
-                AllscaleFromMatrix(state[idx].getLayer<ACTIVE_LAYER>(),
-                                   field[idx]);
-                // Ensure boundary conditions on the outer border.
-                ApplyBoundaryCondition(state, idx);
+    // Time integration forward in time. We want to make Nt (normal) iterations
+    // and Nschwarz Schwarz sub-iterations within each (normal) iteration.
+    ::allscale::api::user::algorithm::stencil(
+        state_field, Nt * Nschwarz,
+        // Process the internal subdomains.
+        [&](time_t t, const point2d_t & idx, const domain_t & state)
+        -> const subdomain_cell_t &  // cell is not copy-constructible, so '&'
+        {
+            assert_true(t >= 0);
+            return SubdomainRoutine(conf, sensors[idx], observations[idx],
+                                    false, size_t(t), state, temp_field,
+                                    state_vars[idx], diff_profile);
+        },
+        // Process the external subdomains.
+        [&](time_t t, const point2d_t & idx, const domain_t & state)
+        -> const subdomain_cell_t &  // cell is not copy-constructible, so '&'
+        {
+            return SubdomainRoutine(conf, sensors[idx], observations[idx],
+                                    true, size_t(t), state, temp_field,
+                                    state_vars[idx], diff_profile);
+        },
+        // Monitoring.
+        ::allscale::api::user::algorithm::observer(
+            // Time filter: choose few moments evenly distributed on time axis.
+            [=](time_t t) {
+                // Filter out the first Schwarz sub-iteration, skip the others.
+                if ((t % time_t(Nschwarz)) != 0)
+                    return false;
+                t /= time_t(Nschwarz);
+                return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
+            },
+            // Space filter: no specific points.
+            [](const point2d_t &) { return true; },
+            // Append a full field to the file of simulation results.
+            [&](time_t t, const point2d_t & p, const subdomain_cell_t & cell) {
+                t /= time_t(Nschwarz);
+                const auto & subdomain = cell.getLayer<ACTIVE_LAYER>();
+                int gx = 0, gy = 0;     // global coordinates
+                for (int y = 0; y < SUBDOMAIN_Y; ++y) { gy = Sub2GloY(p, y);
+                for (int x = 0; x < SUBDOMAIN_X; ++x) { gx = Sub2GloX(p, x);
+                    double val = subdomain[{x,y}];
+                    out_stream.atomic([=](auto & file) {
+                        file.write(static_cast<float>(t));
+                        file.write(static_cast<float>(gx));
+                        file.write(static_cast<float>(gy));
+                        file.write(static_cast<float>(val));
+                    });
+                }}
             }
-        });
-
-        // Write a few full fields as the simulation results.
-        if ((t == 0) || (t+1 == Nt) || ((10*t)/Nt != (10*(t+1))/Nt)) {
-            WriteFullField(conf, state, t);
-        }
-
-        // Visualization: print and/or write the image of the state field.
-        vis.ShowImage(field, "field", t, true, true);
-    }
+        )
+    );
+    file_manager.close(out_stream);
     diff_profile.PrintProfile(conf, "schwarz_diff");
     MY_INFO("%s", "\n\n")
 }

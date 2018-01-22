@@ -140,6 +140,17 @@ int Configuration::asInt(const char * param_name) const
 }
 
 //-----------------------------------------------------------------------------
+// Function returns the unsigned integer parameter value.
+//-----------------------------------------------------------------------------
+size_t Configuration::asUInt(const char * param_name) const
+{
+    int v = asInt(param_name);
+    assert_true(v >= 0);
+    static_assert(sizeof(int) <= sizeof(size_t), "wrong size of built-ins");
+    return static_cast<size_t>(v);
+}
+
+//-----------------------------------------------------------------------------
 // Function returns the floating-point parameter value.
 //-----------------------------------------------------------------------------
 double Configuration::asDouble(const char * param_name) const

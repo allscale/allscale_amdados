@@ -33,26 +33,31 @@ enum {
     L_4m = 0,
 };
 
+const int _X_ = 0;      // index of abscissa
+const int _Y_ = 1;      // index of ordinate
+
+const int ACTIVE_LAYER = L_100m;  // should be template a parameter eventually
+
 //#############################################################################
-// D E P E N D A N T  constants and types.
+// D E R I V E D  constants and types.
 //#############################################################################
 
 // Number of elements (or nodal points) in a subdomain.
 const int SUB_PROBLEM_SIZE = SUBDOMAIN_X * SUBDOMAIN_Y;
 
-// Position, index or size in 2D.
+// 2D point, also "index" in parallel for (pfor) loops.
 typedef ::allscale::api::user::data::GridPoint<2> point2d_t;
-typedef ::allscale::api::user::data::GridPoint<2> size2d_t;
 typedef ::std::vector<point2d_t>                  point_array_t;
 
-// This is more elaborated grid of all the subdomain structures.
-// These special subdomains can handle multi-resolution case.
-using domain_t = ::allscale::api::user::data::Grid<
-                    ::allscale::api::user::data::AdaptiveGridCell<
-                                            double,sub_domain_config_t>, 2>;
+// 2D size (same as 2D point).
+typedef ::allscale::api::user::data::GridPoint<2> size2d_t;
 
-const int _X_ = 0;      // index of abscissa
-const int _Y_ = 1;      // index of ordinate
+// Each cell constitutes a sub-domain.
+using subdomain_cell_t = ::allscale::api::user::data::AdaptiveGridCell<
+                                                double, sub_domain_config_t>;
+
+// Collection of sub-domains constitutes the whole domain.
+using domain_t = ::allscale::api::user::data::Grid<subdomain_cell_t, 2>;
 
 /**
  * Function converts 2D index to a flat 1D one.

@@ -45,6 +45,7 @@ public:
     void PrintParameters() const;
 
     int                 asInt(const char * param_name) const;
+    size_t              asUInt(const char * param_name) const;
     double              asDouble(const char * param_name) const;
     const std::string & asString(const char * param_name) const;
     const char *        asCString(const char * param_name) const;

@@ -29,9 +29,10 @@
 #include <iomanip>
 #include <stdexcept>
 #include <chrono>
+#include <mutex>
 
 #if defined(MY_INFO) || defined(MY_PROGRESS) || defined(MY_TIME_IT) || \
-    defined(MY_TRY) || defined(MY_CATCH)
+    defined(MY_ERR) || defined(MY_TRY) || defined(MY_CATCH)
 #error macro redefinition
 #endif
 
@@ -42,9 +43,27 @@
                             fprintf(stdout, "\n"); \
                             fflush(stdout); }
 
+#define MY_ERR(fmt, ...) { fprintf(stdout, "ERROR: "); \
+                           fprintf(stdout, fmt, __VA_ARGS__); \
+                           fprintf(stdout, "\n"); \
+                           fflush(stdout); }
 
-#define MY_PROGRESS(s) { fprintf(stdout, ((s == '+') ? "+" : ".")); \
-                         fflush(stdout); }
+// https://stackoverflow.com/questions/1579719/
+//          variable-number-of-parameters-in-function-c
+struct sync_print_type {
+    template<typename ... T>
+    sync_print_type(T && ...) {}
+};
+template<typename ... ArgTypes>
+void SyncPrint(ArgTypes ... args) {
+    static std::mutex sync;
+    sync.lock();
+    sync_print_type{0, (std::cout << args, 0) ... };
+    std::cout << std::endl << std::flush;
+    sync.unlock();
+}
+
+#define MY_PROGRESS(s) { fprintf(stdout, s); fflush(stdout); }
 
 /**
  * Simple timer.

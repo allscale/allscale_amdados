@@ -49,8 +49,9 @@ def Amdados2D(config_file, demo):
         print("")
     sensor_idx = LoadSensorLocations(conf)
 
-    # Run forward simulation and record the "true" solutions.
-    ForwardSolver(conf, glo_idx, sensor_idx, demo)
+    # Run forward simulation and record the "true" solutions into file "fid".
+    with open(MakeFileName(conf, "true-field"), "wb") as fid:
+        ForwardSolver(conf, glo_idx, sensor_idx, fid, demo)
 
     # Create video file of PDE integration process, if requested.
     if demo:
@@ -146,7 +147,7 @@ def ApplyBoundaryCondition(conf, field):
     return field
 
 
-def InverseModelMatrix(conf, glo_idx, t):
+def InverseModelMatrix(conf, glo_idx, discrete_time):
     """ Function initializes inverse matrix of implicit Euler time-integrator:
         B * x_{t+1} = x_{t}, where B = A^{-1} is the matrix returned by this
         function. The matrix must be inverted while iterating forward in time:
@@ -161,7 +162,7 @@ def InverseModelMatrix(conf, glo_idx, t):
     cols = np.zeros((num_nz,), dtype=int)
     vals = np.zeros((num_nz,), dtype=float)
 
-    vx, vy = Flow(conf, t)
+    vx, vy = Flow(conf, discrete_time)
     rho_x = conf.rho_x
     rho_y = conf.rho_y
     vx = vx / conf.v0x
@@ -225,12 +226,12 @@ def InverseModelMatrix(conf, glo_idx, t):
     return invA
 
 
-def Flow(conf, t):
+def Flow(conf, discrete_time):
     """ Function computes flow components given a time.
     """
-    T = conf.integration_period
-    vx = -conf.flow_model_max_vx * math.sin(0.1 * t / T - math.pi)
-    vy = -conf.flow_model_max_vy * math.sin(0.2 * t / T - math.pi)
+    t = float(discrete_time) / float(conf.Nt)
+    vx = -conf.flow_model_max_vx * math.sin(0.1 * t - math.pi)
+    vy = -conf.flow_model_max_vy * math.sin(0.2 * t - math.pi)
     return vx, vy
 
 
@@ -258,10 +259,10 @@ def InitialField(conf):
     return field
 
 
-def ForwardSolver(conf, glo_idx, sensor_idx, demo):
+def ForwardSolver(conf, glo_idx, sensor_idx, solution_fid, demo):
     """ Using model matrix A, the function integrates advection-diffusion
         equation forward in time (x_{t+1} = A * x_{t}) and records all the
-        solutions - state fields. These fields are considered as the "true"
+        solution (state) fields. These fields are considered as the "true"
         state of the nature and the source of the "true" observations.
     """
     start_time = timer()
@@ -273,7 +274,8 @@ def ForwardSolver(conf, glo_idx, sensor_idx, demo):
     writer = Writer(conf)
     hFigure = None
     progress = PrintProgress(conf.Nt)
-    Nt = conf.Nt
+    Nt = round(conf.Nt)
+    Nw = round(conf.write_num_fields)
 
     plt = None
     if demo: plt = SwitchToGraphicalBackend()
@@ -285,8 +287,8 @@ def ForwardSolver(conf, glo_idx, sensor_idx, demo):
         # Write the field entries at sensors into the file of observations.
         writer.WriteField(field, sensor_idx, k)
         # Write a few full fields for comparison against simulation later on.
-        if k == 0 or k+1 == Nt or (10*k)//Nt != (10*(k+1))//Nt:
-            WriteEntireField(conf, field, k)
+        if ((Nw-1)*(k-1))//(Nt-1) != ((Nw-1)*k)//(Nt-1):
+            WriteEntireField(solution_fid, field, k)
 
         # Visualization, if needed.
         if plt is not None:
@@ -302,8 +304,7 @@ def ForwardSolver(conf, glo_idx, sensor_idx, demo):
             plt.draw()
 
         # Time marching of the forward solver.
-        t = k * conf.dt                                   # physical time
-        invA = InverseModelMatrix(conf, glo_idx, t)       # invA = A^{-1}
+        invA = InverseModelMatrix(conf, glo_idx, k)       # invA = A^{-1}
         fld1D = np.reshape(field, (conf.problem_size, 1)) # flatten the field
         field = scipy.sparse.linalg.spsolve(invA, fld1D)  # x_{t+1} = invA*x_t
         field = np.reshape(field, (conf.nx, conf.ny))     # back to 2D field
@@ -319,22 +320,23 @@ def ForwardSolver(conf, glo_idx, sensor_idx, demo):
 # Utilities.
 ###############################################################################
 
-def WriteEntireField(conf, field, discrete_time):
-    """ Function writes the entire field in the file as opposed to saving
-        values at sensor locations in the class Writer, see below.
+def WriteEntireField(fid, field, discrete_time):
+    """ Function writes the selected entire field in the binary file. This is
+        different from saving values at sensor locations in the class Writer
+        (see below), where saving is done on every time step.
     """
+    THR = np.finfo(np.float32).max * np.float32(0.5)
     assert isinstance(discrete_time, int) and discrete_time >= 0
-    filename = MakeFileName(conf, "true-field",
-                            "time{0:0>5}.txt".format(discrete_time))
-    # N O T E: np.savetxt() expects (!?) file opened in binary format "wb".
-    with open(filename, "wb") as fid:
-        nr = field.shape[0]
-        nc = field.shape[1]
-        rows = np.repeat(np.arange(nr), nc).astype(int)
-        cols = np.tile(np.arange(nc), nr).astype(int)
-        data = np.column_stack((rows, cols, field.flatten()))
-        np.savetxt(fid, data, fmt="%d %d %.10f", delimiter="\t");
-        fid.flush()
+    assert np.all(np.fabs(field) < THR), "too big values for float32 format"
+    nr = field.shape[0]
+    nc = field.shape[1]
+    ts   = np.full((nr*nc,1), np.float32(discrete_time), dtype=np.float32)
+    rows = np.repeat(np.arange(nr), nc).astype(np.float32)
+    cols = np.tile(np.arange(nc), nr).astype(np.float32)
+    vals = field.flatten().astype(np.float32)
+    data = np.column_stack((ts, rows, cols, vals))
+    data.tofile(fid);
+    fid.flush()
 
 
 class Writer:

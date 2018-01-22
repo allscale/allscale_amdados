@@ -55,7 +55,7 @@ virtual ~Visualizer() {}
  * \return  reference to image that can be plotted, for example, by Gnuplot.
  */
 virtual const ubyte_array_t & Write(const char * title,
-            const Grid<Matrix,2> & field, int time_index, bool write_image)
+            const domain_t & field, int time_index, bool write_image)
 {
 	using ::allscale::api::user::algorithm::pfor;
     const bool flipY = false;
@@ -64,30 +64,29 @@ virtual const ubyte_array_t & Write(const char * title,
     m_image.resize(glo.x * glo.y);
 
     // Compute the minimum and maximum values of the property field.
-    double lower = 0.0, upper = 0.0;
-    {
-        Grid<double,2> minvalues(field.size()), maxvalues(field.size());
-        pfor(point2d_t(0,0), field.size(), [&](const point2d_t & idx) {
-            minvalues[idx] = *(std::min_element(field[idx].begin(),
-                                                field[idx].end()));
-            maxvalues[idx] = *(std::max_element(field[idx].begin(),
-                                                field[idx].end()));
+    double lower = field[{0,0}][{0,0}], upper = field[{0,0}][{0,0}];
+    field.forEach([&](const subdomain_cell_t & cell) {
+        const auto & subfield = cell.getLayer<L_100m>();
+        assert_true(subfield.size()[_X_] == SUBDOMAIN_X);
+        assert_true(subfield.size()[_Y_] == SUBDOMAIN_Y);
+        subfield.forEach([&](const double & v) {
+            if (v < lower) lower = v;
+            if (v > upper) upper = v;
         });
-        // Doing reduction sequentially.
-        minvalues.forEach([&](const double & v) { if (lower > v) lower = v; });
-        maxvalues.forEach([&](const double & v) { if (upper < v) upper = v; });
-    }
+    });
 
-    // Convert the property field into one-byte-per-pixel representation.
+    // Convert the property field into grayscaled (one byte per pixel) image.
     pfor(point2d_t(0,0), field.size(), [&](const point2d_t & idx) {
-        const auto & subfield = field[idx];
+        const auto & subfield = field[idx].getLayer<L_100m>();
+        assert_true(subfield.size()[_X_] == SUBDOMAIN_X);
+        assert_true(subfield.size()[_Y_] == SUBDOMAIN_Y);
         for (int y = 0; y < SUBDOMAIN_Y; ++y) { int yg = Sub2GloY(idx, y);
         for (int x = 0; x < SUBDOMAIN_X; ++x) { int xg = Sub2GloX(idx, x);
             int pos = xg + glo.x * (flipY ? yg : (glo.y - 1 - yg));
             if (!(static_cast<size_t>(pos) < m_image.size()))
                 assert_true(0);
             m_image[pos] = static_cast<unsigned char>(
-                    Round(255.0 * (subfield(x,y) - lower) /
+                    Round(255.0 * (subfield[{x,y}] - lower) /
                             std::max(upper - lower, TINY)) );
         }}
     });
@@ -118,40 +117,45 @@ virtual const ubyte_array_t & Write(const char * title,
  * in the whole domain.
  * \param  H  grid of observation matrices.
  */
-virtual void WriteImageOfSensors(const Grid<Matrix,2> & H)
+template<typename CELL_TYPE>
+void WriteImageOfSensors(const Grid<CELL_TYPE,2> & datagrid)
 {
     using ::allscale::api::user::algorithm::pfor;
-    Grid<Matrix,2> field(H.size());
-    pfor(point2d_t(0,0), H.size(), [&](const point2d_t & idx) {
-        field[idx].Resize(SUBDOMAIN_X, SUBDOMAIN_Y);
+    domain_t field(datagrid.size());
+    pfor(point2d_t(0,0), datagrid.size(), [&](const point2d_t & idx) {
+        field[idx].setActiveLayer(L_100m);
+        const auto & subfield = field[idx].getLayer<L_100m>();
+        assert_true(subfield.size()[_X_] == SUBDOMAIN_X);
+        assert_true(subfield.size()[_Y_] == SUBDOMAIN_Y);
 
-        Matrix       & subfield = field[idx];
-        const Matrix & h = H[idx];
+        const Matrix & H = datagrid[idx].H;
+        assert_true(H.NRows() == SUBDOMAIN_X);
+        assert_true(H.NCols() == SUBDOMAIN_Y);
 
         // Everything is set to black except border points painted in dark gray.
-        Fill(subfield, 0.0);
+        subfield.forEach([](double & v) { v = 0.0; });
         for (int x = 0; x < SUBDOMAIN_X; ++x) {
-            subfield(x,0) = subfield(x,SUBDOMAIN_Y - 1) = 128.0;
+            subfield[{x,0}] = subfield[{x,SUBDOMAIN_Y - 1}] = 128.0;
         }
         for (int y = 0; y < SUBDOMAIN_Y; ++y) {
-            subfield(0,y) = subfield(SUBDOMAIN_X - 1,y) = 128.0;
+            subfield[{0,y}] = subfield[{SUBDOMAIN_X - 1,y}] = 128.0;
         }
 
         // Sensor locations are depicted in white.
-        for (int r = 0; r < h.NRows(); ++r) {
-        for (int c = 0; c < h.NCols(); ++c) {
-            if (h(r,c) > 0.01) {                    // H is a 0/1 matrix
+        for (int r = 0; r < H.NRows(); ++r) {
+        for (int c = 0; c < H.NCols(); ++c) {
+            if (H(r,c) > 0.01) {                    // H is a 0/1 matrix
                 div_t res = div(c, SUBDOMAIN_Y);    // 1D index to 2D point
                 int x = res.quot;
                 int y = res.rem;
                 assert_true(Sub2Ind(x,y) == c);     // check index conversion
-                subfield(x,y) = 255.0;
+                subfield[{x,y}] = 255.0;
             }
         }}
     });
 
-    const int Nx = field.size()[0] * SUBDOMAIN_X;
-    const int Ny = field.size()[1] * SUBDOMAIN_Y;
+    const int Nx = field.size()[_X_] * SUBDOMAIN_X;
+    const int Ny = field.size()[_Y_] * SUBDOMAIN_Y;
     std::stringstream title;
     title << "sensors" << "_Nx" << Nx << "_Ny" << Ny;
     this->Write(title.str().c_str(), field, -1, true);
@@ -167,7 +171,7 @@ virtual void WriteImageOfSensors(const Grid<Matrix,2> & H)
  * \param  write_image  if true, then image will be saved on the dhard disk.
  * \param  plot_image   if true, image will be plotted in a graphical window.
  */
-virtual void ShowImage(const Grid<Matrix,2> & field,
+virtual void ShowImage(const domain_t & field,
                        const char * title,
                        int timestamp,
                        bool write_image = true,

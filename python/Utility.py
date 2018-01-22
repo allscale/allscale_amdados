@@ -3,7 +3,9 @@
 # Copyright : IBM Research Ireland, 2017
 # -----------------------------------------------------------------------------
 
-import glob, os, sys, errno, math, subprocess, traceback
+import pdb; pdb.set_trace()           # enables debugging
+
+import glob, os, sys, errno, math, re, subprocess, traceback
 import numpy as np
 import scipy
 import scipy.misc
@@ -83,8 +85,8 @@ def MakeFileName(conf, entity, suffix=None) -> str:
         filename = filename + "_Nt" + str(conf.Nt)
 
     if suffix is None:
-        assert entity != "true-field", (
-                "file suffix is always expected for the true field")
+        #assert entity != "true-field", (
+        #        "file suffix is always expected for the true field")
         filename = filename + ".txt"
     else:
         if suffix.endswith(".avi"):
@@ -192,7 +194,7 @@ def WriteFieldAsImage(filename, field) -> object:
         Also, the image is flipped vertically so that the origin
         goes to the left-bottom corner.
     """
-    assert isinstance(filename, str) and len(field.shape) == 2
+    assert len(field.shape) == 2
     # Image <- field scaled to [0..1] range.
     vmin = np.amin(field)
     vmax = np.amax(field)
@@ -200,8 +202,55 @@ def WriteFieldAsImage(filename, field) -> object:
                    (vmax - vmin + math.sqrt(np.finfo(float).eps)))
     # Write image file.
     image = np.flipud(image)            # flip Y
-    scipy.misc.imsave(filename, image)
+    if filename is not None:
+        assert isinstance(filename, str)
+        scipy.misc.imsave(filename, image)
     return image
+
+
+def ReadResultFile(filename):
+    """ Function reads the binary file where a number of solutions (full state
+        fields) are stacked one after another. The file format has 4-column
+        layout (time, abscissa, ordinate, value), all values have float-32
+        precision and records are not necessary sorted (in case of C++ output).
+    """
+    # Check file name has the pattern of a file of solution fields.
+    assert re.search(r".*field_Nx\d+_Ny\d+_Nt\d+\.txt", filename), (
+            "wrong pattern of the file for solution field")
+    # Extracts Nx, Ny and Nt from the file name.
+    digits = re.sub("[^0-9]", " ", os.path.basename(filename))
+    params = [int(s) for s in digits.split() if s.isdigit()]
+    assert len(params) == 3
+    Nx = int(params[0])
+    Ny = int(params[1])
+    Nt = int(params[2])
+    # Read the solution fields file and sort the records because the parallel
+    # C++ application does not guarantee proper ordering. Actually, we do not
+    # sort the data as such, rather get the sorting index array.
+    with open(filename, "rb") as fid:
+        data = np.fromfile(fid, dtype=np.float32)
+    data = np.reshape(data, (-1,4))
+    Nw = data.shape[0] // (Nx * Ny)             # number of written records
+    assert data.shape[0] == Nx * Ny * Nw, "wrong file size"
+    idx = np.lexsort(np.rot90(data[:,0:3]))     # sort by {t,x,y} triples
+    # Check the data and form the output fields and corresponding timestamps.
+    timestamps = np.zeros((Nw,), dtype=int)
+    fields = np.zeros((Nw, Nx, Ny), dtype=np.float32)
+    # Expected layouts of abscissas and ordinates.
+    xpos = np.repeat(np.arange(Nx), Ny).astype(int)
+    ypos = np.tile(np.arange(Ny), Nx).astype(int)
+    for i in range(Nw):
+        # Get indices of a block of records corresponding to a separate field.
+        block = idx[i*Nx*Ny : (i+1)*Nx*Ny]
+        # Within the block all timestamps are the same.
+        timestamps[i] = np.rint(data[block[0], 0])
+        assert np.all(np.rint(data[block, 0]) == timestamps[i])
+        # Check the layouts of abscissas and ordinates.
+        assert np.all(np.rint(data[block, 1]) == xpos)
+        assert np.all(np.rint(data[block, 2]) == ypos)
+        # Make 2D field from the last column.
+        fields[i,:,:] = np.reshape(data[block, 3], (Nx, Ny))
+    return timestamps, fields
 
 
 class PrintProgress:
@@ -226,3 +275,6 @@ class PrintProgress:
         """
         print("", flush=True)
 
+
+#if __name__ == "__main__":
+#    ReadResultFile("../output/true-field_Nx121_Ny121_Nt840.txt")

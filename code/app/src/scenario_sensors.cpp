@@ -205,6 +205,7 @@ void LoadSensorLocations(const Configuration   & conf,
 
     // Read the sensor file sequentially.
     std::string filename = MakeFileName(conf, "sensors");
+    CheckFileExists(conf, filename);
     FileIOManager & manager = FileIOManager::getInstance();
     Entry e = manager.createEntry(filename, Mode::Text);
     auto in = manager.openInputStream(e);
