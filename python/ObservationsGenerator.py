@@ -18,7 +18,7 @@ from Utility import *
 
 ZERO_BOUNDARY_CONDITIONS = True
 
-# Path to the C++ executable.
+# Full-path name of C++ executable.
 AMDADOS_EXE = "build/app/amdados"
 
 
@@ -50,12 +50,12 @@ def Amdados2D(config_file, demo):
     sensor_idx = LoadSensorLocations(conf)
 
     # Run forward simulation and record the "true" solutions into file "fid".
-    with open(MakeFileName(conf, "true-field"), "wb") as fid:
+    with open(MakeFileName(conf, "true_field"), "wb") as fid:
         ForwardSolver(conf, glo_idx, sensor_idx, fid, demo)
 
     # Create video file of PDE integration process, if requested.
     if demo:
-        MakeVideo(conf, "true-field")
+        MakeVideo(conf, "true_field")
         #ClearOutputDir(conf, ".png")
 
 
@@ -292,7 +292,7 @@ def ForwardSolver(conf, glo_idx, sensor_idx, solution_fid, demo):
 
         # Visualization, if needed.
         if plt is not None:
-            image = WriteFieldAsImage(MakeFileName(conf, "true-field",
+            image = WriteFieldAsImage(MakeFileName(conf, "true_field",
                                         "time{0:0>5}.png".format(k)), field)
             if hFigure is None:
                 hFigure = plt.imshow(image)

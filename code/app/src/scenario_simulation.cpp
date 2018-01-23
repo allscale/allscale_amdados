@@ -111,9 +111,9 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
     assert_true(z.Size() == n);
     for (int i = 0; i < n; ++i) { z(i) = observations(timestep, i); }
 
-    (void)H;(void)sensors;
-#if 1
-#warning "Some extra validity test"
+    (void) H; (void) sensors;
+#ifdef AMDADOS_DEBUGGING
+    #warning "Some extra validity test"
     Matrix subfield(SUBDOMAIN_X, SUBDOMAIN_Y);
     for (int i = 0; i < static_cast<int>(sensors.size()); ++i) {
         subfield(sensors[i].x, sensors[i].y) = observations(timestep, i);
@@ -552,10 +552,13 @@ double SchwarzUpdate(const Configuration &,
 
             // Copy values from peer's boundary to this subdomain boundary.
             border.inflow[dir] = true;          // in-flow boundary
+#ifdef AMDADOS_DEBUGGING
             border.myself = next_domain[idx].getBoundary(dir);
+#endif
             border.remote = curr_domain[peer_idx].getBoundary(peer_dir);
             next_domain[idx].setBoundary(dir, border.remote);
 
+#ifdef AMDADOS_DEBUGGING
             // Compute and accumulate aggregated difference between
             // boundary values of this subdomain before and after update.
             double rsum = 0.0, msum = 0.0, diff = 0.0;
@@ -567,6 +570,7 @@ double SchwarzUpdate(const Configuration &,
             }
             numer_sum += diff;
             denom_sum += std::max(rsum, msum);
+#endif
         }
     };
 
@@ -827,7 +831,7 @@ void ScenarioSimulation(const std::string & config_file)
     // we can safely proceed to the main part of the simulation algorithm.
     RunDataAssimilation(conf, sensors, observations);
 
-    MakeVideo(conf, "field");
+    //MakeVideo(conf, "field");
 }
 
 } // namespace amdados

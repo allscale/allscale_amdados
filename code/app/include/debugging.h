@@ -48,6 +48,7 @@
                            fprintf(stdout, "\n"); \
                            fflush(stdout); }
 
+// Function prints uninterrupted text line from within parallel for loop.
 // https://stackoverflow.com/questions/1579719/
 //          variable-number-of-parameters-in-function-c
 struct sync_print_type {
@@ -87,14 +88,14 @@ public:
 #define MY_TIME_IT(text) M_y_T_i_m_e_r  _t_i_m_e_r_(text); (void)_t_i_m_e_r_;
 
 
-#define MY_TRY      try
-#define MY_CATCH    catch (const std::domain_error & e) { \
+#define MY_TRY   try
+#define MY_CATCH catch (const std::domain_error & e) { \
     std::cout << std::endl << "domain error: " << e.what() << std::endl; } \
-                    catch (const std::runtime_error & e) { \
+                 catch (const std::runtime_error & e) { \
     std::cout << std::endl << "runtime error: " << e.what() << std::endl; } \
-                    catch (const std::exception & e) { \
+                 catch (const std::exception & e) { \
     std::cout << std::endl << "exception: " << e.what() << std::endl; } \
-                    catch (...) { \
+                 catch (...) { \
     std::cout << std::endl << "Unsupported exception" << std::endl; }
 
 #else   // !AMDADOS_DEBUGGING

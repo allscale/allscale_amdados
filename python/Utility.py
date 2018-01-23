@@ -50,9 +50,9 @@ def MakeBaseFileName(conf, entity) -> str:
     assert entity == "sensors"  or \
            entity == "analytic" or \
            entity == "field"    or \
-           entity == "true-field", \
+           entity == "true_field", \
             "allowed entity strings: " \
-            "{'sensors', 'analytic', 'field', 'true-field'}"
+            "{'sensors', 'analytic', 'field', 'true_field'}"
     Nx = round(conf.num_subdomains_x * conf.subdomain_x)
     Ny = round(conf.num_subdomains_y * conf.subdomain_y)
     assert hasattr(conf, 'Nt'), "number of time steps Nt is not specified"
@@ -72,9 +72,9 @@ def MakeFileName(conf, entity, suffix=None) -> str:
     assert entity == "sensors"  or \
            entity == "analytic" or \
            entity == "solution" or \
-           entity == "true-field", \
+           entity == "true_field", \
             "allowed entity strings: " \
-            "{'sensors', 'analytic', 'simulation', 'true-field'}"
+            "{'sensors', 'analytic', 'simulation', 'true_field'}"
     assert suffix is None or isinstance(suffix, str)
     Nx = round(conf.num_subdomains_x * conf.subdomain_x)
     Ny = round(conf.num_subdomains_y * conf.subdomain_y)
@@ -85,7 +85,7 @@ def MakeFileName(conf, entity, suffix=None) -> str:
         filename = filename + "_Nt" + str(conf.Nt)
 
     if suffix is None:
-        #assert entity != "true-field", (
+        #assert entity != "true_field", (
         #        "file suffix is always expected for the true field")
         filename = filename + ".txt"
     else:
@@ -208,22 +208,45 @@ def WriteFieldAsImage(filename, field) -> object:
     return image
 
 
-def ReadResultFile(filename):
+def ProblemParametersFromFilename(filename, extract_Nt = True,
+                                            prefix = None) -> [int,int,int]:
+    """ Function extracts problem size (Nx,Ny) from the file name
+        and optionally the number of time steps (Nt).
+    """
+    assert isinstance(filename, str)
+    assert (prefix is None) or isinstance(prefix, str)
+    # Get the base file name (without path) and check its validity.
+    basename = os.path.basename(filename)
+    assert (prefix is None) or basename.startswith(prefix), (
+                "base file name should start with the prefix: " + prefix)
+    # Check file name has the pattern of a file of solution fields.
+    assert re.search(r"\w+_Nx\d+_Ny\d+_Nt\d+\.txt", basename), (
+                            "base file name does not match the pattern")
+    # Extracts Nx, Ny and (optionally) Nt from the file name.
+    digits = re.sub("[^0-9]", " ", basename)
+    params = [int(s) for s in digits.split() if s.isdigit()]
+    Nx, Ny, Nt = int(-1), int(-1), int(-1)
+    if extract_Nt:
+        assert len(params) == 3, (
+                "expecting (Nx,Ny,Nt) in the file name: " + basename)
+        Nx = int(params[0])
+        Ny = int(params[1])
+        Nt = int(params[2])
+    else:
+        assert len(params) == 2, (
+                "expecting (Nx,Ny) in the file name: " + basename)
+        Nx = int(params[0])
+        Ny = int(params[1])
+    return Nx, Ny, Nt
+
+
+def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
     """ Function reads the binary file where a number of solutions (full state
         fields) are stacked one after another. The file format has 4-column
         layout (time, abscissa, ordinate, value), all values have float-32
         precision and records are not necessary sorted (in case of C++ output).
     """
-    # Check file name has the pattern of a file of solution fields.
-    assert re.search(r".*field_Nx\d+_Ny\d+_Nt\d+\.txt", filename), (
-            "wrong pattern of the file for solution field")
-    # Extracts Nx, Ny and Nt from the file name.
-    digits = re.sub("[^0-9]", " ", os.path.basename(filename))
-    params = [int(s) for s in digits.split() if s.isdigit()]
-    assert len(params) == 3
-    Nx = int(params[0])
-    Ny = int(params[1])
-    Nt = int(params[2])
+    Nx, Ny, Nt = ProblemParametersFromFilename(filename, True, None)
     # Read the solution fields file and sort the records because the parallel
     # C++ application does not guarantee proper ordering. Actually, we do not
     # sort the data as such, rather get the sorting index array.
@@ -233,7 +256,7 @@ def ReadResultFile(filename):
     Nw = data.shape[0] // (Nx * Ny)             # number of written records
     assert data.shape[0] == Nx * Ny * Nw, "wrong file size"
     idx = np.lexsort(np.rot90(data[:,0:3]))     # sort by {t,x,y} triples
-    # Check the data and form the output fields and corresponding timestamps.
+    # Create the output fields and corresponding timestamps.
     timestamps = np.zeros((Nw,), dtype=int)
     fields = np.zeros((Nw, Nx, Ny), dtype=np.float32)
     # Expected layouts of abscissas and ordinates.
@@ -275,6 +298,3 @@ class PrintProgress:
         """
         print("", flush=True)
 
-
-#if __name__ == "__main__":
-#    ReadResultFile("../output/true-field_Nx121_Ny121_Nt840.txt")

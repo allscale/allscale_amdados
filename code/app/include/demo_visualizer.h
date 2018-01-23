@@ -124,7 +124,7 @@ void WriteImageOfSensors(const Grid<CELL_TYPE,2> & datagrid)
     domain_t field(datagrid.size());
     pfor(point2d_t(0,0), datagrid.size(), [&](const point2d_t & idx) {
         field[idx].setActiveLayer(L_100m);
-        const auto & subfield = field[idx].getLayer<L_100m>();
+        auto & subfield = field[idx].getLayer<L_100m>();
         assert_true(subfield.size()[_X_] == SUBDOMAIN_X);
         assert_true(subfield.size()[_Y_] == SUBDOMAIN_Y);
 
