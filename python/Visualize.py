@@ -21,13 +21,17 @@ def GetTrueFieldFilename(filename):
     basename = os.path.basename(filename)
     if not basename.startswith("field_"):
         sys.exit("\nPlease, use the file named 'field_***.txt' as an input.\n")
-    return os.path.join(dirname, "true-" + basename)
+    return os.path.join(dirname, "true_" + basename)
 
 
-def PlotRelativeDifference(dirname, rel_diff):
+def PlotRelativeDifference(field_filename, rel_diff):
     """ Function plots and save in the file the difference between data
         assimilation simulation and analytic one.
     """
+    dirname = os.path.dirname(field_filename)
+    Nx, Ny, _ = ProblemParametersFromFilename(field_filename, True, "field")
+    filename = "rel_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"
+
     matplotlib.rcParams["legend.fontsize"] = 10
     fig = plt.figure()
     ax = fig.gca()
@@ -35,24 +39,21 @@ def PlotRelativeDifference(dirname, rel_diff):
     ax.set_xlabel("index of time slice")
     ax.set_ylabel("relative difference")
     plt.title("|analytic - simulation| / |analytic|")
-    plt.savefig(os.path.join(dirname, "rel_diff.png"))
+    plt.savefig(os.path.join(dirname, filename))
 
 
-def PlotSensors(field_filename):
+def PlotSensors(field_filename, params):
     """ Function plots the sensor locations.
     """
+    Sx = params["subdomain_x"]
+    Sy = params["subdomain_y"]
     # Load file of sensors corresponding to the file of solution fields.
     dirname = os.path.dirname(field_filename)
     Nx, Ny, _ = ProblemParametersFromFilename(field_filename, True, "field")
     sensors_filename = os.path.join(dirname,
                             "sensors_Nx" + str(Nx) + "_Ny" + str(Ny) + ".txt")
     sensors = np.loadtxt(sensors_filename)
-    # Extract subdomain sizes from the configuration. Recall, the subdomain
-    # sizes remain the same for all the simulations.
-    conf = Configuration("amdados.conf")
-    Sx = conf.subdomain_x
-    Sy = conf.subdomain_y
-    assert Nx % Sx == 0 and Ny % Sx == 0
+    assert Nx % Sx == 0 and Ny % Sy == 0
     # Do plotting with grid spacing at the subdomain boundaries.
     fig = plt.figure()
     ax = fig.gca()
@@ -68,16 +69,14 @@ def PlotSensors(field_filename):
                         "sensors_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"))
 
 
-def PlotSchwarzProfile(field_filename):
+def PlotSchwarzProfile(field_filename, params):
     """ Function plots a picture demonstrating how smoothness of the solution
         improves at the subdomain boundaries as Schwarz iterations progressing.
         If the file of Schwarz iteration profile does not exist (this is only
         available with AMDADOS_DEBUGGING flag defined in C++ application),
         then nothing is done.
     """
-    # Extract the number of Schwarz iterations form the configuration.
-    conf = Configuration("amdados.conf")
-    Nschwarz = round(conf.schwarz_num_iters)
+    Nschwarz = params["Nschwarz"]
     # Load file of sensors corresponding to the file of solution fields.
     dirname = os.path.dirname(field_filename)
     Nx, Ny, Nt = ProblemParametersFromFilename(field_filename, True, "field")
@@ -114,18 +113,18 @@ if __name__ == "__main__":
         parser.add_argument("--field_file",
                 type=str, default=None,
                 help="path to solution fields file.")
-        param = parser.parse_args()
-        param.field_file = os.path.expanduser(param.field_file)
-        param.true_field_file = GetTrueFieldFilename(param.field_file)
+        opts = parser.parse_args()
+        field_file = os.path.expanduser(opts.field_file)
+        true_field_file = GetTrueFieldFilename(opts.field_file)
         print("Parameters:")
-        print("Solution fields file: " + param.field_file)
-        print("True solution fields file: " + param.true_field_file)
+        print("Solution fields file: " + field_file)
+        print("True solution fields file: " + true_field_file)
         print("")
 
         # Read the data files of the solution fields.
         print("Loading solution fields ...", flush=True)
-        true_timestamps, true_fields = ReadResultFile(param.true_field_file)
-        timestamps, fields = ReadResultFile(param.field_file)
+        true_timestamps, true_fields = ReadResultFile(true_field_file)
+        timestamps, fields = ReadResultFile(field_file)
         assert np.all(true_timestamps == timestamps), "mismatch in timestamps"
         assert np.all(true_fields.shape == fields.shape), "mismatch in layouts"
         assert len(timestamps) == fields.shape[0]
@@ -133,6 +132,11 @@ if __name__ == "__main__":
 
         # Relative difference between assimilation and true solutions.
         rel_diff = np.zeros((fields.shape[0],))
+
+        # Read some parameters that were stored by ScalabilityTest.py. These
+        # parameters must match the configuration used during the simulations.
+        params = np.load(
+                os.path.join(os.path.dirname(field_file), "params.npy")).item()
 
         # Plot the separate fields like video.
         plt = SwitchToGraphicalBackend()
@@ -145,28 +149,28 @@ if __name__ == "__main__":
                                             fields[i,:,:].ravel())
             rel_diff[i] = norm_diff / max(norm_true, np.finfo(float).eps)
 
-            ## Plot the solution fields.
-            #true_image = WriteFieldAsImage(None, true_fields[i,:,:])
-            #image = WriteFieldAsImage(None, fields[i,:,:])
-            #t = str(timestamps[i])
-            #if i == 0:
-                #im0 = axarr[0].imshow(true_image)
-            #else:
-                #im0.set_array(true_image)
-            #axarr[0].set_title("True density, t=" + t,
-                                #fontsize=10, fontweight="bold")
-            #if i == 0:
-                #im1 = axarr[1].imshow(image)
-            #else:
-                #im1.set_array(image)
-            #axarr[1].set_title("Density, t=" + t,
-                                #fontsize=10, fontweight="bold")
-            #plt.draw()
-            #plt.pause(0.20)
+            # Plot the solution fields.
+            true_image = WriteFieldAsImage(None, true_fields[i,:,:])
+            image = WriteFieldAsImage(None, fields[i,:,:])
+            t = str(timestamps[i])
+            if i == 0:
+                im0 = axarr[0].imshow(true_image)
+            else:
+                im0.set_array(true_image)
+            axarr[0].set_title("True density, t=" + t,
+                                fontsize=10, fontweight="bold")
+            if i == 0:
+                im1 = axarr[1].imshow(image)
+            else:
+                im1.set_array(image)
+            axarr[1].set_title("Density, t=" + t,
+                                fontsize=10, fontweight="bold")
+            plt.draw()
+            plt.pause(0.20)
 
-        PlotRelativeDifference(os.path.dirname(param.field_file), rel_diff)
-        PlotSensors(param.field_file)
-        PlotSchwarzProfile(param.field_file)
+        PlotRelativeDifference(field_file, rel_diff)
+        PlotSensors(field_file, params)
+        PlotSchwarzProfile(field_file, params)
 
     except AssertionError as error:
         traceback.print_exc()

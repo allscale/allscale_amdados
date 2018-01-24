@@ -3,7 +3,7 @@
 # Copyright : IBM Research Ireland, 2017
 # -----------------------------------------------------------------------------
 
-import pdb; pdb.set_trace()           # enables debugging
+#import pdb; pdb.set_trace()           # enables debugging
 
 import glob, os, sys, errno, math, re, subprocess, traceback
 import numpy as np
