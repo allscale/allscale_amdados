@@ -600,8 +600,6 @@ const subdomain_cell_t & SubdomainRoutine(
                             SubdomainData       & vars,
                             AverageProfile      & diff_profile)
 {
-    // TODO !!!!!!!!!!!!!!!!!!!!! properly distinguish current and next states
-
     assert_true(&curr_state != &next_state);
     assert_true(curr_state.size() == next_state.size());
 
@@ -681,6 +679,8 @@ const subdomain_cell_t & SubdomainRoutine(
         ApplyBoundaryCondition(next_state, idx);
     }
 
+    // Ensure non-negative (physically plausible) density.
+    next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
     return next_state[idx];
 }
 

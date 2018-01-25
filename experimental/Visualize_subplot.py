@@ -3,14 +3,6 @@
 # Copyright : IBM Research Ireland, 2018
 # -----------------------------------------------------------------------------
 
-""" Script visualizes simulation results given a path to field*.txt file.
-    For example, one can visualize all the simulation results (in bash):
- for f in output/field_*.txt; do py3 python/Visualize.py --field_file $f; done
-
-    Note, the script visualizes results of one particular simulation.
-    The reason for that is to have flexibility for debugging.
-"""
-
 #import pdb; pdb.set_trace()           # enables debugging
 import numpy as np
 from scipy.stats import mstats
@@ -20,7 +12,6 @@ from matplotlib.ticker import MultipleLocator
 import sys, traceback, os, math, argparse
 from Utility import *
 from Configuration import Configuration
-
 
 def GetTrueFieldFilename(filename):
     """ Given the name of the solution file, function constructs the name
@@ -149,28 +140,9 @@ if __name__ == "__main__":
 
         # Plot the separate fields like video.
         plt = SwitchToGraphicalBackend()
-        picture = None
-        im = None
+        hFig, axarr = plt.subplots(1,2)
+        im0, im1 = None, None
         for i in range(fields.shape[0]):
-            # Print information regarding the fields.
-            if np.any(np.isinf(true_fields[i,:,:])):
-                print("WARNING: true field contains Inf value(s)")
-            if np.any(np.isinf(fields[i,:,:])):
-                print("WARNING: field contains Inf value(s)")
-            if np.any(np.isnan(true_fields[i,:,:])):
-                print("WARNING: true field contains NaN value(s)")
-            if np.any(np.isnan(fields[i,:,:])):
-                print("WARNING: field contains NaN value(s)")
-            if np.amin(true_fields[i,:,:]) < -3.0 * np.finfo(float).eps:
-                print("WARNING: true field contains negative value(s)")
-            if np.amin(fields[i,:,:]) < -3.0 * np.finfo(float).eps:
-                print("WARNING: field contains negative value(s)")
-            if False:
-                print("true field: min: " + str(np.amin(true_fields[i,:,:])) +
-                                ", max: " + str(np.amax(true_fields[i,:,:])))
-                print("     field: min: " + str(np.amin(fields[i,:,:])) +
-                                ", max: " + str(np.amax(fields[i,:,:])))
-
             # Compute the relative difference between two solutions.
             norm_true = np.linalg.norm(true_fields[i,:,:].ravel())
             norm_diff = np.linalg.norm(true_fields[i,:,:].ravel() -
@@ -178,26 +150,25 @@ if __name__ == "__main__":
             rel_diff[i] = norm_diff / max(norm_true, np.finfo(float).eps)
 
             # Plot the solution fields.
+# The problem here: sometimes the second image is not plotted.
+# Maybe bug in Matplotlib
             true_image = WriteFieldAsImage(None, true_fields[i,:,:])
             image = WriteFieldAsImage(None, fields[i,:,:])
-            assert true_image.shape == image.shape
             t = str(timestamps[i])
-            gap = 20
-            nr = image.shape[0]
-            nc = image.shape[1]
-            if picture is None: picture = np.ones((nr, 2*nc + gap))
-            picture[0:nr, 0:nc] = true_image
-            picture[0:nr, nc+gap:2*nc+gap] = image
             if i == 0:
-                im = plt.imshow(picture)
+                im0 = axarr[0].imshow(true_image)
             else:
-                im.set_array(picture)
+                im0.set_array(true_image)
+            axarr[0].set_title("True density, t=" + t,
+                                fontsize=10, fontweight="bold")
+            if i == 0:
+                im1 = axarr[1].imshow(image)
+            else:
+                im1.set_array(image)
+            axarr[1].set_title("Density, t=" + t,
+                                fontsize=10, fontweight="bold")
             plt.draw()
-            plt.xticks([])
-            plt.yticks([])
-            plt.title("True density (left) vs estimated (right), Nx=" +
-                            str(nr) + ", Ny=" + str(nc) + ", t=" + t)
-            plt.pause(0.05)
+            plt.pause(0.20)
 
         PlotRelativeDifference(field_file, rel_diff)
         PlotSensors(field_file, params)
@@ -212,4 +183,3 @@ if __name__ == "__main__":
     except Exception as error:
         traceback.print_exc()
         print("ERROR: " + str(error.args))
-
