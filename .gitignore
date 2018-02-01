@@ -37,6 +37,7 @@ tags
 verdandi
 verdandi*
 output
+_output_*
 3rd_party
 3rd-party
 *.git

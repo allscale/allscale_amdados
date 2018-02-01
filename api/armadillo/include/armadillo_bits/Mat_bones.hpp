@@ -548,8 +548,8 @@ class Mat : public Base< eT, Mat<eT> >
     {
     public:
     
-    const_row_iterator(const Mat<eT>& in_M, const uword in_row);
-    const_row_iterator(const row_iterator& X);
+    inline const_row_iterator(const Mat<eT>& in_M, const uword in_row);
+    inline const_row_iterator(const row_iterator& X);
     
     inline eT operator*() const;
     
