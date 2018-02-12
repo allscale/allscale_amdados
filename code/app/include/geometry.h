@@ -12,38 +12,61 @@ namespace amdados {
 // P R I M A R Y  constants and types.
 //#############################################################################
 
-// Number of nodal points in a subdomain in each dimension.
-const int SUBDOMAIN_X = 11;
-const int SUBDOMAIN_Y = 11;
+// Maximum number of nodal points in a subdomain in each dimension.
+//const int SUBDOMAIN_X = 16;
+//const int SUBDOMAIN_Y = 16;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = ::allscale::api::user::data::CellConfig<2,
-    ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
-        ::allscale::api::user::data::layer<SUBDOMAIN_X,SUBDOMAIN_Y>,// 10x10 100m nodes each consisting of
-        ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
-        ::allscale::api::user::data::layer<5,5>               //  5x5    4m nodes
-    >
->;
+#if 0
+// layer: 0, size: [16,16]
+// layer: 1, size: [ 8, 8]
+// layer: 2, size: [ 4, 4]
+// layer: 3, size: [ 2, 2]
+// layer: 4, size: [ 1, 1]
+typedef ::allscale::api::user::data::CellConfig<2,
+            ::allscale::api::user::data::layers<
+                    ::allscale::api::user::data::layer<2,2>,
+                    ::allscale::api::user::data::layer<2,2>,
+                    ::allscale::api::user::data::layer<2,2>,
+                    ::allscale::api::user::data::layer<2,2>
+            >
+> subdomain_config_t;
 
 // Assign each layer a level corresponding to coarsest to finest.
 enum {
-    L_100m = 2,
-    L_20m = 1,
-    L_4m = 0,
+    LayerFine = 0,
+    LayerMid  = 1,
+    LayerLow  = 2
 };
+#else
+// layer: 0, size: [16,16]
+// layer: 1, size: [ 8, 8]
+// layer: 2, size: [ 1, 1]
+typedef ::allscale::api::user::data::CellConfig<2,
+            ::allscale::api::user::data::layers<
+                    ::allscale::api::user::data::layer<1,1>,
+                    ::allscale::api::user::data::layer<8,8>,
+                    ::allscale::api::user::data::layer<2,2>
+            >
+> subdomain_config_t;
 
-const int _X_ = 0;      // index of abscissa
-const int _Y_ = 1;      // index of ordinate
+// Assign each layer a level corresponding to coarsest to finest.
+enum {
+    LayerFine = 0,
+    LayerLow  = 1
+};
+#endif
 
-const int ACTIVE_LAYER = L_100m;  // should be template a parameter eventually
+//const int _X_ = 0;      // index of abscissa
+//const int _Y_ = 1;      // index of ordinate
 
 //#############################################################################
 // D E R I V E D  constants and types.
 //#############################################################################
 
 // Number of elements (or nodal points) in a subdomain.
-const int SUB_PROBLEM_SIZE = SUBDOMAIN_X * SUBDOMAIN_Y;
+//const int SUB_PROBLEM_SIZE = SUBDOMAIN_X * SUBDOMAIN_Y;
 
 // 2D point, also "index" in parallel for (pfor) loops.
 typedef ::allscale::api::user::data::GridPoint<2> point2d_t;
@@ -52,77 +75,32 @@ typedef ::std::vector<point2d_t>                  point_array_t;
 // 2D size (same as 2D point).
 typedef ::allscale::api::user::data::GridPoint<2> size2d_t;
 
-// Each cell constitutes a sub-domain.
-using subdomain_cell_t = ::allscale::api::user::data::AdaptiveGridCell<
-                                                double, sub_domain_config_t>;
+// A grid cell that constitutes a sub-domain.
+typedef ::allscale::api::user::data::AdaptiveGridCell<double,
+                                            subdomain_config_t> subdomain_t;
 
 // Collection of sub-domains constitutes the whole domain.
-using domain_t = ::allscale::api::user::data::Grid<subdomain_cell_t, 2>;
+typedef ::allscale::api::user::data::Grid<subdomain_t, 2> domain_t;
 
 /**
- * Function converts 2D index to a flat 1D one.
- * A T T E N T I O N: ordinate changes faster than abscissa.
- *                    This is in agreement with row-major Matrix class.
+ * Function maps a subdomain local coordinates to global ones.
+ * \param  query_point     point in question local to subdomain.
+ * \param  subdomain_pos   position of the subdomain inside a grid structure.
+ * \param  subdomain_size  size of the subdomain.
  */
-inline int Sub2Ind(int x, int y)
+inline point2d_t Sub2Glo(const point2d_t & query_point,
+                         const point2d_t & subdomain_pos,
+                         const size2d_t  & subdomain_size)
 {
+    const long x = query_point.x;
+    const long y = query_point.y;
 #ifndef NDEBUG
-    if (!((static_cast<unsigned>(x) < static_cast<unsigned>(SUBDOMAIN_X)) &&
-          (static_cast<unsigned>(y) < static_cast<unsigned>(SUBDOMAIN_Y))))
+    if (!((static_cast<size_t>(x) < static_cast<size_t>(subdomain_size.x)) &&
+          (static_cast<size_t>(y) < static_cast<size_t>(subdomain_size.y))))
         assert_true(0);
 #endif
-    return (x * SUBDOMAIN_Y + y);
-}
-
-/**
- * Function return the global sizes of a field.
- */
-template<typename T>
-point2d_t GlobalSize(const ::allscale::api::user::data::Grid<T,2> & field)
-{
-    return point2d_t(field.size()[_X_] * SUBDOMAIN_X,
-                     field.size()[_Y_] * SUBDOMAIN_Y);
-}
-
-/**
- * Function maps the subdomain local abscissa to global one.
- */
-inline int Sub2GloX(const point2d_t & subdomain, const int x)
-{
-#ifndef NDEBUG
-    if (!(static_cast<unsigned>(x) < static_cast<unsigned>(SUBDOMAIN_X)))
-        assert_true(0);
-#endif
-    return (x + subdomain[_X_] * SUBDOMAIN_X);
-}
-
-/**
- * Function maps the subdomain local ordinate to global one.
- */
-inline int Sub2GloY(const point2d_t & subdomain, const int y)
-{
-#ifndef NDEBUG
-    if (!(static_cast<unsigned>(y) < static_cast<unsigned>(SUBDOMAIN_Y)))
-        assert_true(0);
-#endif
-    return (y + subdomain[_Y_] * SUBDOMAIN_Y);
-}
-
-/**
- * Function converts global coordinates to the subdomain index on the grid.
- */
-inline point2d_t Glo2CellIndex(const point2d_t & p)
-{
-    return point2d_t(p.x / SUBDOMAIN_X, p.y / SUBDOMAIN_Y);
-}
-
-/**
- * Function converts global coordinates to the local ones inside a subdomain.
- */
-inline point2d_t Glo2Sub(const point2d_t & p)
-{
-    return point2d_t(p.x % SUBDOMAIN_X, p.y % SUBDOMAIN_Y);
+    return point2d_t(x + subdomain_pos.x * subdomain_size.x,
+                     y + subdomain_pos.y * subdomain_size.y);
 }
 
 } // namespace amdados
-

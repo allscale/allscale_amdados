@@ -63,11 +63,7 @@ inline int Round(double val)
     return static_cast<int>(std::floor(val + 0.5));
 }
 
-//void CleanOutputDir(const std::string & dir, const char * ext = nullptr);
-
 void CheckFileExists(const Configuration & conf, const std::string & filename);
-
-void MakeVideo(const Configuration & conf, const std::string & file_title);
 
 uint64_t RandomSeed();
 

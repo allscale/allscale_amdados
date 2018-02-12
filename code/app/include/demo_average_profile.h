@@ -72,7 +72,7 @@ virtual void PrintProfile(const Configuration & conf, const char * entity_name)
                           << filename.str();
     // Scale the profile to get average over all the subdomains.
     const point2d_t size = m_accums.size();
-    const double scale = 1.0 / static_cast<double>(size[_X_] * size[_Y_]);
+    const double scale = 1.0 / static_cast<double>(size.x * size.y);
     for (auto v : profile) f << (v * scale) << std::endl;
     f.flush();
 }

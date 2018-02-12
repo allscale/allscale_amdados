@@ -38,6 +38,7 @@ using ::allscale::api::user::data::Direction::Right;
 
 // amdados_utils.cpp:
 point2d_t GetGridSize(const Configuration & conf);
+void ShowImage(const domain_t & state_field, int timestamp);
 
 // scenario_sensors.cpp:
 void LoadSensorLocations(const Configuration   & conf,
@@ -680,7 +681,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
     // the index of Schwarz sub-iteration in the range [0..Nschwarz).
     assert_true(timestamp < ctx.Nt * ctx.Nschwarz);
     const size_t t_discrete = timestamp / ctx.Nschwarz;
-    const size_t sub_iter   = timestamp % ctx.Nschwarz;  (void) sub_iter;
+    const size_t sub_iter   = timestamp % ctx.Nschwarz;
 
 #ifdef AMDADOS_DEBUGGING    // printing progress
     if ((idx == point2d_t(0,0)) && (sub_iter == 0)) {
@@ -836,6 +837,11 @@ void RunDataAssimilation(const Configuration         & conf,
         [&](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
+#ifdef AMDADOS_DEBUGGING
+            // It turns out this visualization is not correct.
+            if ((idx == point2d_t(0,0)) && !(t % (5 * time_t(Nschwarz))))
+                ShowImage(state, static_cast<int>(t));
+#endif
             if (contexts[idx].Nsensors > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
@@ -890,7 +896,7 @@ void RunDataAssimilation(const Configuration         & conf,
  * The main function of this application runs simulation with data
  * assimilation using Schwarz method to handle domain subdivision.
  */
-void ScenarioSimulation(const std::string & config_file)
+void ScenarioSimulation2(const std::string & config_file)
 {
     MY_INFO("%s", "***** Amdados2D application *****")
     MY_INFO("%s", "AMDADOS_DEBUGGING is enabled")
@@ -901,6 +907,7 @@ void ScenarioSimulation(const std::string & config_file)
     conf.ReadConfigFile(config_file);
     InitDependentParams(conf);
     conf.PrintParameters();
+    //CleanOutputDir(conf.asString("output_dir"));
 
     // Load sensor data obtained from Python code.
     Grid<point_array_t,2> sensors(GetGridSize(conf));

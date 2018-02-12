@@ -26,7 +26,7 @@ const int SUBDOMAIN_Y = 17;
 
 // Set up the configuration of a grid cell (static).
 // With this type we can define a multi-resolution grid.
-using sub_domain_config_t = ::allscale::api::user::data::CellConfig<2,
+using subdomain_config_t = ::allscale::api::user::data::CellConfig<2,
     ::allscale::api::user::data::layers<            //  1000m x 1000m each subdomain covers
         ::allscale::api::user::data::layer<SUBDOMAIN_X,SUBDOMAIN_Y>,// 10x10 100m nodes each consisting of
         ::allscale::api::user::data::layer<5,5>,              //  5x5   20m nodes each consisting of
@@ -48,7 +48,7 @@ using size2d_t = point2d_t;
 // This is more elaborated grid of all the subdomain structures.
 // These special subdomains can handle multi-resolution case.
 using domain_t = ::allscale::api::user::data::Grid<
-                    ::allscale::api::user::data::AdaptiveGridCell<double,sub_domain_config_t>,2>;
+                    ::allscale::api::user::data::AdaptiveGridCell<double,subdomain_config_t>,2>;
 
 // Subdomain is a layer in a grid cell.
 using subdomain_t = ::allscale::utils::StaticGrid<double,size_t(SUBDOMAIN_X),size_t(SUBDOMAIN_Y)>;

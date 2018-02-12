@@ -1,3 +1,41 @@
+// Fearghal wrote:
+// Components to be included
+// 1) Grid structures specific to each subdomain
+//    Each grid structure contains information
+//    a) structures for three different layers of resolution:
+//       (100m (1) ; 20m(2); 4m(3))
+//    b) Solution on each layer
+//
+// 2) Mechanism to switch from layers 1, 2 & 3
+// 3) Advection diffusion solver translated from api-prototype
+//  ) Boundary synchronizations translated from api
+//    Iterative check on error convergence across each subdomain
+//    until error norm of all 4 boundaries < threshold
+// 4) Data assimilation structures translated from api-prototype
+// 5) Matrix operation structures for DA
+// 6) Data assimilation solution
+// 7) File reads for initial conditions (simple ascii format)
+// 8) File reads for flow fields and observation data
+//    (larger files in structured format)
+
+// Model Initialization & file read
+// Create structures here for read from file following variables:
+// Ndom, nelems;
+
+// Data structures initialization for grid, advection diffusion and DA
+
+// Advection diffusion solution
+// Data assimilation check on observation
+// Switch to appropriate grid resolution
+// Data assimilation solver
+// File output at periodic intervals
+
+
+
+
+
+
+
 1) Check indexing consistency: ReadObservations(), SaveGrid2D() and Sub2Ind
 
 2) Mistake in
@@ -80,3 +118,27 @@ pront into file in some MPI/threading safe way.
 9) Type consistency: int and size_t are mixed up.
 10) Compilation bug in ReadObservations()
 11)
+
+
+
+New, Jan 2018:
+1) assert_true fails
+2) allscale::utils::Vector<std::size_t, Dims> getActiveLayerSize() {
+            return data.getLayerSize(active_layer);
+        }
+        must be "const"
+3) coarsen/refine are not fully correct
+
+4) ...../adaptive_grid.cc:95:51: error: macro "assert_true" passed 2 arguments, but takes just 1
+                     assert_true(cell[{x,y}] == cur);
+   but this does work:
+                     assert_true((cell[{x,y}] == cur));
+
+5) abort() in LazyAssertion(), I would go for assert(0) from <cassert>
+
+
+
+
+
+
+

@@ -13,8 +13,8 @@
 #error AMDADOS_DEBUGGING macro redefinition
 #endif
 
-// A T T E N T I O N: Comment the line below in the final release.
-#define AMDADOS_DEBUGGING
+// A T T E N T I O N: Comment out the line below in the final release.
+//#define AMDADOS_DEBUGGING
 
 
 

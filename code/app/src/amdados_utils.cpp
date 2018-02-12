@@ -29,38 +29,6 @@ bool EndsWith(const std::string & str, const std::string & ending)
 }
 
 /**
- * Function clears the output directory removing all the files generated
- * by the previous call to this application.
- * N O T E: this function is designed for debugging.
- *          In production mode it does nothing.
- */
-//void CleanOutputDir(const std::string & dir, const char * ext)
-//{
-//    (void) dir; (void) ext;
-//#ifdef AMDADOS_DEBUGGING
-//    int retval = 0;
-//    assert_true(!dir.empty());
-//    std::string cmd = std::string("/bin/rm -fr ") + dir + PathSep;
-//    retval = std::system("sync");
-//    if (ext == nullptr) {
-//        retval = std::system((cmd + "field*.png").c_str());
-//        retval = std::system((cmd + "field*.pgm").c_str());
-//        retval = std::system((cmd + "field*.jpg").c_str());
-//        retval = std::system((cmd + "field*.avi").c_str());
-//        retval = std::system((cmd + "*.log").c_str());
-//        retval = std::system((cmd + "*.out").c_str());
-//        retval = std::system((cmd + "*profile*.txt").c_str());
-//    } else {
-//        assert_true((std::strlen(ext) == 4) && (ext[0] == '.'))
-//                << "wrong extension; expected format: '.abc'";
-//        retval = std::system(((cmd + "*") + ext).c_str());
-//    }
-//    retval = std::system("sync");
-//    (void) retval;
-//#endif
-//}
-
-/**
  * Function checks if the file exists and prints error message if it does not.
  */
 void CheckFileExists(const Configuration & conf, const std::string & filename)
@@ -71,37 +39,6 @@ void CheckFileExists(const Configuration & conf, const std::string & filename)
         MY_ERR("failed to open file (not existing?): %s", filename.c_str());
         std::exit(1);
     }
-#endif
-}
-
-/**
- * Function creates a video file from a sequence of field states written into
- * image files using 'ffmpeg' utility installed system-wide. By the end of
- * video creation, all *.pgm files are removed in order to save space.
- */
-void MakeVideo(const Configuration & conf, const std::string & file_title)
-{
-    (void) conf; (void) file_title;
-#ifdef AMDADOS_DEBUGGING
-    MY_INFO("%s", "\n\n")
-    const int framerate = 24;
-    int retval = 0;
-    std::stringstream cmd, wildcards;
-    wildcards << conf.asString("output_dir") << PathSep
-              << file_title << "*.pgm";
-    // Generate AVI file, if 'ffmpeg' was installed.
-    cmd << "ffmpeg -y -f image2 -framerate " << framerate
-        << " -pattern_type glob -i '" << wildcards.str() << "' "
-        << MakeFileName(conf, file_title, ".avi");
-    retval = std::system(cmd.str().c_str());
-    retval = std::system("sync");
-    // Remove the individual field images as they were encoded into AVI file.
-    cmd.str(std::string());
-    cmd << "/bin/rm -fr " << wildcards.str();
-    retval = std::system(cmd.str().c_str());
-    retval = std::system("sync");
-    (void) retval;
-    MY_INFO("%s", "\n\n")
 #endif
 }
 

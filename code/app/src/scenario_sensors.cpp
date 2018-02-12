@@ -19,6 +19,24 @@ namespace {
 using ::allscale::api::user::data::Grid;
 
 /**
+ * Function converts global coordinates to the subdomain index on the grid.
+ */
+inline point2d_t Glo2CellIndex(const point2d_t & p, const size2d_t & cell_size)
+{
+    return point2d_t(p.x / cell_size.x,
+                     p.y / cell_size.y);
+}
+
+/**
+ * Function converts global coordinates to the local ones inside a subdomain.
+ */
+inline point2d_t Glo2Sub(const point2d_t & p, const size2d_t & cell_size)
+{
+    return point2d_t(p.x % cell_size.x,
+                     p.y % cell_size.y);
+}
+
+/**
  * Function evaluates objective function and its gradient.
  */
 void EvaluateObjective(double & J, double_array_t & gradJ,
@@ -74,7 +92,7 @@ void InitialGuess(const Configuration & conf,
                   const point2d_t     & idx)
 {
     std::mt19937 gen(RandomSeed() +
-                        idx[_X_] * conf.asInt("num_subdomains_y") + idx[_Y_]);
+                        idx.x * conf.asInt("num_subdomains_y") + idx.y);
     std::uniform_real_distribution<double> distrib(0.0, 1.0);
     std::generate(x.begin(), x.end(), [&](){ return distrib(gen); });
     std::generate(y.begin(), y.end(), [&](){ return distrib(gen); });
@@ -148,8 +166,8 @@ void ScenarioSensors(const std::string & config_file)
 
     // Define useful constants.
     const point2d_t GridSize = GetGridSize(conf);
-    const double SensorFraction =
-                        Bound(conf.asDouble("sensor_fraction"), 0.01, 0.75);
+    const double fraction =
+            Bound(conf.asDouble("sensor_fraction"), 0.001, 0.75);
 
     // Open file manager and the output file for writing.
     std::string filename = MakeFileName(conf, "sensors");
@@ -157,29 +175,60 @@ void ScenarioSensors(const std::string & config_file)
     Entry e = manager.createEntry(filename, Mode::Text);
     auto out = manager.openOutputStream(e);
 
-    // Save sensor locations. Note, order is not guaranteed.
-    pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
+    // Function scales a coordinate from [0..1] range to specified size.
+    auto ScaleCoord = [](double v, int size) -> int {
+        int i = static_cast<int>(std::floor(v * size));
+        i = std::min(std::max(i, 0), size - 1);
+        return i;
+    };
+
+    if (conf.asInt("sensor_per_subdomain")) {
+        // Local (subdomain) sizes at the finest resolution.
+        const int      Sx = conf.asInt("subdomain_x");
+        const int      Sy = conf.asInt("subdomain_y");
+        const int      sub_problem_size = Sx * Sy;
+        const size2d_t subdomain_size(Sx, Sy);
+
+        // Save sensor locations. Note, order is not guaranteed.
+        pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
+            // Generate pseudo-random sensor locations.
+            const int Nobs = std::max(Round(fraction * sub_problem_size), 1);
+            double_array_t x(Nobs), y(Nobs);    // sensors' coordinates
+            InitialGuess(conf, x, y, idx);
+            OptimizePointLocations(x, y);
+
+            // Save (scaled) pseudo-randomly distributed sensor locations.
+            for (int k = 0; k < Nobs; ++k) {
+                point2d_t loc(ScaleCoord(x[k], Sx), ScaleCoord(y[k], Sy));
+                point2d_t glo = Sub2Glo(loc, idx, subdomain_size);
+                out.atomic([=](auto & file) {
+                    file << glo.x << " " << glo.y << "\n";
+                });
+            }
+        });
+    } else {
+        // Global (whole domain) sizes.
+        const int Nx = conf.asInt("subdomain_x") * GridSize.x;
+        const int Ny = conf.asInt("subdomain_y") * GridSize.y;
+        const int problem_size = Nx * Ny;
+
         // Generate pseudo-random sensor locations.
-        const int Nobs = std::max(Round(SensorFraction * SUB_PROBLEM_SIZE), 1);
-        double_array_t x(Nobs), y(Nobs);    // sensors' coordinates
-        InitialGuess(conf, x, y, idx);
+        const int Nobs = std::max(Round(fraction * problem_size), 1);
+        std::cout << "fraction of sensor points = " << fraction
+                  << ", #observations = " << Nobs << std::endl;
+        double_array_t x(Nobs), y(Nobs);
+        InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);
 
-        // Save pseudo-randomly distributed sensor locations.
+        // Save (scaled) sensor locations.
         for (int k = 0; k < Nobs; ++k) {
-            // Scale coordinates from [0..1] range to subdomain sizes.
-            int xk = static_cast<int>(std::floor(x[k] * SUBDOMAIN_X));
-            int yk = static_cast<int>(std::floor(y[k] * SUBDOMAIN_Y));
-
-            xk = std::min(std::max(xk, 0), SUBDOMAIN_X - 1);
-            yk = std::min(std::max(yk, 0), SUBDOMAIN_Y - 1);
-
-            // Make global coordinates and save.
-            xk = Sub2GloX(idx, xk);
-            yk = Sub2GloY(idx, yk);
-            out.atomic([=](auto & file) { file << xk << " " << yk << "\n"; });
+            int xk = ScaleCoord(x[k], Nx);
+            int yk = ScaleCoord(y[k], Ny);
+            out.atomic([=](auto & file) {
+                file << xk << " " << yk << "\n";
+            });
         }
-    });
+    }
     manager.close(out);
 }
 
@@ -195,6 +244,9 @@ void LoadSensorLocations(const Configuration   & conf,
     using ::allscale::api::core::Entry;
     using ::allscale::api::core::Mode;
     using ::allscale::api::user::algorithm::pfor;
+
+    const size2d_t finest_layer_size(conf.asUInt("subdomain_x"),
+                                     conf.asUInt("subdomain_y"));
 
     // Define useful constants.
     const point2d_t GridSize = GetGridSize(conf);
@@ -215,10 +267,10 @@ void LoadSensorLocations(const Configuration   & conf,
         if (!in) {
             break;
         }
-        point2d_t idx = Glo2CellIndex(pt);
+        point2d_t idx = Glo2CellIndex(pt, finest_layer_size);
         assert_true((0 <= idx.x) && (idx.x < GridSize.x));
         assert_true((0 <= idx.y) && (idx.y < GridSize.y));
-        sensors[idx].push_back(Glo2Sub(pt));
+        sensors[idx].push_back(Glo2Sub(pt, finest_layer_size));
     }
     manager.close(in);
 
@@ -250,6 +302,9 @@ void LoadSensorMeasurements(const Configuration         & conf,
     using ::allscale::api::core::Entry;
     using ::allscale::api::core::Mode;
     using ::allscale::api::user::algorithm::pfor;
+
+    const size2d_t finest_layer_size(conf.asInt("subdomain_x"),
+                                     conf.asInt("subdomain_y"));
 
     // Define useful constants.
     const point2d_t GridSize = GetGridSize(conf);
@@ -291,7 +346,7 @@ void LoadSensorMeasurements(const Configuration         & conf,
             in.atomic([&](auto & file) { file >> pt.x >> pt.y >> val; });
 
             // Get subdomain position on the grid.
-            point2d_t idx = Glo2CellIndex(pt);
+            point2d_t idx = Glo2CellIndex(pt, finest_layer_size);
             assert_true((0 <= idx.x) && (idx.x < GridSize.x));
             assert_true((0 <= idx.y) && (idx.y < GridSize.y));
 
@@ -307,7 +362,7 @@ void LoadSensorMeasurements(const Configuration         & conf,
 
             // Check that sensor coordinates appear in exactly the same order.
             assert_true(cnt < nsensors);
-            assert_true(Glo2Sub(pt) == sensors[idx][cnt]);
+            assert_true(Glo2Sub(pt, finest_layer_size) == sensors[idx][cnt]);
 
             // Save the measurement in the data matrix.
             m(t,cnt) = val;

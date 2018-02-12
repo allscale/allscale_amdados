@@ -4,8 +4,10 @@
 # -----------------------------------------------------------------------------
 
 """ Script visualizes simulation results given a path to field*.txt file.
-    For example, one can visualize all the simulation results (in bash):
- for f in output/field_*.txt; do py3 python/Visualize.py --field_file $f; done
+    For example, one can visualize all the simulation results in bash
+    terminal (mind the mandatory parameter "--field_file"):
+
+for f in output/field_*.txt; do python3 python/Visualize.py --field_file $f; done
 
     Note, the script visualizes results of one particular simulation.
     The reason for that is to have flexibility for debugging.
@@ -17,6 +19,7 @@ from scipy.stats import mstats
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib.ticker import MultipleLocator
+import matplotlib.animation as manimation
 import sys, traceback, os, math, argparse
 from Utility import *
 from Configuration import Configuration
@@ -45,7 +48,7 @@ def PlotRelativeDifference(field_filename, rel_diff):
     fig = plt.figure()
     ax = fig.gca()
     ax.plot(np.arange(1, len(rel_diff) + 1), rel_diff)
-    ax.set_xlabel("index of time slice")
+    ax.set_xlabel("relative time: 100 * t / T")
     ax.set_ylabel("relative difference")
     plt.title("|analytic - simulation| / |analytic|")
     plt.savefig(os.path.join(dirname, filename))
@@ -72,6 +75,8 @@ def PlotSensors(field_filename, params):
     ax.yaxis.set_minor_locator(MultipleLocator(Sy))
     ax.set_xlabel("x")
     ax.set_ylabel("y")
+    ax.set_xlim((0, Nx))
+    ax.set_ylim((0, Ny))
     plt.title("Sensor locations")
     plt.tight_layout()
     plt.savefig(os.path.join(dirname,
@@ -95,7 +100,10 @@ def PlotSchwarzProfile(field_filename, params):
         print("WARNING: file " + profile_filename + " does not exist")
         return
     profile = np.loadtxt(profile_filename)
-    assert len(profile.shape) == 1 and len(profile) == Nt * Nschwarz
+    if len(profile.shape) != 1 or len(profile) != Nt * Nschwarz:
+        print("Warning: corrupted, empty or incomplete " +
+              "file of Schwarz differences")
+        return
     profile = np.reshape(profile, (Nt, Nschwarz))
     # Compute quantiles among Nt samples of size Nschwarz.
     quantiles = mstats.mquantiles(profile, axis=0)
@@ -113,6 +121,16 @@ def PlotSchwarzProfile(field_filename, params):
     plt.grid()
     plt.savefig(os.path.join(dirname,
                     "schwarz_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"))
+
+
+def MakeVideoFile(field_filename):
+    """ Function makes the video file name from the field one.
+    """
+    dirname = os.path.dirname(field_filename)
+    Nx, Ny, Nt = ProblemParametersFromFilename(field_filename, True, "field")
+    video_filename = os.path.join(dirname,
+            "video_Nx" + str(Nx) + "_Ny" + str(Ny) + "_Nt" + str(Nt) + ".avi")
+    return video_filename
 
 
 if __name__ == "__main__":
@@ -147,57 +165,71 @@ if __name__ == "__main__":
         params = np.load(
                 os.path.join(os.path.dirname(field_file), "params.npy")).item()
 
+        # Create ffmpeg writer for video output.
+        FFMpegWriter = manimation.writers["ffmpeg"]
+        metadata = dict(title="Simulation with data assimilation",
+                        artist="Matplotlib", comment="visualization")
+        video_writer = FFMpegWriter(fps=10, metadata=metadata)
+
         # Plot the separate fields like video.
         plt = SwitchToGraphicalBackend()
+        fig = plt.figure()
         picture = None
         im = None
-        for i in range(fields.shape[0]):
-            # Print information regarding the fields.
-            if np.any(np.isinf(true_fields[i,:,:])):
-                print("WARNING: true field contains Inf value(s)")
-            if np.any(np.isinf(fields[i,:,:])):
-                print("WARNING: field contains Inf value(s)")
-            if np.any(np.isnan(true_fields[i,:,:])):
-                print("WARNING: true field contains NaN value(s)")
-            if np.any(np.isnan(fields[i,:,:])):
-                print("WARNING: field contains NaN value(s)")
-            if np.amin(true_fields[i,:,:]) < -3.0 * np.finfo(float).eps:
-                print("WARNING: true field contains negative value(s)")
-            if np.amin(fields[i,:,:]) < -3.0 * np.finfo(float).eps:
-                print("WARNING: field contains negative value(s)")
-            if False:
-                print("true field: min: " + str(np.amin(true_fields[i,:,:])) +
-                                ", max: " + str(np.amax(true_fields[i,:,:])))
-                print("     field: min: " + str(np.amin(fields[i,:,:])) +
-                                ", max: " + str(np.amax(fields[i,:,:])))
+        with video_writer.saving(fig, MakeVideoFile(field_file), dpi=100):
+            for i in range(fields.shape[0]):
+                # Print information regarding the fields.
+                if np.any(np.isinf(true_fields[i,:,:])):
+                    print("WARNING: true field contains Inf value(s)")
+                if np.any(np.isinf(fields[i,:,:])):
+                    print("WARNING: field contains Inf value(s)")
+                if np.any(np.isnan(true_fields[i,:,:])):
+                    print("WARNING: true field contains NaN value(s)")
+                if np.any(np.isnan(fields[i,:,:])):
+                    print("WARNING: field contains NaN value(s)")
+                if np.amin(true_fields[i,:,:]) < -3.0 * np.finfo(float).eps:
+                    print("WARNING: true field contains negative value(s)")
+                if np.amin(fields[i,:,:]) < -3.0 * np.finfo(float).eps:
+                    print("WARNING: field contains negative value(s)")
+                if False:
+                    print("true field:", end="")
+                    print("  min: " + str(np.amin(true_fields[i,:,:])) +
+                          ", max: " + str(np.amax(true_fields[i,:,:])))
+                    print("field:", end="")
+                    print("  min: " + str(np.amin(fields[i,:,:])) +
+                          ", max: " + str(np.amax(fields[i,:,:])))
 
-            # Compute the relative difference between two solutions.
-            norm_true = np.linalg.norm(true_fields[i,:,:].ravel())
-            norm_diff = np.linalg.norm(true_fields[i,:,:].ravel() -
-                                            fields[i,:,:].ravel())
-            rel_diff[i] = norm_diff / max(norm_true, np.finfo(float).eps)
+                # Compute the relative difference between two solutions,
+                # excluding the external boundary points.
+                norm_true = np.linalg.norm(true_fields[i, 2:-2, 2:-2].ravel())
+                norm_diff = np.linalg.norm(true_fields[i, 2:-2, 2:-2].ravel() -
+                                                fields[i, 2:-2, 2:-2].ravel())
+                rel_diff[i] = norm_diff / max(norm_true, np.finfo(float).eps)
 
-            # Plot the solution fields.
-            true_image = WriteFieldAsImage(None, true_fields[i,:,:])
-            image = WriteFieldAsImage(None, fields[i,:,:])
-            assert true_image.shape == image.shape
-            t = str(timestamps[i])
-            gap = 20
-            nr = image.shape[0]
-            nc = image.shape[1]
-            if picture is None: picture = np.ones((nr, 2*nc + gap))
-            picture[0:nr, 0:nc] = true_image
-            picture[0:nr, nc+gap:2*nc+gap] = image
-            if i == 0:
-                im = plt.imshow(picture)
-            else:
-                im.set_array(picture)
-            plt.draw()
-            plt.xticks([])
-            plt.yticks([])
-            plt.title("True density (left) vs estimated (right), Nx=" +
-                            str(nr) + ", Ny=" + str(nc) + ", t=" + t)
-            plt.pause(0.05)
+                # Plot the solution fields.
+                true_image = WriteFieldAsImage(None, true_fields[i,:,:])
+                image = WriteFieldAsImage(None, fields[i,:,:])
+                assert true_image.shape == image.shape
+                t = str(timestamps[i])
+                gap = 20
+                nr = image.shape[0]
+                nc = image.shape[1]
+                if picture is None: picture = np.ones((nr, 2*nc + gap))
+                picture[0:nr, 0:nc] = true_image
+                picture[0:nr, nc+gap:2*nc+gap] = image
+                if i == 0:
+                    im = plt.imshow(picture)
+                else:
+                    im.set_array(picture)
+                plt.xticks([])
+                plt.yticks([])
+                plt.title("True density (left) vs estimated (right), Nx=" +
+                                str(nr) + ", Ny=" + str(nc) + ", t=" + t)
+                if i == 0:
+                    plt.get_current_fig_manager().full_screen_toggle()
+                plt.draw()
+                video_writer.grab_frame()
+                plt.pause(0.05)
 
         PlotRelativeDifference(field_file, rel_diff)
         PlotSensors(field_file, params)
@@ -213,3 +245,39 @@ if __name__ == "__main__":
         traceback.print_exc()
         print("ERROR: " + str(error.args))
 
+
+
+#https://matplotlib.org/examples/animation/moviewriter.html
+#This example uses a MovieWriter directly to grab individual frames and write
+#them to a file. This avoids any event loop integration, but has the advantage
+#of working with even the Agg backend. This is not recommended for use in an
+#interactive setting.
+
+#"""
+## -*- noplot -*-
+
+#import numpy as np
+#import matplotlib
+#matplotlib.use("Agg")
+#import matplotlib.pyplot as plt
+#import matplotlib.animation as manimation
+
+#FFMpegWriter = manimation.writers['ffmpeg']
+#metadata = dict(title='Movie Test', artist='Matplotlib',
+                #comment='Movie support!')
+#writer = FFMpegWriter(fps=15, metadata=metadata)
+
+#fig = plt.figure()
+#l, = plt.plot([], [], 'k-o')
+
+#plt.xlim(-5, 5)
+#plt.ylim(-5, 5)
+
+#x0, y0 = 0, 0
+
+#with writer.saving(fig, "writer_test.mp4", 100):
+    #for i in range(100):
+        #x0 += 0.1 * np.random.randn()
+        #y0 += 0.1 * np.random.randn()
+        #l.set_data(x0, y0)
+        #writer.grab_frame()
