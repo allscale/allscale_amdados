@@ -1,45 +1,17 @@
 //-----------------------------------------------------------------------------
 // Author    : Fearghal O'Donncha, feardonn@ie.ibm.com
 //             Albert Akhriev, albert_akhriev@ie.ibm.com
-// Copyright : IBM Research Ireland, 2017
+// Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
 #pragma once
 
 namespace amdados {
 
-//#############################################################################
-// P R I M A R Y  constants and types.
-//#############################################################################
-
-// Maximum number of nodal points in a subdomain in each dimension.
-//const int SUBDOMAIN_X = 16;
-//const int SUBDOMAIN_Y = 16;
-
-// Set up the configuration of a grid cell (static).
-// With this type we can define a multi-resolution grid.
-#if 0
-// layer: 0, size: [16,16]
-// layer: 1, size: [ 8, 8]
-// layer: 2, size: [ 4, 4]
-// layer: 3, size: [ 2, 2]
-// layer: 4, size: [ 1, 1]
-typedef ::allscale::api::user::data::CellConfig<2,
-            ::allscale::api::user::data::layers<
-                    ::allscale::api::user::data::layer<2,2>,
-                    ::allscale::api::user::data::layer<2,2>,
-                    ::allscale::api::user::data::layer<2,2>,
-                    ::allscale::api::user::data::layer<2,2>
-            >
-> subdomain_config_t;
-
-// Assign each layer a level corresponding to coarsest to finest.
-enum {
-    LayerFine = 0,
-    LayerMid  = 1,
-    LayerLow  = 2
-};
-#else
+// I M P O R T A N T: cell layout must agree with the parameters specified
+// in configuration file. Namely, "subdomain_x" and "subdomain_y" must be
+// equal to the number of points in the finest layer (of index 0).
+//
 // layer: 0, size: [16,16]
 // layer: 1, size: [ 8, 8]
 // layer: 2, size: [ 1, 1]
@@ -51,22 +23,11 @@ typedef ::allscale::api::user::data::CellConfig<2,
             >
 > subdomain_config_t;
 
-// Assign each layer a level corresponding to coarsest to finest.
+// Levels of resolution of subdomain layers.
 enum {
     LayerFine = 0,
     LayerLow  = 1
 };
-#endif
-
-//const int _X_ = 0;      // index of abscissa
-//const int _Y_ = 1;      // index of ordinate
-
-//#############################################################################
-// D E R I V E D  constants and types.
-//#############################################################################
-
-// Number of elements (or nodal points) in a subdomain.
-//const int SUB_PROBLEM_SIZE = SUBDOMAIN_X * SUBDOMAIN_Y;
 
 // 2D point, also "index" in parallel for (pfor) loops.
 typedef ::allscale::api::user::data::GridPoint<2> point2d_t;
@@ -75,11 +36,11 @@ typedef ::std::vector<point2d_t>                  point_array_t;
 // 2D size (same as 2D point).
 typedef ::allscale::api::user::data::GridPoint<2> size2d_t;
 
-// A grid cell that constitutes a sub-domain.
+// A grid cell constitutes a sub-domain.
 typedef ::allscale::api::user::data::AdaptiveGridCell<double,
                                             subdomain_config_t> subdomain_t;
 
-// Collection of sub-domains constitutes the whole domain.
+// Grid of sub-domains constitutes the whole domain.
 typedef ::allscale::api::user::data::Grid<subdomain_t, 2> domain_t;
 
 /**

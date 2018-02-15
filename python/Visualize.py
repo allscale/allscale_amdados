@@ -101,8 +101,7 @@ def PlotSchwarzProfile(field_filename, params):
         return
     profile = np.loadtxt(profile_filename)
     if len(profile.shape) != 1 or len(profile) != Nt * Nschwarz:
-        print("Warning: corrupted, empty or incomplete " +
-              "file of Schwarz differences")
+        print("WARNING: empty or incomplete file of Schwarz differences")
         return
     profile = np.reshape(profile, (Nt, Nschwarz))
     # Compute quantiles among Nt samples of size Nschwarz.
@@ -169,7 +168,11 @@ if __name__ == "__main__":
         FFMpegWriter = manimation.writers["ffmpeg"]
         metadata = dict(title="Simulation with data assimilation",
                         artist="Matplotlib", comment="visualization")
-        video_writer = FFMpegWriter(fps=10, metadata=metadata)
+        bitrate = None      # default
+        bitrate = 4096      # high quality
+        fps = 10
+        fps = 50
+        video_writer = FFMpegWriter(fps=fps, bitrate=bitrate, metadata=metadata)
 
         # Plot the separate fields like video.
         plt = SwitchToGraphicalBackend()
@@ -223,7 +226,7 @@ if __name__ == "__main__":
                     im.set_array(picture)
                 plt.xticks([])
                 plt.yticks([])
-                plt.title("True density (left) vs estimated (right), Nx=" +
+                plt.title("< true density vs estimated >, Nx=" +
                                 str(nr) + ", Ny=" + str(nc) + ", t=" + t)
                 if i == 0:
                     plt.get_current_fig_manager().full_screen_toggle()
@@ -248,36 +251,4 @@ if __name__ == "__main__":
 
 
 #https://matplotlib.org/examples/animation/moviewriter.html
-#This example uses a MovieWriter directly to grab individual frames and write
-#them to a file. This avoids any event loop integration, but has the advantage
-#of working with even the Agg backend. This is not recommended for use in an
-#interactive setting.
 
-#"""
-## -*- noplot -*-
-
-#import numpy as np
-#import matplotlib
-#matplotlib.use("Agg")
-#import matplotlib.pyplot as plt
-#import matplotlib.animation as manimation
-
-#FFMpegWriter = manimation.writers['ffmpeg']
-#metadata = dict(title='Movie Test', artist='Matplotlib',
-                #comment='Movie support!')
-#writer = FFMpegWriter(fps=15, metadata=metadata)
-
-#fig = plt.figure()
-#l, = plt.plot([], [], 'k-o')
-
-#plt.xlim(-5, 5)
-#plt.ylim(-5, 5)
-
-#x0, y0 = 0, 0
-
-#with writer.saving(fig, "writer_test.mp4", 100):
-    #for i in range(100):
-        #x0 += 0.1 * np.random.randn()
-        #y0 += 0.1 * np.random.randn()
-        #l.set_data(x0, y0)
-        #writer.grab_frame()
