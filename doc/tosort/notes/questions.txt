@@ -1,0 +1,1 @@
+x_est[t] = x_prior[t] + K * (y[t] - H*x_prior[t])

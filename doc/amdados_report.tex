@@ -1,0 +1,39 @@
+\documentclass[]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+
+%opening
+\title{Allscale AMDADOS Application \\ Techinal Report}
+\author{Albert Akhriev}
+
+\begin{document}
+\maketitle
+%\begin{abstract}
+%\end{abstract}
+
+\section{Overview}
+
+\section{Working with Amdados application}
+
+\subsection{Building the application.}
+\begin{enumerate}
+\item The application executable must be available before any test (even in Python) is run.
+\item We recommend the standard way for building the application presented in the script ``standard.build.sh'' in the project root folder.
+\item Another useful script is ``./scripts/download.sh'' which downloads the latest Allscale API and the Armadillo library for unit tests.
+\item We do \textit{not} recommend the development script for building the application ``mybuild'', which relies on ramdisk and other development specific features. Just for completeness, we provide script's options: \texttt{-f} clears any previous build and starts from scratch; \texttt{-r/-d} release/debug mode; \texttt{-t} runs tests after building the project. For example: \texttt{./mybuild -f -r -t}.
+\end{enumerate}
+
+\subsection{Application parameters.}
+\begin{enumerate}
+\item The application is controlled by the configuration file. The default one can be located in the project root folder under the name ``amdados.conf''. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
+\item Not everything can be controlled by configuration file. For example, the size of sub-domain is hard-coded because of using of templates in grid implementation.
+\item The flow model is also hard-coded (see the function \texttt{Flow()} in the file ``scenario\_simulation.cpp'' and corresponding function in the Python code). The reason for this is to get away of any specific format of flow data representation while focusing on Allscale API piece.
+\item The same is true for sensor locations. Currently, user has to specify a fraction of nodal points occupied by sensors and then the location are (pseudo) randomly generated.
+\item The default configuration file ``amdados.conf'' contains brief description of each parameter sufficient to match it to the source code.
+\end{enumerate}
+
+\subsection{Running the Amdados simulation}
+
+
+\end{document}

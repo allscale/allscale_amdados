@@ -1,0 +1,13 @@
+solvertype == 5
+"solving by dADN Minimax filter with observations"
+
+solvertype == 31
+"SYNC RICCATI TEST. solving SD by Minimax with observations"
+
+solvertype == 11
+"solving by dADN MINIMAX filter with observations. Riccati sync"
+
+Ensemble ADN TELEMAC with observations
+solvertype == 12
+"solving by dADN Discrete Ensemble Kalman filter with observations."
+

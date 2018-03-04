@@ -1,0 +1,74 @@
+\documentclass[]{article}
+\usepackage{amssymb,amsmath,mathrsfs,bm}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+%opening
+\title{Notes on Minimax filtering}
+\author{Albert Akhriev}
+
+\newcommand{\TODO}[1]{({\bf{\color{red}{TODO:}}}\,\,\,{\footnotesize\it{#1}})}
+
+\begin{document}
+\maketitle
+
+%\begin{abstract}
+%\end{abstract}
+
+\section{Minimax filter basics}
+
+To be done ...
+
+%Source: \cite{wiki1}, \cite{Welch06}.
+%\pagebreak
+
+\subsection{Minimax filter model}
+
+In what follows, we consider a simplified version of the discrete time minimax filter \cite{Zhuk09}.
+
+\noindent\textbf{Process model}:
+\begin{equation}
+x_{k+1} = C_k x_k + f_{k+1}.
+\end{equation}
+\noindent\textbf{Measurement model}:
+\begin{equation}
+y_k = H_k x_k + g_k.
+\end{equation}
+\begin{description}
+\item[$x_k$]: state vector of the system;
+\item[$C_k$]: state transition model applied to the previous state $x_{k-1}$;
+\item[$H_k$]: observation model that maps the state to observations;
+\item[$f_k$]: process noise with zero mean and covariance $S_k$. \TODO{true?}
+\item[$g_k$]: measurement noise with zero mean and covariance $R_k$; \TODO{true?}
+\end{description}
+
+\noindent Noises: (1) independent of each other; (2) not necessary Gaussian. \TODO{true?}
+
+\subsection{Minimax filter algorithm}
+
+\noindent\textbf{Initialization}:
+\begin{eqnarray}
+r_0      &=& H_0^T R_0 \, y_0, \\
+P_0      &=& H_0^T R_0 \, H_0 + S_0, \\
+\alpha_0 &=& y_0^T R_0 \, y_0, \\
+B_0      &=& P_0 + C_0^T S_0 \, C_0,  \mbox{\TODO{true?}}
+%\beta_0  &=& 1 - \alpha_0 + x_0^T P_0 \, x_0.
+\end{eqnarray}
+
+\noindent\textbf{Progression}: \TODO{$C_{k-1} B_{k-1}^{+} C_k^T$  or  $C_{k-1}^T B_{k-1}^{+} C_k$ ???}
+\begin{eqnarray}
+P_k      &=& H_k^T R_k \, H_k + S_{k-1} - S_{k-1}^T C_{k-1} B_{k-1}^{+} C_k^T S_{k-1},   \\
+B_k      &=& P_k + C_k^T S_k \, C_k, \\
+\alpha_k &=& \alpha_{k-1} + y_k^T R_k \, y_k - r_{k-1}^T B_{k-1}^{+} \, r_{k-1}, \\
+r_k      &=& S_{k-1} C_{k-1} B_{k-1}^{+} r_{k-1} + H_k^T R_k \, y_k, \\
+x_k      &=& P_k^{+} \, r_k, \\
+\beta_k  &=& 1 - \alpha_k + x_k^T P_k \, x_k.
+\end{eqnarray}
+
+\noindent\textbf{Post-condition}: $\beta_k \ge 0$, otherwise we claim filter failure. \TODO{true?}
+
+\begin{thebibliography}{1}
+\bibitem{Zhuk09} Zhuk~S.M., ``Minimax state estimation for linear discrete-time differential-algebraic equations'', Automatica J. IFAC, 46 (11), pp.1785-1789, 2010.
+\end{thebibliography}
+
+\end{document}

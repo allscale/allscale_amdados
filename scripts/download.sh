@@ -1,7 +1,7 @@
 #!/bin/bash
 #--------------------------------------------------------------------------------------------------
 # Author   : Albert Akhriev (albert_akhriev@ie.ibm.com)
-# Copyright: IBM Research Ireland, 2014 - 2017
+# Copyright: IBM Research Ireland, 2017-2018
 #--------------------------------------------------------------------------------------------------
 
 # Check we are in the root directory.
@@ -13,7 +13,8 @@ then
     exit 1
 fi
 
-# Make the destination folder, if needed.
+# Remove (clear) and then make the destination folder.
+/bin/rm -fr api
 mkdir -p api
 
 # Download and build Armadillo library (for some tests).

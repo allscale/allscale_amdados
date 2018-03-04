@@ -1,10 +1,10 @@
 #!/bin/bash
 #--------------------------------------------------------------------------------------------------
 # Author   : Albert Akhriev (albert_akhriev@ie.ibm.com)
-# Copyright: IBM Research Ireland, 2014 - 2017
+# Copyright: IBM Research Ireland, 2017-2018
 #--------------------------------------------------------------------------------------------------
 
-VER=8.300.4
+VER=8.400.0
 
 FNAME="armadillo-${VER}.tar.xz"
 DNAME="armadillo-${VER}"

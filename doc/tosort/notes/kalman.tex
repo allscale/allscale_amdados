@@ -1,0 +1,96 @@
+\documentclass[]{article}
+
+%opening
+\title{Notes on Kalman filtering}
+\author{Albert Akhriev}
+
+\begin{document}
+
+\maketitle
+
+%\begin{abstract}
+%\end{abstract}
+
+\newcommand{\myx}[1]{{{\bf x}_{#1}}}
+\newcommand{\myu}[1]{{{\bf u}_{#1}}}
+\newcommand{\myw}[1]{{{\bf w}_{#1}}}
+\newcommand{\myv}[1]{{{\bf v}_{#1}}}
+\newcommand{\myy}[1]{{{\bf y}_{#1}}}
+\newcommand{\myz}[1]{{{\bf z}_{#1}}}
+\newcommand{\myA}[1]{{{\bf A}_{#1}}}
+\newcommand{\myAt}[1]{{{\bf A}_{#1}^T}}
+\newcommand{\myB}[1]{{{\bf B}_{#1}}}
+\newcommand{\myH}[1]{{{\bf H}_{#1}}}
+\newcommand{\myHt}[1]{{{\bf H}_{#1}^T}}
+\newcommand{\myK}[1]{{{\bf K}_{#1}}}
+\newcommand{\myQ}[1]{{{\bf Q}_{#1}}}
+\newcommand{\myP}[1]{{{\bf P}_{#1}}}
+\newcommand{\myR}[1]{{{\bf R}_{#1}}}
+\newcommand{\myS}[1]{{{\bf S}_{#1}}}
+\newcommand{\xest}[1]{{{\hat{\bf x}}_{#1}}}
+
+\section{Kalman filter basics}
+
+The Kalman filter addresses the general problem of trying to estimate the state $\myx{} \in {\cal R}^n$ of a discrete-time controlled process that is governed by the linear stochastic difference equation.
+
+% Wikipedia
+The Kalman filter does not make any assumption that the errors are Gaussian. However, the filter yields the exact conditional probability estimate in the special case that all errors are Gaussian-distributed.
+
+The Kalman filter deals effectively with the uncertainty due to noisy sensor data and random external factors. The Kalman filter produces an estimate of the state of the system as an average of the system's predicted state and of the new measurement using a weighted average. The purpose of the weights is that values with smaller estimated uncertainty are ``trusted'' more. 
+
+The relative certainty of the measurements and current state estimate is an important consideration, and it is common to discuss the response of the filter in terms of the Kalman filter's gain. The Kalman gain is the relative weight given to the measurements and current state estimate, and can be ``tuned'' to achieve particular performance. With a high gain, the filter places more weight on the most recent measurements, and thus follows them more responsively. With a low gain, the filter follows the model predictions more closely.
+
+The matrix $\myK{}$ in equations below is chosen to be the \textit{gain} or \textit{blending factor} that minimizes the \textit{a posteriori error} covariance.
+
+Together with the linear-quadratic regulator (LQR), the Kalman filter solves the linear-quadratic-Gaussian control problem (LQG).
+
+Source: \cite{wiki1}, \cite{Welch06}.
+\pagebreak
+
+\subsection{Kalman filter model}
+
+\noindent\textbf{Process model}:
+\begin{equation}
+\myx{k} = \myA{k}\myx{k-1} + \myB{k}\myu{k} + \myw{k-1}.
+\end{equation}
+\noindent\textbf{Measurement model}:
+\begin{equation}
+\myz{k} = \myH{k}\myx{k} + \myv{k}.
+\end{equation}
+\begin{description}
+\item[$\myA{k}$]: state transition model applied to the previous state $\myx{k-1}$;
+\item[$\myB{k}$]: control-input model applied to the control vector $\myu{k}$;
+\item[$\myH{k}$]: observation model that maps the state to observations;
+\item[$\myw{k}$]: process noise with covariance $\myQ{k}$: $p(\myw{k}) \sim {\cal N}(0, \myQ{k})$;
+\item[$\myv{k}$]: measurement noise with covariance $\myR{k}$: $p(\myv{k}) \sim {\cal N}(0, \myR{k})$;
+\end{description}
+
+\noindent Noises: (1) independent (of each other); (2) white; (3) normally distributed.
+
+\subsection{Kalman filter progression}
+
+On each iteration, the Kalman progresses in two-phase manner. Here we follow the notations in \cite{wiki1} except a posteriori state and covariance, i.e. $\xest{k}$, $\myP{k}$ are used instead of $\xest{k|k}$, $\myP{k|k}$.
+\vspace{0.5em}
+
+\noindent\textbf{Prediction phase}:
+\begin{eqnarray}
+\mbox{A priori state estimate}      &:& \xest{k|k-1} = \myA{k}\,\xest{k-1} + \myB{k}\,\myu{k} \\
+\mbox{A priori estimate covariance} &:& \myP{k|k-1} = \myA{k}\,\myP{k-1}\,\myAt{k} + \myQ{k}
+\end{eqnarray}
+
+
+\noindent\textbf{Update phase}:
+\begin{eqnarray}
+\mbox{Innovation (measurement residual)} &:& \myy{k} = \myz{k} - \myH{k}\,\xest{k|k-1} \\
+\mbox{Innovation covariance} &:& \myS{k} = \myH{k}\,\myP{k|k-1}\,\myHt{k} + \myR{k} \\
+\mbox{Kalman gain} &:& \myK{k} = \myP{k|k-1}\,\myHt{k}\,(\myS{k})^{-1} \\
+\mbox{A posteriori state estimate} &:& \xest{k} = \xest{k|k-1} + \myK{k}\,\myy{k} \\
+\mbox{A posteriori estimate covariance} &:& \myP{k} = ({\bf I} - \myK{k}\,\myH{k})\,\myP{k|k-1}
+\end{eqnarray}
+
+\begin{thebibliography}{1}
+\bibitem{wiki1} Wikipedia: \verb|https://en.wikipedia.org/wiki/Kalman_filter|\,\,.
+\bibitem{Welch06}  G.~Welch and G.~Bishop, ``An Introduction to the Kalman Filter'', TR 95-041, \verb|https://www.cs.unc.edu/~welch/media/pdf/kalman_intro.pdf|\,\,, 2006.
+\end{thebibliography}
+
+\end{document}

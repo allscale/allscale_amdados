@@ -1,7 +1,7 @@
 #!/bin/bash
 #------------------------------------------------------------------------------
 # Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-# Copyright : IBM Research Ireland, 2017
+# Copyright : IBM Research Ireland, 2017-2018
 #------------------------------------------------------------------------------
 
 CONF=Debug    # Release
@@ -173,7 +173,7 @@ GenerateCTags()
 BuildAndTest()
 {
     cd ${BUILD_DIR}
-    if $TEST ; then
+    if ${TEST} ; then
         KALMAN_PY=${CURR_DIR}/code/app/test/kalman_test_plot.py
         KALMAN_OUT=${TEST_DIR}/kalman_test.out
 
