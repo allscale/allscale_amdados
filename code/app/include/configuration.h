@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-// Copyright : IBM Research Ireland, 2017
+// Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
 #pragma once

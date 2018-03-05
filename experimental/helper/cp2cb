@@ -1,0 +1,24 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c)
+#------------------------------------------------------------------------------
+
+echo "Copying the project to the blade machine ..."
+
+DESTIN="${CUDABLADE}:/home/${USER}/work/"
+
+rsync -arv \
+--exclude 'bin' --exclude 'output' --exclude 'build*' \
+--exclude '*.jpg' --exclude '*.pdf' --exclude 'verdandi*' \
+--exclude '*.tgz' --exclude '*.zip' --exclude '*gdb.sh' --exclude '.git*' \
+--exclude 'Results' --exclude 'tags' --exclude "octave-workspace" \
+--exclude '*.*.swp' --exclude '*~' --exclude '*.swo' --exclude '*.log' \
+--exclude 'documentation'  --exclude 'doc' --exclude 'experimental' \
+--exclude '__pycache__' --exclude 'simulation_results' \
+../allscale_amdados ${DESTIN}
+
+echo ""
+echo ""
+echo ""
+

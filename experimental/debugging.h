@@ -31,7 +31,7 @@
 #include <chrono>
 #include <mutex>
 
-#if defined(MY_INFO) || defined(MY_TIME_IT) || \
+#if defined(MY_INFO) || defined(MY_PROGRESS) || defined(MY_TIME_IT) || \
     defined(MY_ERR) || defined(MY_TRY) || defined(MY_CATCH)
 #error macro redefinition
 #endif
@@ -48,8 +48,29 @@
                            fprintf(stdout, "\n"); \
                            fflush(stdout); }
 
-// Simple timer.
-class M_y_T_i_m_e_r {
+// Function prints uninterrupted text line from within parallel for loop.
+// https://stackoverflow.com/questions/1579719/
+//          variable-number-of-parameters-in-function-c
+struct sync_print_type {
+    template<typename ... T>
+    sync_print_type(T && ...) {}
+};
+template<typename ... ArgTypes>
+void SyncPrint(ArgTypes ... args) {
+    static std::mutex sync;
+    sync.lock();
+    sync_print_type{0, (std::cout << args, 0) ... };
+    std::cout << std::endl << std::flush;
+    sync.unlock();
+}
+
+#define MY_PROGRESS(s) { fprintf(stdout, s); fflush(stdout); }
+
+/**
+ * Simple timer.
+ */
+class M_y_T_i_m_e_r
+{
 private:
     std::chrono::high_resolution_clock::time_point m_start_time;
 public:
@@ -66,6 +87,7 @@ public:
 };
 #define MY_TIME_IT(text) M_y_T_i_m_e_r  _t_i_m_e_r_(text); (void)_t_i_m_e_r_;
 
+
 #define MY_TRY   try
 #define MY_CATCH catch (const std::domain_error & e) { \
     std::cout << std::endl << "domain error: " << e.what() << std::endl; } \
@@ -79,9 +101,9 @@ public:
 #else   // !AMDADOS_DEBUGGING
 
 #define MY_INFO(x, ...)     { (void)(x); }
+#define MY_PROGRESS(x)      { (void)(x); }
 #define MY_TIME_IT(x)       { (void)(x); }
 #define MY_TRY
 #define MY_CATCH
 
 #endif  // AMDADOS_DEBUGGING
-

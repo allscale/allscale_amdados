@@ -20,17 +20,26 @@
 \begin{enumerate}
 \item The application executable must be available before any test (even in Python) is run.
 \item We recommend the standard way for building the application presented in the script ``standard.build.sh'' in the project root folder.
-\item Another useful script is ``./scripts/download.sh'' which downloads the latest Allscale API and the Armadillo library for unit tests.
+\item Another useful script ``./scripts/download.sh'' downloads the latest Allscale API and the Armadillo library for unit tests.
 \item We do \textit{not} recommend the development script for building the application ``mybuild'', which relies on ramdisk and other development specific features. Just for completeness, we provide script's options: \texttt{-f} clears any previous build and starts from scratch; \texttt{-r/-d} release/debug mode; \texttt{-t} runs tests after building the project. For example: \texttt{./mybuild -f -r -t}.
 \end{enumerate}
 
 \subsection{Application parameters.}
 \begin{enumerate}
-\item The application is controlled by the configuration file. The default one can be located in the project root folder under the name ``amdados.conf''. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
-\item Not everything can be controlled by configuration file. For example, the size of sub-domain is hard-coded because of using of templates in grid implementation.
+\item The application is controlled by the configuration file. The default one can be found in the project root folder under the name ``amdados.conf''. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
+\item Not everything can be controlled by configuration file. For example, the size of sub-domain is hard-coded because of using of templates in C++ grid implementation.
 \item The flow model is also hard-coded (see the function \texttt{Flow()} in the file ``scenario\_simulation.cpp'' and corresponding function in the Python code). The reason for this is to get away of any specific format of flow data representation while focusing on Allscale API piece.
 \item The same is true for sensor locations. Currently, user has to specify a fraction of nodal points occupied by sensors and then the location are (pseudo) randomly generated.
 \item The default configuration file ``amdados.conf'' contains brief description of each parameter sufficient to match it to the source code.
+\end{enumerate}
+
+\subsection{The application structure}
+\begin{enumerate}
+\item In order to demonstrate a data assimilation process we need a ``true'' solution or, in other words, a ``true state of nature''. The reason is twofold. First, this ground-truth is used for the accuracy assessment of data assimilation. Second, the \textit{input data} ``measured'' at sensor locations across the domain govern the simulation by pushing it towards the ``true'' solution.
+\item In Amdados use-case scenario, the \textit{input data are simulated} by direct forward solver (see equation (\ref{?})) in the entire domain. The solver is written in Python. For simplicity, the Python forward solver does not implement any sub-domain partitioning, operating in the entire domain directly, but uses the same number of nodal points as the C++ Amdados application, the same integration period and the same flow model, see the functions \texttt{Flow()} in both C++ and Python implementations.
+\item The Python code, implemented in ``python/ObservationsGenerator.py'', reads the configuration file (assuming the C++ application will use the same file later on) to initialize geometry and initial conditions. Then it runs the forward solver storing two large files.
+\item Naming convention ...
+\item For convenience, is a file of sensor locations was not found, the Python script ... 
 \end{enumerate}
 
 \subsection{Running the Amdados simulation}

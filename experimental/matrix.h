@@ -290,6 +290,54 @@ public:
     bool IsSquare() const { return (nrows == ncols); }
 };
 
+////-----------------------------------------------------------------------------
+//// Copy vector from Allscale vector.
+////-----------------------------------------------------------------------------
+//template<typename AllscaleGrid>
+//void VectorFromAllscale(VectorView & v, const AllscaleGrid & a)
+//{
+//    const int size = a.size()[0];
+//    assert_true(v.Size() == size);
+//    for (int i = 0; i < size; ++i) { v(i) = a[{i}]; }
+//}
+//
+////-----------------------------------------------------------------------------
+//// Copy Allscale vector from vector.
+////-----------------------------------------------------------------------------
+//template<typename AllscaleGrid>
+//void AllscaleFromVector(AllscaleGrid & a, const VectorView & v)
+//{
+//    const int size = a.size()[0];
+//    assert_true(v.Size() == size);
+//    for (int i = 0; i < size; ++i) { a[{i}] = v(i); }
+//}
+
+////-----------------------------------------------------------------------------
+//// Copy matrix from Allscale matrix.
+////-----------------------------------------------------------------------------
+//template<typename AllscaleGrid>
+//void MatrixFromAllscale(Matrix & m, const AllscaleGrid & a)
+//{
+//    const int nrows = a.size()[0];
+//    const int ncols = a.size()[1];
+//    assert_true((m.NRows() == nrows) && (m.NCols() == ncols));
+//    for (int r = 0; r < nrows; ++r) {
+//    for (int c = 0; c < ncols; ++c) { m(r,c) = a[{r,c}]; }}
+//}
+//
+////-----------------------------------------------------------------------------
+//// Copy Allscale matrix from matrix.
+////-----------------------------------------------------------------------------
+//template<typename AllscaleGrid>
+//void AllscaleFromMatrix(AllscaleGrid & a, const Matrix & m)
+//{
+//    const int nrows = a.size()[0];
+//    const int ncols = a.size()[1];
+//    assert_true((m.NRows() == nrows) && (m.NCols() == ncols));
+//    for (int r = 0; r < nrows; ++r) {
+//    for (int c = 0; c < ncols; ++c) { a[{r,c}] = m(r,c); }}
+//}
+
 void MatMult(Matrix & result, const Matrix & A, const Matrix & B);
 
 void MatMultTr(Matrix & result, const Matrix & A, const Matrix & B);

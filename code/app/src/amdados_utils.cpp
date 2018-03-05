@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-// Copyright : IBM Research Ireland, 2017
+// Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
 #include <string>
@@ -18,29 +18,19 @@
 namespace amdados {
 
 /**
- * Function returns "true" if the string "str" ends with "ending".
- */
-bool EndsWith(const std::string & str, const std::string & ending)
-{
-    const size_t ns = str.size();
-    const size_t ne = ending.size();
-    if (ns < ne) return false;
-    return (str.compare(ns - ne, ne, ending) == 0);
-}
-
-/**
  * Function checks if the file exists and prints error message if it does not.
  */
+#ifdef AMDADOS_DEBUGGING
 void CheckFileExists(const Configuration & conf, const std::string & filename)
 {
-    (void) conf; (void) filename;
-#ifdef AMDADOS_DEBUGGING
     if (!std::fstream(filename, std::ios::in).good()) {
         MY_ERR("failed to open file (not existing?): %s", filename.c_str());
         std::exit(1);
     }
-#endif
 }
+#else
+void CheckFileExists(const Configuration &, const std::string &) {}
+#endif
 
 /**
  * Function queries the high-resolution clock until it has changed. The last
@@ -56,50 +46,34 @@ uint64_t RandomSeed()
 }
 
 /**
- * Function returns the file name for sensor locations, analytic solution,
- * simulation solution or field given configuration settings. Important,
- * grid resolution and the number of time steps (except for sensor locations)
- * are encrypted into the file name. The latter makes the results obtained
- * with different settings to be distinguishable.
+ * Function returns the file name for: (1) sensor locations ("sensors"), (2)
+ * analytic solution ("analytic") or (3) state field ("field") given
+ * configuration settings. Important, grid resolution and the number of time
+ * steps (except for sensor locations) are encrypted into the file name. This
+ * helps to distinguish simulations with different settings.
  */
-std::string MakeFileName(const Configuration & conf,
-                         const std::string & entity, const char * suffix)
+std::string MakeFileName(const Configuration & conf, const std::string & what)
 {
-    if (!((entity == "sensors")  ||
-          (entity == "analytic") ||
-          (entity == "solution") ||
-          (entity == "field"))) {
-        MY_INFO("%s", "allowed entity strings: "
-                "{'sensors', 'analytic', 'simulation', 'field'}");
-        assert_true(0) << "wrong entity to make a file name for";
-    }
-
     int Nx = conf.asInt("num_subdomains_x") * conf.asInt("subdomain_x");
     int Ny = conf.asInt("num_subdomains_y") * conf.asInt("subdomain_y");
 
     std::stringstream filename;
-    filename << conf.asString("output_dir") << PathSep << entity
+    filename << conf.asString("output_dir") << PathSep << what
              << "_Nx" << Nx << "_Ny" << Ny;
-    if (entity != "sensors") {
-        filename << "_Nt" << conf.asInt("Nt");
-    }
 
-    if (suffix == nullptr) {
-//        assert_true(entity != "field")
-//                << "file suffix is always expected for the field entity";
+    if (what == "sensors") {
         filename << ".txt";
+    } else if (what == "analytic") {
+        filename << "_Nt" << conf.asInt("Nt") << ".txt";
+    } else if (what == "field") {
+        filename << "_Nt" << conf.asInt("Nt") << ".bin";
     } else {
-        if (EndsWith(suffix, ".avi")) {
-            filename << suffix;
-        } else if (EndsWith(suffix, ".png") || EndsWith(suffix, ".txt")) {
-            filename << "_" << suffix;
-        } else {
-            assert_true(0) << "file suffix does not have expected extension";
-        }
+        assert_true(0) << "unknown entity to make a file name from";
     }
 
-    const char * fmt = (entity == "field") ? "\n%s%s" : "%s%s";
-    MY_INFO(fmt, "File name: ", filename.str().c_str()); (void)fmt;
+    MY_INFO(((what == "field") ? "\n%s%s" : "%s%s"),
+            "File name: ", filename.str().c_str());
+
     return filename.str();
 }
 

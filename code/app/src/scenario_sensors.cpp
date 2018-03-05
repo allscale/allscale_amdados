@@ -1,3 +1,8 @@
+//-----------------------------------------------------------------------------
+// Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017-2018
+//-----------------------------------------------------------------------------
+
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
 #include "allscale/api/core/io.h"

@@ -1,8 +1,8 @@
 #!/bin/bash
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Author   : Albert Akhriev (albert_akhriev@ie.ibm.com)
 # Copyright: IBM Research Ireland, 2017-2018
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 VER=8.400.0
 
@@ -44,7 +44,8 @@ RemoveDir() {
 }
 ############################################################
 
-# Set pristine environmental variables, otherwise the installer searches my local library folders.
+# Set pristine environmental variables, otherwise the installer searches
+# my local library folders.
 export CPATH=
 export C_INCLUDE_PATH=
 export CPLUS_INCLUDE_PATH=

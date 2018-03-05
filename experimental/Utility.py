@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-# Copyright : IBM Research Ireland, 2017-2018
+# Copyright : IBM Research Ireland, 2017
 # -----------------------------------------------------------------------------
 
 #import pdb; pdb.set_trace()           # enables debugging
@@ -14,7 +14,18 @@ matplotlib.use("Agg")
 from Configuration import Configuration
 
 
-def MakePath(path) -> None:
+def RemoveFile(filename) -> None:
+    """ Check if a file exists on disk. If exists, delete it.
+    """
+    if os.path.exists(filename):
+        try:
+            os.remove(filename)
+            print("File removed: " + filename)
+        except OSError as ex:
+            sys.exit("Error: {} : {}".format(ex.filename, ex.strerror))
+
+
+def AssurePathExists(path) -> None:
     """ Takes directory or file name as an input
         and creates the path if it does not exist.
     """
@@ -28,40 +39,128 @@ def MakePath(path) -> None:
                 sys.exit("Failed to create folder: " + folder)
 
 
-def MakeFileName(conf, what) -> str:
-    """ Function returns the file name for: (1) sensor locations ("sensors"),
-        (2) analytic solution ("analytic") or (3) true state field
-        ("true_field") given configuration settings. Important, grid resolution
-        and the number of time steps (except for sensor locations) are
-        encrypted into the file name. This helps to distinguish simulations
-        with different settings.
+def MakeBaseFileName(conf, entity) -> str:
+    """ Function returns the file name for sensor locations, analytic solution,
+        simulation (solution) field or true field given configuration settings.
+        The term "base" means user should supply the proper suffix and
+        extension, while the path and the base file name is formed
+        by this function.
     """
-    assert isinstance(conf, Configuration) and isinstance(what, str)
-    assert hasattr(conf, 'Nt'), "number of time steps Nt is not specified"
-
+    assert isinstance(conf, Configuration)
+    assert entity == "sensors"  or \
+           entity == "analytic" or \
+           entity == "field"    or \
+           entity == "true_field", \
+            "allowed entity strings: " \
+            "{'sensors', 'analytic', 'field', 'true_field'}"
     Nx = round(conf.num_subdomains_x * conf.subdomain_x)
     Ny = round(conf.num_subdomains_y * conf.subdomain_y)
-    filename = os.path.join(conf.output_dir,
-                            what + "_Nx" + str(Nx) + "_Ny" + str(Ny))
-    if what == "sensors":
+    assert hasattr(conf, 'Nt'), "number of time steps Nt is not specified"
+    filename = os.path.join(conf.output_dir, entity +
+                                "_Nx" + str(Nx) + "_Ny" + str(Ny))
+    if entity != "sensors":
+        filename = filename + "_Nt" + str(conf.Nt)
+    return filename
+
+
+def MakeFileName(conf, entity, suffix=None) -> str:
+    """ Function returns the file name for sensor locations,
+        analytic solution, simulation solution or true field
+        given configuration settings.
+    """
+    assert isinstance(conf, Configuration)
+    assert entity == "sensors"  or \
+           entity == "analytic" or \
+           entity == "solution" or \
+           entity == "true_field", \
+            "allowed entity strings: " \
+            "{'sensors', 'analytic', 'simulation', 'true_field'}"
+    assert suffix is None or isinstance(suffix, str)
+    Nx = round(conf.num_subdomains_x * conf.subdomain_x)
+    Ny = round(conf.num_subdomains_y * conf.subdomain_y)
+    assert hasattr(conf, 'Nt'), "number of time steps Nt is not specified"
+    filename = os.path.join(conf.output_dir, entity +
+                                "_Nx" + str(Nx) + "_Ny" + str(Ny))
+    if entity != "sensors":
+        filename = filename + "_Nt" + str(conf.Nt)
+
+    if suffix is None:
+        #assert entity != "true_field", (
+        #        "file suffix is always expected for the true field")
         filename = filename + ".txt"
-    elif what == "analytic":
-        filename = filename + "_Nt" + str(conf.Nt) + ".txt"
-    elif what == "true_field":
-        filename = filename + "_Nt" + str(conf.Nt) + ".bin"
     else:
-        sys.exit("unknown entity to make a file name from")
+        if suffix.endswith(".avi"):
+            filename = filename + suffix
+        elif suffix.endswith(".png") or suffix.endswith(".txt"):
+            filename = filename + "_" + suffix
+        elif suffix == "*.txt":
+            filename = filename + suffix
+        else:
+            sys.exit("file suffix does not have expected extension")
 
     print("File name: " + filename)
     return filename
+
+
+#def ClearOutputDir(conf, ext=None) -> None:
+    #""" Function clears the output directory, if it does exist.
+        #Optionally, one can remove files of specified type. Note,
+        #the extension argument should start from '.', e.g. '.txt'.
+    #"""
+    #assert isinstance(conf, Configuration)
+    #if os.path.exists(conf.output_dir):
+        #if ext is None:
+            #filelist = [f for f in os.listdir(conf.output_dir)
+                        #if f.endswith(".avi") or
+                           #f.endswith(".pgm") or
+                           #f.endswith(".png") or
+                           #f.endswith(".jpg") or
+                           #f.endswith(".txt")]
+        #else:
+            #assert isinstance(ext, str) and ext and ext.startswith(".")
+            #filelist = [f for f in os.listdir(conf.output_dir)
+                        #if f.endswith(ext)]
+        #for f in filelist:
+            #os.remove(os.path.join(conf.output_dir, f))
+
+
+def MakeVideo(conf, filetitle) -> None:
+    """ Function creates a video file from a sequence
+        of field states written into image files using
+        'ffmpeg' utility installed system-wide.
+    """
+    print("")
+    print("")
+    print("")
+    filename = MakeFileName(conf, filetitle, ".avi")
+    if os.path.isfile(filename): os.remove(filename)
+    wildcards = os.path.join(conf.output_dir, filetitle + "*.png")
+    framerate = 24
+    try:
+        subprocess.run(["ffmpeg", "-y", "-f", "image2", "-framerate",
+                str(framerate), "-pattern_type", "glob", "-i",
+                "'" + wildcards + "'", filename], check=True)
+    except Exception as error:
+        traceback.print_exc()
+        print("WARNING: " + str(error.args))
+        print("Failed to make video; please, check if 'ffmpeg' was installed")
+        print("We can proceed without video ...")
+
+    # Save space by removing image files, which had been encoded in AVI file.
+    for f in glob.glob(wildcards):
+        os.remove(f)
+
+    print("")
+    print("")
+    print("")
 
 
 def CheckPythonVersion() -> None:
     """ Function checks for the minimum supported Python version.
     """
     if (sys.version_info[0] < 3 or
-            (sys.version_info[0] == 3 and sys.version_info[1] < 5)):
-        sys.exit("Python of version 3.5+ is expected")
+            (sys.version_info[0] == 3 and sys.version_info[1] < 6)):
+        sys.exit("Python of version 3.6+ is expected")
 
 
 def SwitchToGraphicalBackend() -> object:
@@ -88,11 +187,31 @@ def SwitchToGraphicalBackend() -> object:
     return plt
 
 
+def WriteFieldAsImage(filename, field) -> object:
+    """ Function writes out specified field as an image.
+        Here we transpose the field: field(x,y) -> field(y,x)
+        because Python assumes abscissas in the second dimension.
+        Also, the image is flipped vertically so that the origin
+        goes to the left-bottom corner.
+    """
+    assert len(field.shape) == 2
+    # Image <- field scaled to [0..1] range.
+    vmin = np.amin(field)
+    vmax = np.amax(field)
+    image = np.abs((np.transpose(field) - vmin) /
+                   (vmax - vmin + math.sqrt(np.finfo(float).eps)))
+    # Write image file.
+    image = np.flipud(image)            # flip Y
+    if filename is not None:
+        assert isinstance(filename, str)
+        scipy.misc.imsave(filename, image)
+    return image
+
+
 def ProblemParametersFromFilename(filename, extract_Nt = True,
                                             prefix = None) -> [int,int,int]:
     """ Function extracts problem size (Nx,Ny) from the file name
-        and optionally the number of time steps (Nt). The function is useful
-        when preparing demonstration from simulation results.
+        and optionally the number of time steps (Nt).
     """
     assert isinstance(filename, str)
     assert (prefix is None) or isinstance(prefix, str)
@@ -158,7 +277,7 @@ def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
 
 
 class PrintProgress:
-    """ Class prints a progress-line in terminal window.
+    """ Class implements progress printing in terminal window.
     """
     def __init__(self, N):
         """ Constructor sets the range of time/iteration index.
@@ -178,20 +297,4 @@ class PrintProgress:
         """ Prints the final new line.
         """
         print("", flush=True)
-
-
-def Field2Image(field) -> object:
-    """ Function converts state field to image. Here we transpose the field
-        because Python assumes abscissas in the second dimension. Also, the
-        image is flipped vertically so that the origin goes to the left-bottom
-        corner.
-    """
-    assert len(field.shape) == 2
-    # Image <- field scaled to [0..1] range.
-    vmin = np.amin(field)
-    vmax = np.amax(field)
-    image = np.abs((np.transpose(field) - vmin) /
-                   (vmax - vmin + math.sqrt(np.finfo(float).eps)))
-    image = np.flipud(image)            # flip Y
-    return image
 

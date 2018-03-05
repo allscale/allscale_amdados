@@ -1,6 +1,6 @@
 //-----------------------------------------------------------------------------
 // Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-// Copyright : IBM Research Ireland, 2017
+// Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
 #pragma once
@@ -67,9 +67,7 @@ void CheckFileExists(const Configuration & conf, const std::string & filename);
 
 uint64_t RandomSeed();
 
-std::string MakeFileName(const Configuration & conf,
-                         const std::string & entity,
-                         const char * suffix = nullptr);
+std::string MakeFileName(const Configuration & conf, const std::string & what);
 
 } // namespace amdados
 

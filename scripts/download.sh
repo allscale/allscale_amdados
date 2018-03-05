@@ -1,8 +1,8 @@
 #!/bin/bash
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Author   : Albert Akhriev (albert_akhriev@ie.ibm.com)
 # Copyright: IBM Research Ireland, 2017-2018
-#--------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
 # Check we are in the root directory.
 rootDir="allscale_amdados"
@@ -15,7 +15,9 @@ fi
 
 # Remove (clear) and then make the destination folder.
 /bin/rm -fr api
+sync
 mkdir -p api
+sync
 
 # Download and build Armadillo library (for some tests).
 bash ./scripts/armadillo.sh

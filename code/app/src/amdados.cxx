@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 // Author    : Fearghal O'Donncha, feardonn@ie.ibm.com
 //             Albert Akhriev, albert_akhriev@ie.ibm.com
-// Copyright : IBM Research Ireland, 2017
+// Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
 #include <iostream>
@@ -52,7 +52,7 @@ int main(int argc, char ** argv)
 {
     MY_TRY
     {
-        std::string scenario;
+        std::string scenario = "simulation";
         std::string config_file = "amdados.conf";
 
         // Parse command-line options.
