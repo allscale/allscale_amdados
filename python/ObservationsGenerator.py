@@ -43,6 +43,7 @@ def Amdados2D(config_file, demo):
             "Application 'amdados' must be built before running this script")
         subprocess.run([AMDADOS_EXE, "--scenario", "sensors",
                         "--config", config_file], check=True)
+        subprocess.run("sync", check=True)
         print("")
         print("")
     sensor_idx = LoadSensorLocations(conf)
@@ -347,13 +348,12 @@ if __name__ == "__main__":
     try:
         CheckPythonVersion()
         parser = argparse.ArgumentParser()
-        parser.add_argument("--config_file",
-                type=str, default="amdados.conf",
-                help="path to configuration file.")
+        parser.add_argument("--config",
+                            type=str, default="amdados.conf",
+                            help="path to configuration file")
         parser.add_argument("--demo", nargs="?", const=True,
-                type=bool, default=False,
-                help="flag enables visualization by generating "
-                        "image and video files.")
+                            type=bool, default=False,
+                            help="show live progress in a window")
         param = parser.parse_args()
         param.config_file = os.path.expanduser(param.config_file)
         print("Options:")

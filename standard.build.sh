@@ -7,12 +7,16 @@
 # Clear any previous build.
 /bin/rm -fr build
 sync
+
+# Create the "build" and "output" directories.
+# Note, the output directory (parameter "output_dir") in your configuration
+# file might be different.
+OUTDIR=$(grep 'output_dir' amdados.conf | awk '{print $2}')
 mkdir -p build
-mkdir -p output
+mkdir -p ${OUTDIR}
 sync
 
-# Optionally load a fresh Allscale API
-# and Armadillo library for unit tests.
+# Optionally load a fresh Allscale API and Armadillo library for unit tests.
 # bash ./scripts/download.sh
 
 # Number of CPU utilized.

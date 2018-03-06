@@ -50,6 +50,7 @@ _output_*
 *.o
 *.so
 *.dylib
+.clang-format
 
 __pycache__
 .ipynb_checkpoints
