@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 # Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
-# Copyright : IBM Research Ireland, 2018
+# Copyright : IBM Research Ireland, 2017-2018
 # -----------------------------------------------------------------------------
 
 """ Script visualizes simulation results given a path to field*.txt file.
@@ -12,6 +12,7 @@ for f in output/field_*.txt; do python3 python/Visualize.py --field_file $f; don
     Note, the script visualizes results of one particular simulation.
     The reason for that is to have flexibility for debugging.
 """
+print(__doc__)
 
 #import pdb; pdb.set_trace()           # enables debugging
 import numpy as np

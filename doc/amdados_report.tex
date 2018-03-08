@@ -5,7 +5,7 @@
 
 %opening
 \title{Allscale AMDADOS Application \\ Techinal Report}
-\author{Albert Akhriev}
+\author{Albert Akhriev \\ Add Yourself}
 
 \begin{document}
 \maketitle
@@ -22,7 +22,9 @@
 \section{Working with Amdados application}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Building the application.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
 \item The application executable must be available before any test (even in Python) is run.
 \item We recommend the standard way for building the application presented in the script ``\textit{standard.build.sh}'' in the project root folder.
@@ -30,7 +32,9 @@
 \item We do \textit{not} recommend the development script for building the application ``\textit{mybuild}'', which relies on ramdisk and other development specific features. Just for completeness, we provide script's options: \texttt{-f} clears any previous build and starts from scratch; \texttt{-r/-d} release/debug mode; \texttt{-t} runs tests after building the project. For example: \texttt{./mybuild -f -r -t}.
 \end{enumerate}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Application parameters.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
 \item The application is controlled by the configuration file. The default one can be found in the project root folder under the name ``\textit{amdados.conf}''. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
 \item Not everything can be controlled by configuration file. For example, the size of sub-domain is hard-coded because of using of templates in C++ grid implementation.
@@ -39,7 +43,9 @@
 \item The default configuration file ``\textit{amdados.conf}'' contains brief description of each parameter sufficient to match it to the source code.
 \end{enumerate}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{The application structure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
 \item In order to demonstrate a data assimilation process we need a ``true'' solution or, in other words, a ``true state of nature''. The reason is twofold. First, this ground-truth is used for the accuracy assessment of data assimilation. Second, the \textit{input data} ``measured'' at sensor locations across the domain govern the simulation by pushing it towards the ``true'' solution.
 \item In Amdados use-case scenario, the \textit{input data are simulated} by direct forward solver (see equation (\ref{?})) in the entire domain. The solver is written in Python. For simplicity, the Python forward solver does not implement any sub-domain partitioning, operating in the entire domain directly, but uses the same number of nodal points as the C++ Amdados application, the same integration period and the same flow model, see the functions \texttt{Flow()} in both C++ and Python implementations.
@@ -63,34 +69,52 @@ $$
 where \textit{analytic} is the \textsf{data type prefix}, $N_x=176$ is the total number of nodal points in $x$ dimension, $N_y=176$ is the total number of nodal points in $y$ dimension, $N_t=1225$ is number of time integration step, and \textit{txt/bin} is the extension of a text or binary file respectively. The number of time steps is omitted in the name of sensor locations file because sensors do not change their positions over time.
 \end{enumerate}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Running the Amdados simulation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Single run}
 \begin{enumerate}
 \item Step into the project root directory.
-\item Create a configuration file using whatever settings you need. It is not recommended to modify the default file ``\textit{amdados.conf}'' or tweak any parameter except the number of sub-domains in either direction and the integration time (unless you understand all the implications). Also, note that the size of a sub-domain must coincide with the hard-coded size in C++ code, where it is used for template instantiation. We advice to use ``\textit{amdados.conf}'' as a starting point.
+\item Create a configuration file using whatever settings you need. It is not recommended to modify the default file ``\textit{amdados.conf}'' or tweak any parameter, except for the number of sub-domains in either direction and the integration time, unless you understand all the implications. Also, note that the size of a sub-domain must coincide with the hard-coded size in C++ code, where it is used for template instantiation. We advice to use ``\textit{amdados.conf}'' as a starting point.
 \item Build \texttt{Amdados} executable in ``Release'' mode:
 $$
 \mbox{\small\texttt{bash standard.build.sh}}
 $$
-The building script extracts the output directory from ``\textit{amdados.conf}''. If your choice is different, please, modify the simple file ``\textit{standard.build.sh}'' accordingly.
+The building script extracts the output directory from ``\textit{amdados.conf}''. If your preferences are different, please, modify the self-explanatory file ``\textit{standard.build.sh}'' accordingly.
 \item If you want to get rid of any previous stuff in the output folder it is worth to do this right after building the executable. Note, all the simulation artefacts will go into the output directory. 
 \item Run the Python script to generate a file of sensor locations (if it is missed), the file of observations and the file of full-field snapshots:
 $$
 \mbox{\small\texttt{python3 python/ObservationsGenerator.py --config your.conf}}
 $$
-If not specified, the configuration file ``\textit{amdados.conf}'' will be used. The command \texttt{--help} lists all the options. Upon completion the following files will be created in the output folder:
-$$\mbox{\small\texttt{sensors\_Nx*\_Ny*.txt}}$$
-$$\mbox{\small\texttt{analytic\_Nx*\_Ny*\_Nt*.txt}}$$
-$$\mbox{\small\texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}}$$
+If not specified, the configuration file ``\textit{amdados.conf}'' will be used. The command \texttt{--help} lists all the options. Upon completion the following files will be created in the output folder: \newline
+\hspace*{4em}{\small\texttt{sensors\_Nx*\_Ny*.txt}} \newline
+\hspace*{4em}{\small\texttt{analytic\_Nx*\_Ny*\_Nt*.txt}} \newline
+\hspace*{4em}{\small\texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}} \newline
 where the values under symbols '$*$' depend on current settings.
 \end{enumerate}
+
 \subsubsection{Size scalability test}
 \begin{enumerate}
-\item fff
+\item The Python script ``\textit{python/ScalabilityTestSize.py}'' runs several simulations with increasing problem size. The doc-string at the beginning of the script provides further details.
+\item The script should be launched without any argument provided the \texttt{Amdados} application was compiled.
+\item There are two script's variables that user should modify according to his/her requirements: \texttt{GridSizes} and \texttt{IntegrationPeriod}. The former is a set of problem sizes (number of sub-domains in both dimensions). Note, the large sizes can result in weeks (if not months) of simulation. As a rule of thumb, a size should not exceed $100{\times}100$ sub-domains. Considering the default size of a sub-domain is $16{\times}16$ points, the whole domain size would be $1600{\times}1600$ nodal points --- quite large problem. The latter variable gives the integration time in seconds.
+\item Besides the aforementioned variables \texttt{GridSizes} and \texttt{IntegrationPeriod}, \newline which have to be selected by user, everything else is done automatically.
+\item Once the test had finished, the results, stored in the output directory, can be visualized, see Section~\ref{sec:visual} for further details.
 \end{enumerate}
+
 \subsubsection{Multi-threading scalability test}
 \begin{enumerate}
-\item fff
+\item The Python script ``\textit{python/ScalabilityTestMT.py}'' mostly repeates the functionality of the previous one except runs several simulations with the same problem size but increasing the number of CPU cores (threads). The doc-string at the beginning of the script provides further details.
+\item The same variables \texttt{GridSizes} and \texttt{IntegrationPeriod} should be modified by user. No input arguments are required.
+\item Once the test had finished, the results, stored in the output directory, can be visualized, see Section~\ref{sec:visual} for further details.
+\item \textbf{Important}: we strongly recommend not to use the same size or integration period as in the test ``\textit{python/ScalabilityTestSize.py}'', otherwise some result files can be overwritten with the loss of test information.
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsubsection{Visualization}\label{sec:visual}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{enumerate}
+    \item fff
 \end{enumerate}
 
 \end{document}
