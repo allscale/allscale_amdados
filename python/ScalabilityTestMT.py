@@ -59,11 +59,11 @@ if __name__ == "__main__":
         if not os.path.isdir(conf.output_dir): os.mkdir(conf.output_dir)
         # Check existence of "amdados" application executable.
         assert os.path.isfile(AMDADOS_EXE), "amdados executable was not found"
-        # Save some parameters that will be used for visualization.
-        params = {"subdomain_x" : int(round(conf.subdomain_x)),
-                  "subdomain_y" : int(round(conf.subdomain_y)),
-                  "Nschwarz"    : int(round(conf.schwarz_num_iters))}
-        np.save(os.path.join(conf.output_dir, "params.npy"), params)
+        ## Save some parameters that will be used for visualization.
+        #params = {"subdomain_x" : int(round(conf.subdomain_x)),
+                  #"subdomain_y" : int(round(conf.subdomain_y)),
+                  #"Nschwarz"    : int(round(conf.schwarz_num_iters))}
+        #np.save(os.path.join(conf.output_dir, "params.npy"), params)
 
         # Modify parameters given the current grid size.
         setattr(conf, "num_subdomains_x", int(GridSize[0]))

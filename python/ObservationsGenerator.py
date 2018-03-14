@@ -355,12 +355,12 @@ if __name__ == "__main__":
                             type=bool, default=False,
                             help="show live progress in a window")
         param = parser.parse_args()
-        param.config_file = os.path.expanduser(param.config_file)
+        param.config = os.path.expanduser(param.config)
         print("Options:")
         print("Visualization: " + str(param.demo))
-        print("Configuration files: " + param.config_file)
+        print("Configuration files: " + param.config)
         print("")
-        Amdados2D(param.config_file, param.demo)
+        Amdados2D(param.config, param.demo)
 
     except subprocess.CalledProcessError as error:
         traceback.print_exc()

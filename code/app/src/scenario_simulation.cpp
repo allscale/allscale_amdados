@@ -744,8 +744,6 @@ void RunDataAssimilation(const Configuration         & conf,
     using ::allscale::api::core::Entry;
     using ::allscale::api::core::Mode;
 
-    MY_INFO("%s", "Running simulation with data assimilation")
-
     AverageProfile diff_profile(conf);
 
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
@@ -911,6 +909,7 @@ void ScenarioSimulation(const std::string & config_file)
     // Run the simulation with data assimilation. Important: by this time
     // some parameters had been initialized in InitDependentParams(..), so
     // we can safely proceed to the main part of the simulation algorithm.
+    MY_TIME_IT("Running the simulation with data assimilation ...")
     RunDataAssimilation(conf, sensors, observations);
 }
 
