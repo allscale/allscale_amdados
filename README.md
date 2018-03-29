@@ -117,72 +117,54 @@ not capable of dealing with such a setup correctly.
 The Armadillo matrix library is used only (!) for testing of matrix operations.
 It is not included in the repository (see .gitignore).
 Armadillo is installed along with other dependencies, see below.
+As of 29.03.2018 Armadillo is included in the repository, but this is not
+necessary. It can be always installed from the official web-site, see
+./scripts/armadillo.sh
 
 ### Dependecies
 
 In order to compile the project on machine without Internet connection
-(e.g. blade behind firewall), some prerequisites should be downloaded beforehand.
-From the project root folder, one should execute:
+(e.g. blade behind firewall), some prerequisites should be downloaded
+beforehand. From the project root folder, one should execute:
     bash ./scripts/download.sh
 This will install all necessary dependencies (including the Armadillo library)
 into the folder "api".
 
-### Visualization
+### Amdados application
 
-For live visualization of C++ code on Linux just install gnuplot.
+For complete description see "./doc/amdados_report.pdf".
+As a quick start, one can run the application with default settings,
+section 2.4.1 in the report:
 
-On Mac OS ( https://apple.stackexchange.com/questions/103814/cant-plot-with-gnuplot-on-my-mac ):
-1) Install XQuartz (via brew);
-2) brew uninstall gnuplot
-3) brew install gnuplot --with-x11
-Now gnuplot supports the x11 terminal.
+    bash standard.build.sh
+    /bin/rm -fr output/*                    # optional cleanup
+    python3 python/ObservationsGenerator.py --config amdados.conf
+    ./build/app/amdados --config amdados.conf
+    python3 python/Visualize.py --field file output/field_Nx*_Ny*_Nt*.bin
 
-Gnuplot on Windows is also easy to get running, but at the moment we do not support this OS.
+where "field_Nx*_Ny_Nt*.bin" should be replaced with the actual file name with
+prefix "field".
 
-Enabling flag should be defined prior to gnuplot header inclusion:
-'#define AMDADOS_ENABLE_GNUPLOT'
-'#include "gnuplot.h"'
+B E W A R E:
+simulation might be very long (~ 1 day) on the machine with few CPU cores.
 
-### Python
+### Prerequisites
 
-Python-based prototype (./python) is a simplified version of the application
-for testing and comparison against C++ implementation.
+(1) Python of version 3.5+ is needed to generate observations, to find
+    ground-truth solution and for testing & visualization,
+    see "./doc/amdados_report.pdf".
 
-Prerequisites:
-(1) Python3 + numpy + scipy + matplotlib.
-(2) 'ffmpeg' utility for generating AVI files (installable from the standard
-    Ubuntu 16.04 repository).
-(3) optional 'mplayer' for playing AVI files, e.g.
-        mplayer -nosound -x 512 -y 512 output/field.avi
-    'mplayer' is also installable from the standard Ubuntu 16.04 repository.
+    We recommend multiplatform package manager Anaconda ver.3:
+    https://www.anaconda.com/download/
 
-In order to run Python prototype, standing in the project root directory:
-        python3 ./python/Amdados2D.py
+    Anaconda includes numpy, scipy, matplotlib, ffmpeg and their dependencies.
 
-Results will appear in the "./output" folder, such as a sequence of fields,
-AVI file where all the field are put together, etc.
-Suppose the script had finished successfully, then user can run the following
-commands to visualize the results (from the project root directory):
+(2) The latest Allscale API and Armadillo library (used in unit tests)
+    can be downloaded and installed as mentioned above:
+        bash ./scripts/download.sh
 
-    # play the [t]rue density field AVI file:
-        bash ./scripts/python/show_results.sh -t
-
-    # play [b]oth fields - the true density field and data assimilation solution:
-        bash ./scripts/python/show_results.sh -b
-
-    # plot the relative [d]ifference between the true density field and
-    # data assimilation solution:
-        bash ./scripts/python/show_results.sh -d
-
-Note, the output of the Python scrip depends on few state flags
-defined at the beginning of Amdados2D.py script file (see the description therein):
-    conf.generate_video
-    conf.generate_text_output
-    conf.generate_observations_only
-
-There are also 1D and 2D Matlab implementations of the same algorithm as in
-Amdados2D.py called Amdados1D.m and Amdados2D.m respectively. Matlab version
-is faster and more readable. It can be run in terminal (from the project root
-directory) as described at the beginning of each script. The script Amdados2D.m
-produces only "./output/both_fields.avi".
+(3) a) On Mac OS one probably wants to install "XQuartz" (via brew) for
+    visualization with Python.
+    b) Another useful tool is "mplayer" - a command-line player that
+    shows the solution rolling out in time.
 

@@ -24,6 +24,8 @@ doc/references
 *.png
 *.jpg
 *.jpeg
+opreport*
+*.out
 
 .settings
 *~
@@ -59,3 +61,7 @@ __pycache__
 
 /Debug/
 /Release/
+
+inventory.txt
+todo.txt
+

@@ -101,7 +101,7 @@ def ProblemParametersFromFilename(filename, extract_Nt = True,
     assert (prefix is None) or basename.startswith(prefix), (
                 "base file name should start with the prefix: " + prefix)
     # Check file name has the pattern of a file of solution fields.
-    assert re.search(r"\w+_Nx\d+_Ny\d+_Nt\d+\.txt", basename), (
+    assert re.search(r"\w+_Nx\d+_Ny\d+_Nt\d+\.bin", basename), (
                             "base file name does not match the pattern")
     # Extracts Nx, Ny and (optionally) Nt from the file name.
     digits = re.sub("[^0-9]", " ", basename)
@@ -134,7 +134,7 @@ def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
     with open(filename, "rb") as fid:
         data = np.fromfile(fid, dtype=np.float32)
     data = np.reshape(data, (-1,4))
-    Nw = data.shape[0] // (Nx * Ny)             # number of written records
+    Nw = data.shape[0] // (Nx * Ny)             # number of written fields
     assert data.shape[0] == Nx * Ny * Nw, "wrong file size"
     idx = np.lexsort(np.rot90(data[:,0:3]))     # sort by {t,x,y} triples
     # Create the output fields and corresponding timestamps.

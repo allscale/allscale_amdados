@@ -1,7 +1,14 @@
 \documentclass[]{article}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=blue,
+    urlcolor=blue
+}
 
 %opening
 \title{Allscale AMDADOS Application \\ Techinal Report}
@@ -11,6 +18,9 @@
 \maketitle
 %\begin{abstract}
 %\end{abstract}
+
+\tableofcontents
+\newpage
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Overview}
@@ -26,42 +36,42 @@
 \subsection{Building the application.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
-\item The application executable must be available before any test (even in Python) is run.
-\item We recommend the standard way for building the application presented in the script ``\textit{standard.build.sh}'' in the project root folder.
-\item Another useful script ``./scripts/download.sh'' downloads the latest Allscale API and the Armadillo library for unit tests.
-\item We do \textit{not} recommend the development script for building the application ``\textit{mybuild}'', which relies on ramdisk and other development specific features. Just for completeness, we provide script's options: \texttt{-f} clears any previous build and starts from scratch; \texttt{-r/-d} release/debug mode; \texttt{-t} runs tests after building the project. For example: \texttt{./mybuild -f -r -t}.
+\item The application executable must be available before running any test (even in Python).
+\item We recommend the standard way for building the application presented in the script \texttt{standard.build.sh} in the project root folder.
+\item Another useful script \texttt{./scripts/download.sh} downloads the latest \linebreak Allscale API and the Armadillo library for unit tests.
+\item We do \textit{not} recommend the development script for building the application \texttt{mybuild}, which relies on ramdisk and other development specific features. For completeness, we provide script's options: \texttt{-f} clears any previous build and starts from scratch; \texttt{-r/-d} release/debug mode; \texttt{-t} runs tests after building the project. For example: \texttt{./mybuild -f -r -t}.
 \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Application parameters.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
-\item The application is controlled by the configuration file. The default one can be found in the project root folder under the name ``\textit{amdados.conf}''. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
+\item The application is controlled by configuration file. The default one can be found in the project root folder under the name \texttt{amdados.conf}. The most interesting parameters are: the integration period and the number of sub-domains in either dimension. 
 \item Not everything can be controlled by configuration file. For example, the size of sub-domain is hard-coded because of using of templates in C++ grid implementation.
-\item The flow model is also hard-coded (see the function \texttt{Flow()} in the file ``\textit{scenario\_simulation.cpp}'' and corresponding function in the Python code). The reason for this is to get away of any specific format of flow data representation while focusing on Allscale API piece.
+\item The flow model is also hard-coded (see the function \texttt{Flow()} in the file \texttt{scenario\_simulation.cpp} and corresponding function in the Python code). The reason for that is to get away of any specific format of flow data representation while focusing solely on Allscale API.
 \item The same is true for sensor locations. Currently, user has to specify a fraction of nodal points occupied by sensors and then the location are (pseudo) randomly generated.
-\item The default configuration file ``\textit{amdados.conf}'' contains brief description of each parameter sufficient to match it to the source code.
+\item The default configuration file \texttt{amdados.conf} contains brief description of each parameter sufficient to match it to the source code.
 \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{The application structure}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
-\item In order to demonstrate a data assimilation process we need a ``true'' solution or, in other words, a ``true state of nature''. The reason is twofold. First, this ground-truth is used for the accuracy assessment of data assimilation. Second, the \textit{input data} ``measured'' at sensor locations across the domain govern the simulation by pushing it towards the ``true'' solution.
-\item In Amdados use-case scenario, the \textit{input data are simulated} by direct forward solver (see equation (\ref{?})) in the entire domain. The solver is written in Python. For simplicity, the Python forward solver does not implement any sub-domain partitioning, operating in the entire domain directly, but uses the same number of nodal points as the C++ Amdados application, the same integration period and the same flow model, see the functions \texttt{Flow()} in both C++ and Python implementations.
-\item The Python code, implemented in ``\textit{python/ObservationsGenerator.py}'', reads the configuration file (assuming the C++ application will use the same file later on) to set-up geometry and initial conditions. Then it runs the forward solver storing two large files.
-\item Those files are: (1) values of the state field at all sensor locations recorded every time step; this file has prefix ``\textit{analytic}'' in its name for historical reasons (it might contain data of analytic as well as simulated solution); (2) the file of a number of entire fields with prefix ``\textit{true\_field}''\footnote{Parameter \textit{write\_num\_fields}.}. The latter file contains full (ground-truth) state fields for presentation and comparison against the data assimilation solution. It is important to emphasize that these files can grow up to dozens of gigabytes in case of a large problem. For this reason, we record solution values only at sensor locations on each time step and a quite small number of full fields over the course of simulation to save memory.
+\item In order to demonstrate data assimilation process we need a ``true'' solution or, in other words, a ``true state of nature''. The reason is twofold. First, the \textit{input data} ``measured'' at sensor locations simulate the process of data acquisition in real world applications. The \textbf{observations} collected across the domain govern the simulation by pushing it towards the ``true'' solution. Second, the ground-truth solution is used for the accuracy assessment of data assimilation.
+\item In the use-case scenario, named ``simulation'', \textit{input data are simulated} by direct forward solver (see equation (\ref{?})) in the entire domain. The solver is written in Python. For simplicity, the Python forward solver does not implement any sub-domain partitioning, operating in the entire domain directly, but uses the same number of nodal points as C++ Amdados application, the same integration period and the same flow model, see the functions \texttt{Flow()} in both C++ and Python implementations.
+\item The Python code, implemented in \texttt{python/ObservationsGenerator.py}, reads the configuration file (assuming the C++ application will use the same file later on) to set-up geometry and initial conditions. Then it runs the forward solver producing two large files.
+\item Those files are: (1) values of the state field at all sensor locations recorded every time step; this file has prefix ``\textit{analytic}'' in its name for historical reasons (it might contain data of analytic as well as simulated solution); (2) the file of a number of entire fields with prefix ``\textit{true\_field}''. The latter file contains full (ground-truth) state fields for presentation and comparison against the data assimilation solution. It is important to emphasize that these files can grow up to dozens of gigabytes in case of a large problem. For this reason, we record solution values only at sensor locations on each time step and a quite small number of full fields over the course of simulation to save memory space\footnote{Parameter \textit{write\_num\_fields}.}.
 \item Input data for C++ \texttt{Amdados} application:
     \begin{itemize}
     \item Text file of sensor locations: ``\textit{sensors*.txt}'';
     \item Text file of \textit{observations} at sensor locations: ``\textit{analytic*.txt}''.
     \end{itemize}
-    The first of these file is generated by \texttt{Amdados} application running in
-    special scenario\footnote{Sensors' generation by Python is too slow, so we use C++ implementation instead.}, e.g.:
+    The first of these files is generated by \texttt{Amdados} application running in
+    special scenario\footnote{Sensors generation by Python is too slow, so we use C++ implementation instead.}, e.g.:
     $$
     \mbox{\small\texttt{build/app/amdados --scenario sensors --config config-file-name}}
     $$
-    For convenience, is a file of sensor locations was not found in the output directory\footnote{Parameter \textit{output\_dir}.} upon launching the script ``\textit{python/ObservationsGenerator.py}'', the \texttt{Amdados} application will be automatically run in aforementioned scenario to generate sensors (pseudo) randomly seeded inside the domain.
+    For convenience, if a file of sensor locations was not found in the output directory\footnote{Parameter \textit{output\_dir} in configuration file.} upon launching the script \texttt{python/ObservationsGenerator.py}, the \texttt{Amdados} application will be automatically run in aforementioned scenario to generate sensors (pseudo) randomly seeded inside the domain.
 \item In order to distinguish simulations with different settings the naming convention was adopted, which is best explained by example:
 $$
 \mbox{\small\texttt{analytic\_Nx176\_Ny176\_Nt1225.txt}},
@@ -75,46 +85,117 @@ where \textit{analytic} is the \textsf{data type prefix}, $N_x=176$ is the total
 \subsubsection{Single run}
 \begin{enumerate}
 \item Step into the project root directory.
-\item Create a configuration file using whatever settings you need. It is not recommended to modify the default file ``\textit{amdados.conf}'' or tweak any parameter, except for the number of sub-domains in either direction and the integration time, unless you understand all the implications. Also, note that the size of a sub-domain must coincide with the hard-coded size in C++ code, where it is used for template instantiation. We advice to use ``\textit{amdados.conf}'' as a starting point.
+\item Create a configuration file using whatever settings you need or just use the default one. It is not recommended to modify the default file \texttt{amdados.conf} or tweak any parameter, except for the number of sub-domains in either direction and the integration time, unless you understand all the consequences. Also, note that the size of a sub-domain must coincide with the hard-coded size in C++ code, where it is used for template instantiation. We advice to use \texttt{amdados.conf} as a starting point.
 \item Build \texttt{Amdados} executable in ``Release'' mode:
 $$
 \mbox{\small\texttt{bash standard.build.sh}}
 $$
-The building script extracts the output directory from ``\textit{amdados.conf}''. If your preferences are different, please, modify the self-explanatory file ``\textit{standard.build.sh}'' accordingly.
+The building script extracts the output directory from \texttt{amdados.conf}. If your preferences are different, please, modify the self-explanatory file \texttt{standard.build.sh} accordingly.
 \item If you want to get rid of any previous stuff in the output folder it is worth to do this right after building the executable. Note, all the simulation artefacts will go into the output directory. 
-\item Run the Python script to generate a file of sensor locations (if it is missed), the file of observations and the file of full-field snapshots:
+\item Run the Python\footnote{We recommend Python 3.6+; Python 3.5+ is the minimum acceptable version.} script to generate a file of sensor locations (if missed), the file of observations and the file of full-field snapshots:
 $$
 \mbox{\small\texttt{python3 python/ObservationsGenerator.py --config your.conf}}
 $$
-If not specified, the configuration file ``\textit{amdados.conf}'' will be used. The command \texttt{--help} lists all the options. Upon completion the following files will be created in the output folder: \newline
-\hspace*{4em}{\small\texttt{sensors\_Nx*\_Ny*.txt}} \newline
-\hspace*{4em}{\small\texttt{analytic\_Nx*\_Ny*\_Nt*.txt}} \newline
-\hspace*{4em}{\small\texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}} \newline
-where the values under symbols '$*$' depend on current settings.
+If not specified, the configuration file \texttt{amdados.conf} will be used. The command \texttt{--help} lists all the options. Upon completion the following files will be created in the output folder:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{sensors\_Nx*\_Ny*.txt}} \\
+\mbox{\small\texttt{analytic\_Nx*\_Ny*\_Nt*.txt}} \\
+\mbox{\small\texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}}
+\end{array}
+$$
+where the values under symbols ``$*$'' depend on current settings.
+\item Run \texttt{Amdados} executable in (normal) simulation mode:
+$$
+\mbox{\small\texttt{./build/app/amdados --config your.conf}}
+$$
+This will generate the output file \texttt{field\_Nx*\_Ny*\_Nt*.bin} containing a number of full-field snapshots of data assimilation solutions (the same number of snapshots evenly distributed over integration period as in aforementioned file of ``true'' solutions: \texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}).
+\item Putting all together:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{bash standard.build.sh}} \\
+\mbox{\small\texttt{/bin/rm -fr output/* \qquad\qquad \# {\it optional cleanup}}} \\
+\mbox{\small\texttt{python3 python/ObservationsGenerator.py --config amdados.conf}} \\
+\mbox{\small\texttt{./build/app/amdados --config amdados.conf}}
+\end{array}
+$$
+The example was shown with the default configuration file \texttt{amdados.conf}. When finished, we obtain the snapshots of the ``true'' and data assimilation solutions that can be compared and visualized, see Section~\ref{sec:visual}.
+
+\textit{Note}, during the last simulation \textit{no console output will be printed}. Please, do not be surprised --- this is the project requirement.
+
+\textit{Note}, in the meantime data assimilation is slow due to frequent matrix inversion. We recommend to use many-core machine (16+) even for default configuration \texttt{amdados.conf}.
+
+If you need to debug the code, some verbosity as well as additional error checking can be enabled in the file \texttt{code/app/include/debugging.h} by un-commenting the line: \texttt{\#define AMDADOS\_DEBUGGING}.
 \end{enumerate}
 
 \subsubsection{Size scalability test}
 \begin{enumerate}
-\item The Python script ``\textit{python/ScalabilityTestSize.py}'' runs several simulations with increasing problem size. The doc-string at the beginning of the script provides further details.
-\item The script should be launched without any argument provided the \texttt{Amdados} application was compiled.
-\item There are two script's variables that user should modify according to his/her requirements: \texttt{GridSizes} and \texttt{IntegrationPeriod}. The former is a set of problem sizes (number of sub-domains in both dimensions). Note, the large sizes can result in weeks (if not months) of simulation. As a rule of thumb, a size should not exceed $100{\times}100$ sub-domains. Considering the default size of a sub-domain is $16{\times}16$ points, the whole domain size would be $1600{\times}1600$ nodal points --- quite large problem. The latter variable gives the integration time in seconds.
+\item The Python script \texttt{python/ScalabilityTestSize.py} runs several simulations with increasing problem size. The doc-string at the beginning of the script provides further details.
+\item The script should be launched without any argument provided the \texttt{Amdados} application was compiled, for example:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{bash standard.build.sh}} \\
+\mbox{\small\texttt{python3 python/ScalabilityTestSize.py}} \\
+\end{array}
+$$
+\item There are two script's variables that user can modify according to his/her requirements: \texttt{GridSizes} and \texttt{IntegrationPeriod}. The former is a set of problem sizes (number of sub-domains in both dimensions). Note, the large sizes can result in weeks (if not months) of simulation. As a rule of thumb, a size should not exceed $100{\times}100$ sub-domains. Considering the default size of a sub-domain is $16{\times}16$ points, the whole domain size would be $1600{\times}1600$ nodal points --- quite large problem. The latter variable -- \texttt{IntegrationPeriod} -- gives the integration time in seconds.
 \item Besides the aforementioned variables \texttt{GridSizes} and \texttt{IntegrationPeriod}, \newline which have to be selected by user, everything else is done automatically.
 \item Once the test had finished, the results, stored in the output directory, can be visualized, see Section~\ref{sec:visual} for further details.
 \end{enumerate}
 
 \subsubsection{Multi-threading scalability test}
 \begin{enumerate}
-\item The Python script ``\textit{python/ScalabilityTestMT.py}'' mostly repeates the functionality of the previous one except runs several simulations with the same problem size but increasing the number of CPU cores (threads). The doc-string at the beginning of the script provides further details.
-\item The same variables \texttt{GridSizes} and \texttt{IntegrationPeriod} should be modified by user. No input arguments are required.
+\item The Python script \texttt{python/ScalabilityTestMT.py} mostly repeats the functionality of the previous one except runs several simulations with the same problem size but increasing the number of CPU cores (threads). The doc-string at the beginning of the script provides further details.
+\item The same variables \texttt{GridSizes} and \texttt{IntegrationPeriod} can be modified by user. No input arguments are required, for example:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{bash standard.build.sh}} \\
+\mbox{\small\texttt{python3 python/ScalabilityTestMT.py}} \\
+\end{array}
+$$
 \item Once the test had finished, the results, stored in the output directory, can be visualized, see Section~\ref{sec:visual} for further details.
-\item \textbf{Important}: we strongly recommend not to use the same size or integration period as in the test ``\textit{python/ScalabilityTestSize.py}'', otherwise some result files can be overwritten with the loss of test information.
+\item \textbf{Important}: we strongly recommend not to use the same size or integration period as in the test \texttt{python/ScalabilityTestSize.py}, otherwise some result files can be overwritten with the loss of test information.
 \end{enumerate}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsubsection{Visualization}\label{sec:visual}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{enumerate}
-    \item fff
+\item If everything went al-right, we obtain four files in the output folder for a single run, for example:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{sensors\_Nx*\_Ny*.txt}} \\
+\mbox{\small\texttt{analytic\_Nx*\_Ny*\_Nt*.txt}} \\
+\mbox{\small\texttt{true\_field\_Nx*\_Ny*\_Nt*.bin}} \\
+\mbox{\small\texttt{field\_Nx*\_Ny*\_Nt*.bin}}
+\end{array}
+$$
+In case of scalability tests a number of quadruples will be generated with different sub-domain numbers ($N_x$, $N_y$) and integration time ($N_t$).
+Note, the values $N_x$, $N_y$ and $N_t$ are used as a signature of simulation.
+
+The symbols ``*'' hides the actual parameters selected in your configuration.
+\item Visualization script \texttt{python/Visualize.py} gives an example of how the \textit{binary} files of field snapshots can be read (function \texttt{ReadResultFile()} in the module \texttt{python/Utility.py}). Although file of field snapshots is binary, internally it consists of 4 columns (time, abscissa, ordinate, value) of each nodal point. The records are not sorted since Allscale IO API does not guarantees ordering, so we sort the records lexicographically by the triplets ($t$,$x$,$y$) and group them into separate fields (by the time-stamp $t$).
+\item For a single simulation we can run:
+$$
+\mbox{\footnotesize\texttt{python3 python/Visualize.py --field\_file  output/field\_Nx*\_Ny*\_Nt*.bin}},
+$$
+where the names of all other files related to the simulation are deduced from the name of data assimilation result.
+\item Upon completion one will find the following new files in the output folder:
+$$
+\begin{array}{l}
+\mbox{\small\texttt{sensors\_Nx176\_Ny176.png}} \\
+\mbox{\small\texttt{rel\_diff\_Nx176\_Ny176.png}} \\
+\mbox{\small\texttt{video\_Nx176\_Ny176\_Nt1225.avi}}
+\end{array},
+$$
+where the first image depicts sensor layout and sub-domains, the second picture shows how relative error between the ``true'' and estimated density changes over the course of time integration, and finally the third video-file demonstrates the evolution of the ``true'' density field versus data assimilation solution.
+\item In case of multiple simulations, it would be easier to run the following bash script for all the results in turn:
+\begin{verbatim}
+    for f in output/field_*.txt; do
+        python3 python/Visualize.py --field_file $f
+    done
+\end{verbatim}
+See also the doc-string in the file \texttt{python/Visualize.py}.
 \end{enumerate}
 
 \end{document}

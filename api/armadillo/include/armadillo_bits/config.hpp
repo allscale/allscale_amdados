@@ -43,14 +43,14 @@
 #endif
 
 #if !defined(ARMA_USE_SUPERLU)
-#define ARMA_USE_SUPERLU
+/* #undef ARMA_USE_SUPERLU */
 //// Uncomment the above line if you have SuperLU.
 //// SuperLU is used for solving sparse linear systems via spsolve()
 //// Caveat: only SuperLU version 5.2 can be used!
 #endif
 
 #if !defined(ARMA_SUPERLU_INCLUDE_DIR)
-#define ARMA_SUPERLU_INCLUDE_DIR /usr/local/include/superlu/
+#define ARMA_SUPERLU_INCLUDE_DIR /
 //// If you're using SuperLU and want to explicitly include the SuperLU headers,
 //// uncomment the above define and specify the appropriate include directory.
 //// Make sure the directory has a trailing /
@@ -267,5 +267,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.1_2/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib;/usr/local/lib/libsuperlu.a
-#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.1_2/include;/usr/local/opt/szip/include;/usr/local/include/superlu
+#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.1_2/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib
+#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.1_2/include;/usr/local/opt/szip/include
