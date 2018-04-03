@@ -134,7 +134,7 @@ def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
     with open(filename, "rb") as fid:
         data = np.fromfile(fid, dtype=np.float32)
     data = np.reshape(data, (-1,4))
-    Nw = data.shape[0] // (Nx * Ny)             # number of written fields
+    Nw = data.shape[0] // (Nx * Ny)     # number of written records per field
     assert data.shape[0] == Nx * Ny * Nw, "wrong file size"
     idx = np.lexsort(np.rot90(data[:,0:3]))     # sort by {t,x,y} triples
     # Create the output fields and corresponding timestamps.
