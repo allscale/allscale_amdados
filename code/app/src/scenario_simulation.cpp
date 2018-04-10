@@ -92,7 +92,7 @@ struct SubdomainContext
 
     point2d_t     idx;          // subdomain's position on the grid
     size_t        Nt;           // number of time integration steps
-    size_t        Nschwarz;     // number of Schwarz iterations
+    size_t        Nsubiter;     // number of sub-iterations
     size_t        Nsensors;     // convenience variable = sensors.size()
     flow_t        flow;         // current flow vector (vel_x, vel_y)
 
@@ -101,7 +101,7 @@ struct SubdomainContext
         , Kalman(), B()
         , P(), Q(), H(), R(), z()
         , sensors(), LU(), tmp_field()
-        , idx(-1,-1), Nt(0), Nschwarz(0), Nsensors(0), flow(0.0, 0.0)
+        , idx(-1,-1), Nt(0), Nsubiter(0), Nsensors(0), flow(0.0, 0.0)
     {}
 };
 
@@ -475,16 +475,12 @@ void MatrixFromAllscale(Matrix & field,
     const long Sx = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().x;
     const long Sy = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().y;
 
-    // Set up the internal points from the subdomain.
-    // Mind the extended subdomain: one extra point layer on either side.
+    // Copy the internal points of a subdomain to the (internal part of) output
+    // field. Mind the extended subdomain: an extra point layer on either side.
     assert_true(CheckSizes(dom[idx], field));
     dom[idx].forAllActiveNodes([&](const point2d_t & pos, const double & val) {
         field(pos.x + 1, pos.y + 1) = val;
     });
-
-    // Set the corner points to zero (we do not use them in any case).
-    field(0,      0) = field(0,      Sy + 1) = 0.0;
-    field(Sx + 1, 0) = field(Sx + 1, Sy + 1) = 0.0;
 
     double_array_t boundary;    // placeholder of boundary points
 
@@ -496,22 +492,22 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x-1, idx.y}].data.getBoundary(layer_no, Right);
 #endif
         assert_true(boundary.size() == size_t(Sy));
-        for (int y = 0; y < Sy; ++y) field(0, y + 1) = boundary[y];
+        for (int y = 0; y < Sy; ++y) field(0, y+1) = boundary[y];
     } else {
-        for (int y = 0; y < Sy; ++y) field(0, y + 1) = field(2, y + 1);
+        for (int y = 0; y < Sy; ++y) field(0, y+1) = field(2, y+1);
     }
 
     // Set up right-most points from the left boundary of the right peer.
-    if (idx.x + 1 < Nx) {
+    if (idx.x+1 < Nx) {
 #if MY_MULTISCALE_METHOD == 1
         AdjustBoundary(boundary, dom[{idx.x+1, idx.y}].getBoundary(Left), Sy);
 #else // method == 2
         boundary = dom[{idx.x+1, idx.y}].data.getBoundary(layer_no, Left);
 #endif
         assert_true(boundary.size() == size_t(Sy));
-        for (int y = 0; y < Sy; ++y) field(Sx + 1, y + 1) = boundary[y];
+        for (int y = 0; y < Sy; ++y) field(Sx+1, y+1) = boundary[y];
     } else {
-        for (int y = 0; y < Sy; ++y) field(Sx + 1, y + 1) = field(Sx - 1, y + 1);
+        for (int y = 0; y < Sy; ++y) field(Sx+1, y+1) = field(Sx-1, y+1);
     }
 
     // Set up bottom-most points from the top boundary of the bottom peer.
@@ -522,27 +518,38 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x, idx.y-1}].data.getBoundary(layer_no, Up);
 #endif
         assert_true(boundary.size() == size_t(Sx));
-        for (int x = 0; x < Sx; ++x) field(x + 1, 0) = boundary[x];
+        for (int x = 0; x < Sx; ++x) field(x+1, 0) = boundary[x];
     } else {
-        for (int x = 0; x < Sx; ++x) field(x + 1, 0) = field(x + 1, 2);
+        for (int x = 0; x < Sx; ++x) field(x+1, 0) = field(x+1, 2);
     }
 
     // Set up top-most points from the bottom boundary of the top peer.
-    if (idx.y + 1 < Ny) {
+    if (idx.y+1 < Ny) {
 #if MY_MULTISCALE_METHOD == 1
         AdjustBoundary(boundary, dom[{idx.x, idx.y+1}].getBoundary(Down), Sx);
 #else // method == 2
         boundary = dom[{idx.x, idx.y+1}].data.getBoundary(layer_no, Down);
 #endif
         assert_true(boundary.size() == size_t(Sx));
-        for (int x = 0; x < Sx; ++x) field(x + 1, Sy + 1) = boundary[x];
+        for (int x = 0; x < Sx; ++x) field(x+1, Sy+1) = boundary[x];
     } else {
-        for (int x = 0; x < Sx; ++x) field(x + 1, Sy + 1) = field(x + 1, Sy - 1);
+        for (int x = 0; x < Sx; ++x) field(x+1, Sy+1) = field(x+1, Sy-1);
     }
+
+    // The corner points are not used in finite-difference scheme applied to
+    // internal subdomain points, however, Kalman filter uses the entire
+    // subdomain field (as currently implemented but could be easily avoided).
+    // For the latter reason, we have to assign some feasible values to the
+    // corner points. Note, since we operate on extended subdomains, their
+    // corners belong to unreachable diagonal peers.
+    field(0,0)       = (field(1,0)     + field(1,1)   + field(0,1)    ) / 3.0;
+    field(0,Sy+1)    = (field(1,Sy+1)  + field(1,Sy)  + field(0,Sy)   ) / 3.0;
+    field(Sx+1,0)    = (field(Sx,0)    + field(Sx,1)  + field(Sx+1,1) ) / 3.0;
+    field(Sx+1,Sy+1) = (field(Sx,Sy+1) + field(Sx,Sy) + field(Sx+1,Sy)) / 3.0;
 }
 
 /**
- * Function copies a matrix, which represents an extended subdomain, to
+ * Function copies a matrix, which represents an extended subdomain,
  * to Allscale subdomain structure.
  */
 void AllscaleFromMatrix(subdomain_t & cell, const Matrix & field)
@@ -585,10 +592,10 @@ const subdomain_t & SubdomainRoutineKalman(
         const_cast<subdomain_t&>(curr_state[idx]).getActiveLayerSize();
 
     // Get the discrete time (index of iteration) in the range [0..Nt) and
-    // the index of Schwarz sub-iteration in the range [0..Nschwarz).
-    assert_true(timestamp < ctx.Nt * ctx.Nschwarz);
-    const size_t t_discrete = timestamp / ctx.Nschwarz;
-    const size_t sub_iter   = timestamp % ctx.Nschwarz;
+    // the index of sub-iteration in the range [0..Nsubiter).
+    assert_true(timestamp < ctx.Nt * ctx.Nsubiter);
+    const size_t t_discrete = timestamp / ctx.Nsubiter;
+    const size_t sub_iter   = timestamp % ctx.Nsubiter;
 
 #ifdef AMDADOS_DEBUGGING    // printing progress
     if ((idx == point2d_t(0,0)) && (sub_iter == 0)) {
@@ -604,7 +611,7 @@ const subdomain_t & SubdomainRoutineKalman(
     // Copy state field into the matrix object.
     MatrixFromAllscale(ctx.field, curr_state, idx);
 
-    // At the beginning of a regular iteration (i.e. at the first Schwarz
+    // At the beginning of a regular iteration (i.e. at the first
     // sub-iteration) do: (1) get the new observations; (2) obtain new noise
     // covariance matrices; (3) compute the prior state estimation.
     if (sub_iter == 0) {
@@ -677,10 +684,10 @@ const subdomain_t & SubdomainRoutineNoSensors(
         const_cast<subdomain_t&>(curr_state[idx]).getActiveLayerSize();
 
     // Get the discrete time (index of iteration) in the range [0..Nt) and
-    // the index of Schwarz sub-iteration in the range [0..Nschwarz).
-    assert_true(timestamp < ctx.Nt * ctx.Nschwarz);
-    const size_t t_discrete = timestamp / ctx.Nschwarz;
-    const size_t sub_iter   = timestamp % ctx.Nschwarz;  (void) sub_iter;
+    // the index of sub-iteration in the range [0..Nsubiter).
+    assert_true(timestamp < ctx.Nt * ctx.Nsubiter);
+    const size_t t_discrete = timestamp / ctx.Nsubiter;
+    const size_t sub_iter   = timestamp % ctx.Nsubiter;  (void) sub_iter;
 
 #ifdef AMDADOS_DEBUGGING    // printing progress
     if ((idx == point2d_t(0,0)) && (sub_iter == 0)) {
@@ -698,7 +705,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
 
     // Prior estimation.
     InverseModelMatrix(ctx.B, conf, ctx.flow, layer_size,
-                       resolution, ctx.Nschwarz);
+                       resolution, ctx.Nsubiter);
     ctx.tmp_field = ctx.field;              // copy state into a temporary one
     ctx.LU.Init(ctx.B);                     // decompose: B = L*U
     ctx.LU.Solve(ctx.field, ctx.tmp_field); // new_field = B^{-1}*old_field
@@ -731,8 +738,8 @@ const subdomain_t & SubdomainRoutineNoSensors(
 /**
  * Using model matrix A, the function integrates advection-diffusion equation
  * forward in time inside individual subdomains and records all the solutions
- * as the state fields. Schwarz iterations are applied in order to make the
- * global solution seamless along subdomain boundaries. On top of that, the
+ * as the state fields. Sub-iterations are applied in order to make the
+ * global solution seam-less along subdomain boundaries. On top of that, the
  * Kalman filters (separate filter in each subdomain) drive the solution
  * towards the observations at sensor locations (data assimilation).
  */
@@ -748,7 +755,7 @@ void RunDataAssimilation(const Configuration         & conf,
 
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
     const size_t    Nt = conf.asUInt("Nt");
-    const size_t    Nschwarz = conf.asUInt("schwarz_num_iters");
+    const size_t    Nsubiter = conf.asUInt("num_sub_iter");
     const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
@@ -802,7 +809,7 @@ void RunDataAssimilation(const Configuration         & conf,
         }
         ctx.idx = idx;
         ctx.Nt = Nt;
-        ctx.Nschwarz = Nschwarz;
+        ctx.Nsubiter = Nsubiter;
         ctx.Nsensors = sensors[idx].size();
     });
 
@@ -813,9 +820,9 @@ void RunDataAssimilation(const Configuration         & conf,
     auto out_stream = file_manager.openOutputStream(stream_entry);
 
     // Time integration forward in time. We want to make Nt (normal) iterations
-    // and Nschwarz Schwarz sub-iterations within each (normal) iteration.
+    // and Nsubiter sub-iterations within each (normal) iteration.
     ::allscale::api::user::algorithm::stencil(
-        state_field, Nt * Nschwarz,
+        state_field, Nt * Nsubiter,
         // Process the internal subdomains.
         [&](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
@@ -847,16 +854,16 @@ void RunDataAssimilation(const Configuration         & conf,
         ::allscale::api::user::algorithm::observer(
             // Time filter: choose time-slices evenly distributed on time axis.
             [=](time_t t) {
-                // Filter out the first Schwarz sub-iteration, skip the others.
-                if ((t % time_t(Nschwarz)) != 0) return false;
-                t /= time_t(Nschwarz);
+                // Filter out the first sub-iteration, skip the others.
+                if ((t % time_t(Nsubiter)) != 0) return false;
+                t /= time_t(Nsubiter);
                 return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
             },
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
             [&](time_t t, const point2d_t & idx, const subdomain_t & cell) {
-                t /= time_t(Nschwarz);
+                t /= time_t(Nsubiter);
                 // Important: we save field at the finest resolution.
                 subdomain_t temp;
                 temp = cell;
@@ -878,7 +885,7 @@ void RunDataAssimilation(const Configuration         & conf,
         )
     );
     file_manager.close(out_stream);
-    diff_profile.PrintProfile(conf, "schwarz_diff");
+    diff_profile.PrintProfile(conf, "subiter_diff");
     MY_INFO("%s", "\n\n")
 }
 
@@ -886,7 +893,7 @@ void RunDataAssimilation(const Configuration         & conf,
 
 /**
  * The main function of this application runs simulation with data
- * assimilation using Schwarz method to handle domain subdivision.
+ * assimilation using method to handle domain subdivision.
  */
 void ScenarioSimulation(const std::string & config_file)
 {

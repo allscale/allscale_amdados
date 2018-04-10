@@ -9,14 +9,20 @@
     One can also visualize all the simulation results in bash
     terminal (mind the mandatory parameter "--field_file"):
 
-    for f in output/field_*.txt \
+    for f in output/field_*.bin \
     do \
         python3 python/Visualize.py --field_file $f \
     done
+
+    or in a single line:
+
+    for f in output/field_*.bin; do python3 python/Visualize.py --field_file $f; done
+
 """
 print(__doc__)
 
 #import pdb; pdb.set_trace()           # enables debugging
+
 import numpy as np
 from scipy.stats import mstats
 import matplotlib
@@ -84,43 +90,43 @@ def PlotSensors(field_filename, conf):
                         "sensors_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"))
 
 
-def PlotSchwarzProfile(field_filename, conf):
+def PlotSubiterProfile(field_filename, conf):
     """ Function plots a picture demonstrating how smoothness of the solution
-        improves at the subdomain boundaries as Schwarz iterations progressing.
-        If the file of Schwarz iteration profile does not exist (this is only
+        improves at the subdomain boundaries as sub-terations progressing.
+        If the file of sub-iteration profile does not exist (this is only
         available with AMDADOS_DEBUGGING flag defined in C++ application),
         then nothing is done.
     """
-    Nschwarz = conf.Nschwarz
+    Nsubiter = conf.Nsubiter
     # Load file of sensors corresponding to the file of solution fields.
     dirname = os.path.dirname(field_filename)
     Nx, Ny, Nt = ProblemParametersFromFilename(field_filename, True, "field")
     profile_filename = os.path.join(dirname,
-                    "schwarz_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".txt")
+                    "subiter_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".txt")
     if not os.path.isfile(profile_filename):
         print("WARNING: file " + profile_filename + " does not exist")
         return
     profile = np.loadtxt(profile_filename)
-    if len(profile.shape) != 1 or len(profile) != Nt * Nschwarz:
-        print("WARNING: empty or incomplete file of Schwarz differences")
+    if len(profile.shape) != 1 or len(profile) != Nt * Nsubiter:
+        print("WARNING: empty or incomplete file of sub-iteration differences")
         return
-    profile = np.reshape(profile, (Nt, Nschwarz))
-    # Compute quantiles among Nt samples of size Nschwarz.
+    profile = np.reshape(profile, (Nt, Nsubiter))
+    # Compute quantiles among Nt samples of size Nsubiter.
     quantiles = mstats.mquantiles(profile, axis=0)
     # Plotting the picture of the relative difference behaviour.
     fig = plt.figure()
     ax = fig.gca()
     labels = ["25%", "50%", "75%"]
     for i, q in enumerate(quantiles):
-        plt.plot(np.arange(1, Nschwarz+1), q, label=labels[i])
+        plt.plot(np.arange(1, Nsubiter+1), q, label=labels[i])
     plt.legend()
-    ax.set_xlabel("Schwarz iteration")
+    ax.set_xlabel("Sub-iteration")
     ax.set_ylabel("Relative difference")
     plt.title("Decay of relative difference at subdomain boundaries")
     plt.tight_layout()
     plt.grid()
     plt.savefig(os.path.join(dirname,
-                    "schwarz_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"))
+                    "subiter_diff_Nx" + str(Nx) + "_Ny" + str(Ny) + ".png"))
 
 
 def MakeVideoFile(field_filename):
@@ -235,7 +241,7 @@ if __name__ == "__main__":
 
         PlotRelativeDifference(field_file, rel_diff)
         PlotSensors(field_file, conf)
-        #PlotSchwarzProfile(field_file, conf)
+        #PlotSubiterProfile(field_file, conf)
 
     except AssertionError as error:
         traceback.print_exc()
