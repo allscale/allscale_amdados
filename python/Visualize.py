@@ -9,14 +9,20 @@
     One can also visualize all the simulation results in bash
     terminal (mind the mandatory parameter "--field_file"):
 
-    for f in output/field_*.txt \
+    for f in output/field_*.bin \
     do \
         python3 python/Visualize.py --field_file $f \
     done
+
+    or in a single line:
+
+    for f in output/field_*.bin; do python3 python/Visualize.py --field_file $f; done
+
 """
 print(__doc__)
 
 #import pdb; pdb.set_trace()           # enables debugging
+
 import numpy as np
 from scipy.stats import mstats
 import matplotlib

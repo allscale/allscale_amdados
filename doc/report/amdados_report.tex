@@ -190,11 +190,11 @@ $$
 where the first image depicts sensor layout and sub-domains, the second picture shows how relative error between the ``true'' and estimated density changes over the course of time integration, and finally the third video-file demonstrates the evolution of the ``true'' density field versus data assimilation solution.
 \item In case of multiple simulations, it would be easier to run the following bash script for all the results in turn:
 \begin{verbatim}
-    for f in output/field_*.txt; do
+    for f in output/field_*.bin; do
         python3 python/Visualize.py --field_file $f
     done
 \end{verbatim}
-See also the doc-string in the file \texttt{python/Visualize.py}.
+See also the doc-string in the file \texttt{python/Visualize.py}. Note, the script should be launched from the project root folder and input file name is prepended by the \texttt{output} directory name.
 \end{enumerate}
 
 \end{document}
