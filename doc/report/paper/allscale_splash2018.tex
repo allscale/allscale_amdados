@@ -171,6 +171,18 @@ Text of abstract \ldots.
 
 Text of paper \ldots
 
+\section{Problem formulation}
+
+We demonstrate the ability of Allscale API by modelling a spread over of some contaminant in marine environment or any other open space. Suppose at time $t=0$ and some point ${\bf p}_c$ of rectangular domain $\Omega$ a contaminating substance had been spilled out with high concentration. Neither position ${\bf p}_c$ nor the initial concentration level are known in advance. However, we can monitor the situation at few sensors randomly spread inside the domain, see example on Fig~\ref{fig:sensors}. The sensors are assumed sufficiently accurate but scarce in number.
+
+The physical model of such a process is well studied and mathematically characterized by advection-diffusion equation, which describes physical phenomena where quantities are transferred inside a system due to advection and diffusion. For the full treatment of this class of PDE, user is referred to \cite{Hundsdorfer03}.
+
+Implying the marine environment (as an example) and assuming that we can (1) measure the concentration of contaminant at sensor locations; (2) measure the speed and direction of the current at sensor locations; and (3) we know the diffusion coefficient $D$ for contaminant in the saline water; the problem in hand can be formulated as follow: \textit{find the distribution of contaminant in the domain given sensor measurements  (concentration and current velocity) as a function of space and time}. 
+
+\begin{figure}
+\includegraphics[scale=0.5]{./images/sensors-Nx208-Ny176}
+\caption{Example of domain sub-division. Blue points depict location of sensors pseudo-randomly scattered across the domain. Coordinates are defined as indices of nodal points.}
+\end{figure}
 
 %% Acknowledgments
 \begin{acks}                            %% acks environment is optional
@@ -191,7 +203,7 @@ Text of paper \ldots
 
 
 %% Bibliography
-%\bibliography{bibfile}
+\bibliography{references}
 
 
 %% Appendix
