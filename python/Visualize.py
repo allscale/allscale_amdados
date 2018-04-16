@@ -25,6 +25,7 @@ print(__doc__)
 
 import numpy as np
 from scipy.stats import mstats
+import scipy.misc
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib.ticker import MultipleLocator
@@ -139,6 +140,14 @@ def MakeVideoFile(field_filename):
     return video_filename
 
 
+def MakePngFile(field_filename, title, t):
+    """ Function makes the png-file name from the field one.
+    """
+    dirname = os.path.dirname(field_filename)
+    png_filename = os.path.join(dirname, title + "-t=" + str(t) + ".png")
+    return png_filename
+
+
 if __name__ == "__main__":
     try:
         CheckPythonVersion()
@@ -219,6 +228,12 @@ if __name__ == "__main__":
                 image = Field2Image(fields[i,:,:])
                 assert true_image.shape == image.shape
                 t = str(timestamps[i])
+                if False:
+                    # If we want images for publication:
+                    scipy.misc.imsave(MakePngFile(field_file, "true-field", t),
+                                      true_image)
+                    scipy.misc.imsave(MakePngFile(field_file, "field", t),
+                                      image)
                 gap = 20
                 nr = image.shape[0]
                 nc = image.shape[1]

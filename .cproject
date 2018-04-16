@@ -21,7 +21,7 @@
 							<builder buildPath="${workspace_loc:/allscale_amdados}/Debug" id="cdt.managedbuild.target.gnu.builder.macosx.exe.debug.1149039029" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.debug.649583642" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug.707048049" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.debug">
-								<option id="macosx.cpp.link.option.paths.2019163047" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+								<option id="macosx.cpp.link.option.paths.2019163047" name="Library search path (-L)" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value=".././api/allscale_api"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.483833126" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
@@ -43,10 +43,10 @@
 								<option id="gnu.cpp.compiler.option.warnings.extrawarn.729167638" name="Extra warnings (-Wextra)" superClass="gnu.cpp.compiler.option.warnings.extrawarn" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<option id="gnu.cpp.compiler.option.warnings.wconversion.95116545" name="Implicit conversion warnings (-Wconversion)" superClass="gnu.cpp.compiler.option.warnings.wconversion" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1054091215" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="/home/albert/soft/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/allscale_api/code/api/include/}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/allscale_api/code/utils/include}&quot;"/>
 									<listOptionValue builtIn="false" value="../build/googletest-prefix/src/googletest/googletest/include/gtest"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/armadillo/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.971061678" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1269964558" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -96,7 +96,7 @@
 							<builder buildPath="${workspace_loc:/allscale_amdados}/Release" id="cdt.managedbuild.target.gnu.builder.macosx.exe.release.1751902254" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.macosx.exe.release"/>
 							<tool id="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.release.1566092769" name="MacOS X C Linker" superClass="cdt.managedbuild.tool.macosx.c.linker.macosx.exe.release"/>
 							<tool id="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.release.1390758757" name="MacOS X C++ Linker" superClass="cdt.managedbuild.tool.macosx.cpp.linker.macosx.exe.release">
-								<option id="macosx.cpp.link.option.paths.1794485588" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
+								<option id="macosx.cpp.link.option.paths.1794485588" name="Library search path (-L)" superClass="macosx.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="../api"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.macosx.cpp.linker.input.937084482" superClass="cdt.managedbuild.tool.macosx.cpp.linker.input">
@@ -118,10 +118,10 @@
 								<option id="gnu.cpp.compiler.option.dialect.std.852945893" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.dialect.flags.566224968" name="Other dialect flags" superClass="gnu.cpp.compiler.option.dialect.flags" useByScannerDiscovery="true" value="-std=c++14" valueType="string"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1609345780" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
-									<listOptionValue builtIn="false" value="/home/albert/soft/include"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/allscale_api/code/api/include/}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/allscale_api/code/utils/include}&quot;"/>
 									<listOptionValue builtIn="false" value="../build/googletest-prefix/src/googletest/googletest/include/gtest"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/allscale_amdados/api/armadillo/include}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.1593487302" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2016133593" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>

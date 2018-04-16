@@ -456,7 +456,7 @@ void InverseModelMatrix(Matrix & B, const Configuration & conf,
  * Function copies an Allscale subdomain to the matrix. The output matrix
  * represents so called "extended subdomain" where one extra point layer on
  * either side is added by copying values from the peer subdomains' boundaries.
- * When a subdomain is located at the outer bounrary of the whole domain,
+ * When a subdomain is located at the outer boundary of the whole domain,
  * we initialize the extended points in a way that provides zero boundary
  * condition on the density derivative along the normal: du/dn = 0. For example,
  * at the left boundary we set (see the code): field(0,:) = field(2,:);
