@@ -1,0 +1,38 @@
+Submission #220 has been updated at the Object-Oriented Programming,
+Systems, Languages & Applications Conference (OOPSLA 2018) site.
+
+       Title: AllScale toolchain pilot application: Development of an
+              advanced data assimilation framework within a parallel
+              computing environment
+     Authors: Albert Akhriev (IBM Research Ireland)
+              Fearghal O'Donncha (IBM Research Ireland)
+  Paper site: https://urldefense.proofpoint.com/v2/url?u=https-3A__oopsla18.hotcrp.com_paper_220-3Fcap-3D0220aUROPN2wOrWU&d=DwIBaQ&c=jf_iaSHvJObTbx-siA1ZOg&r=nps06H2VXaIN2SJHO72MjeRg-3UQAjlJ4NlpaAlf9OM&m=3FRhCHIAnlxSMEmna7Xc0FdZUldwU2mUdb-rcMUAdcI&s=TZFPnnKgDR-uguPlGv54dUuueYdRXg7-7nUMbj7Vaus&e=
+
+You will receive email when reviews are available. Further updates are
+allowed until 17 Apr 2018 7:59:59am EDT.
+
+Contact Manu Sridharan <manu@sridharan.net> with any questions or concerns.
+
+- OOPSLA 2018 Submissions
+
+
+Submission #220 has been submitted for review at the Object-Oriented
+Programming, Systems, Languages & Applications Conference (OOPSLA 2018)
+site.
+
+       Title: AllScale toolchain pilot application: Development of an
+              advanced data assimilation framework within a parallel
+              computing environment
+     Authors: Albert Akhriev (IBM Research Ireland)
+              Fearghal O'Donncha (IBM Research Ireland)
+  Paper site: https://urldefense.proofpoint.com/v2/url?u=https-3A__oopsla18.hotcrp.com_paper_220-3Fcap-3D0220aUROPN2wOrWU&d=DwIBaQ&c=jf_iaSHvJObTbx-siA1ZOg&r=nps06H2VXaIN2SJHO72MjeRg-3UQAjlJ4NlpaAlf9OM&m=wCdZSfWnyvY7eoTv5wphIa0DHzD_a5pSJYuKDU-Dmd8&s=lJFua16k4fQsCu4nmQEQoawPxQpM2SJiF8uGtezLTy0&e=
+
+You will receive email when reviews are available. Further updates are
+allowed until 17 Apr 2018 7:59:59am EDT.
+
+Contact Manu Sridharan <manu@sridharan.net> with any questions or concerns.
+
+- OOPSLA 2018 Submissions
+
+
+

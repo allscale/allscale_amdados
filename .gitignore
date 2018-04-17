@@ -18,6 +18,8 @@ doc/python*
 doc/references
 *.aux
 *.toc
+*.bbl
+*.blg
 *.log
 *.pdf
 *.ps
