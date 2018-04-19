@@ -73,6 +73,7 @@ if __name__ == "__main__":
         # For all the grid sizes in the list ...
         exe_time_profile = np.zeros((len(GridSizes),2))
         for grid_no, grid in enumerate(GridSizes):
+            assert grid[0] >= 2 and grid[1] >= 2, "the minimum grid size is 2x2"
             # Modify parameters given the current grid size.
             setattr(conf, "num_subdomains_x", int(grid[0]))
             setattr(conf, "num_subdomains_y", int(grid[1]))

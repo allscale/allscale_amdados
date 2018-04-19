@@ -34,5 +34,25 @@ Contact Manu Sridharan <manu@sridharan.net> with any questions or concerns.
 
 - OOPSLA 2018 Submissions
 
+/////////////////////////////////////////////////////////////////////////
+
+Oceans 2018
+
+Abstract Submission Confirmed
+Thank you for your submission.
+Your abstract number is 180418-125. If you or a co-author who will be presenting the paper will require a visa to attend the conference, please start that process immediately to allow sufficient time.
+
+A confirmation email has been sent to the corresponding author. If you do not receive this confirmation email within the next 24 hours, please contact us at: TechnicalChair@oceans18mtsieeecharleston.org
+
+You may log into your author dashboard at any time to track the status of your abstract. Through the dashboard you will also be able to edit your abstract up until the time the review process begins. You may also edit author contact information. If your submission is accepted, you will execute a copyright, register for the conference, and upload your paper through the dashboard.
+
+Your personal login information is shown below. Please note the URL, username, and password and keep them in a safe place.
+
+http://authors.oceans18mtsieeecharleston.org/
+Email: albert_akhriev@ie.ibm.com
+Password: 8108
+
+
+
 
 
