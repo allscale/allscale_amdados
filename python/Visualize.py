@@ -155,8 +155,8 @@ if __name__ == "__main__":
         parser.add_argument("--field", type=str, default=None,
                             help="path to solution field file.")
         opts = parser.parse_args()
-        field_file = os.path.expanduser(opts.field_file)
-        true_field_file = GetTrueFieldFilename(opts.field_file)
+        field_file = os.path.expanduser(opts.field)
+        true_field_file = GetTrueFieldFilename(opts.field)
         print("Parameters:")
         print("Solution fields file: " + field_file)
         print("True solution fields file: " + true_field_file)
