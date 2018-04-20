@@ -50,7 +50,8 @@ from Utility import *
 #GridSizes = [(11,11), (19,17), (23,25), (37,31), (43,41), (83,89)]
 # Small problems for a relatively brief testing.
 #GridSizes = [(13,11), (17,13), (19,15), (23,21), (25,23), (27,25)]
-GridSizes = [(13,11), (18,16), (23,21), (29,27), (34,32), (39,37)]
+#GridSizes = [(13,11), (18,16), (23,21), (29,27), (34,32), (39,37)]
+GridSizes = [(2,2),(4,4),(8,8),(12,12),(16,16),(20,20),(24,24),(28,28),(32,32)]
 
 # Integration period in seconds.
 IntegrationPeriod = 9000
