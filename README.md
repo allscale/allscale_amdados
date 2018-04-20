@@ -140,7 +140,7 @@ section 2.4.1 in the report:
     /bin/rm -fr output/*                    # optional cleanup
     python3 python/ObservationsGenerator.py --config amdados.conf
     ./build/app/amdados --config amdados.conf
-    python3 python/Visualize.py --field file output/field_Nx*_Ny*_Nt*.bin
+    python3 python/Visualize.py --field output/field_Nx*_Ny*_Nt*.bin
 
 where "field_Nx*_Ny_Nt*.bin" should be replaced with the actual file name with
 prefix "field".

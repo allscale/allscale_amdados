@@ -7,16 +7,16 @@
     Note, this script visualizes results of one particular simulation.
     The reason for that is to have flexibility for debugging.
     One can also visualize all the simulation results in bash
-    terminal (mind the mandatory parameter "--field_file"):
+    terminal (mind the mandatory parameter "--field"):
 
     for f in output/field_*.bin \
     do \
-        python3 python/Visualize.py --field_file $f \
+        python3 python/Visualize.py --field $f \
     done
 
     or in a single line:
 
-    for f in output/field_*.bin; do python3 python/Visualize.py --field_file $f; done
+    for f in output/field_*.bin; do python3 python/Visualize.py --field $f; done
 
 """
 print(__doc__)
@@ -152,9 +152,8 @@ if __name__ == "__main__":
     try:
         CheckPythonVersion()
         parser = argparse.ArgumentParser()
-        parser.add_argument("--field_file",
-                type=str, default=None,
-                help="path to solution fields file.")
+        parser.add_argument("--field", type=str, default=None,
+                            help="path to solution field file.")
         opts = parser.parse_args()
         field_file = os.path.expanduser(opts.field_file)
         true_field_file = GetTrueFieldFilename(opts.field_file)

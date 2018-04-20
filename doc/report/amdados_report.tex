@@ -176,7 +176,7 @@ The symbols ``*'' hides the actual parameters selected in your configuration.
 \item Visualization script \texttt{python/Visualize.py} gives an example of how the \textit{binary} files of field snapshots can be read (function \texttt{ReadResultFile()} in the module \texttt{python/Utility.py}). Although file of field snapshots is binary, internally it consists of 4 columns (time, abscissa, ordinate, value) of each nodal point. The records are not sorted since Allscale IO API does not guarantees ordering, so we sort the records lexicographically by the triplets ($t$,$x$,$y$) and group them into separate fields (by the time-stamp $t$).
 \item For a single simulation we can run:
 $$
-\mbox{\footnotesize\texttt{python3 python/Visualize.py --field\_file  output/field\_Nx*\_Ny*\_Nt*.bin}},
+\mbox{\footnotesize\texttt{python3 python/Visualize.py --field  output/field\_Nx*\_Ny*\_Nt*.bin}},
 $$
 where the names of all other files related to the simulation are deduced from the name of data assimilation result.
 \item Upon completion one will find the following new files in the output folder:
@@ -191,7 +191,7 @@ where the first image depicts sensor layout and sub-domains, the second picture 
 \item In case of multiple simulations, it would be easier to run the following bash script for all the results in turn:
 \begin{verbatim}
     for f in output/field_*.bin; do
-        python3 python/Visualize.py --field_file $f
+        python3 python/Visualize.py --field $f
     done
 \end{verbatim}
 See also the doc-string in the file \texttt{python/Visualize.py}. Note, the script should be launched from the project root folder and input file name is prepended by the \texttt{output} directory name.

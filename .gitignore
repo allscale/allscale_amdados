@@ -28,6 +28,7 @@ doc/references
 *.jpeg
 opreport*
 *.out
+.pydevproject
 
 .settings
 *~
