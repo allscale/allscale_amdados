@@ -5,6 +5,7 @@
 
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
+#include "allscale/api/user/algorithm/async.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
 
@@ -146,6 +147,16 @@ void OptimizePointLocations(double_array_t & x, double_array_t & y)
         gradJ = gradJ_new;
         step *= 2.0;
     }
+
+}
+
+/**
+* Function scales a coordinate from [0..1] range to specified size.
+*/
+int ScaleCoord(double v, int size) {
+    int i = static_cast<int>(std::floor(v * size));
+    i = std::min(std::max(i, 0), size - 1);
+    return i;
 }
 
 } // anonymous namespace
@@ -163,7 +174,7 @@ void ScenarioSensors(const std::string & config_file)
     using ::allscale::api::core::FileIOManager;
     using ::allscale::api::core::Entry;
     using ::allscale::api::core::Mode;
-    using ::allscale::api::user::algorithm::pfor;
+    using ::allscale::api::user::algorithm::async;
 
     // Read configuration file.
     Configuration conf;
@@ -174,19 +185,6 @@ void ScenarioSensors(const std::string & config_file)
     const double fraction =
             Bound(conf.asDouble("sensor_fraction"), 0.001, 0.75);
 
-    // Open file manager and the output file for writing.
-    std::string filename = MakeFileName(conf, "sensors");
-    FileIOManager & manager = FileIOManager::getInstance();
-    Entry e = manager.createEntry(filename, Mode::Text);
-    auto out = manager.openOutputStream(e);
-
-    // Function scales a coordinate from [0..1] range to specified size.
-    auto ScaleCoord = [](double v, int size) -> int {
-        int i = static_cast<int>(std::floor(v * size));
-        i = std::min(std::max(i, 0), size - 1);
-        return i;
-    };
-
     if (conf.asInt("sensor_per_subdomain")) {
         // Local (subdomain) sizes at the finest resolution.
         const int      Sx = conf.asInt("subdomain_x");
@@ -194,22 +192,33 @@ void ScenarioSensors(const std::string & config_file)
         const int      sub_problem_size = Sx * Sy;
         const size2d_t subdomain_size(Sx, Sy);
 
-        // Save sensor locations. Note, order is not guaranteed.
-        pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
+        // Save sensor locations.
+        std::string filename = MakeFileName(conf, "sensors");
+        allscale::api::user::algorithm::async([conf,fraction,GridSize,subdomain_size,sub_problem_size,Sx,Sy,filename]() {
+            // Open file manager and the output file for writing.
+            FileIOManager & manager = FileIOManager::getInstance();
+            Entry e = manager.createEntry(filename, Mode::Text);
+            auto out = manager.openOutputStream(e);
+            
             // Generate pseudo-random sensor locations.
             const int Nobs = std::max(Round(fraction * sub_problem_size), 1);
             double_array_t x(Nobs), y(Nobs);    // sensors' coordinates
-            InitialGuess(conf, x, y, idx);
-            OptimizePointLocations(x, y);
-
-            // Save (scaled) pseudo-randomly distributed sensor locations.
-            for (int k = 0; k < Nobs; ++k) {
-                point2d_t loc(ScaleCoord(x[k], Sx), ScaleCoord(y[k], Sy));
-                point2d_t glo = Sub2Glo(loc, idx, subdomain_size);
-                out.atomic([=](auto & file) {
-                    file << glo.x << " " << glo.y << "\n";
-                });
+            
+            for(int i = 0; i < GridSize.x; ++i) {
+                for(int j = 0; j < GridSize.y; ++j) {
+                    point2d_t idx(i,j);
+                    InitialGuess(conf, x, y, idx);
+                    OptimizePointLocations(x, y);
+                    
+                    // Save (scaled) pseudo-randomly distributed sensor locations.
+                    for(int k = 0; k < Nobs; ++k) {
+                        point2d_t loc(ScaleCoord(x[k], Sx), ScaleCoord(y[k], Sy));
+                        point2d_t glo = Sub2Glo(loc, idx, subdomain_size);
+                        out << glo.x << " " << glo.y << "\n";
+                    }
+                }
             }
+            manager.close(out);
         });
     } else {
         // Global (whole domain) sizes.
@@ -225,16 +234,20 @@ void ScenarioSensors(const std::string & config_file)
         InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);
 
+        // Open file manager and the output file for writing.
+        std::string filename = MakeFileName(conf, "sensors");
+        FileIOManager & manager = FileIOManager::getInstance();
+        Entry e = manager.createEntry(filename, Mode::Text);
+        auto out = manager.openOutputStream(e);
+        
         // Save (scaled) sensor locations.
         for (int k = 0; k < Nobs; ++k) {
             int xk = ScaleCoord(x[k], Nx);
             int yk = ScaleCoord(y[k], Ny);
-            out.atomic([=](auto & file) {
-                file << xk << " " << yk << "\n";
-            });
+            out << xk << " " << yk << "\n";
         }
+        manager.close(out);
     }
-    manager.close(out);
 }
 
 /**
