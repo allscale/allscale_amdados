@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <allscale/utils/serializer.h>
+
 namespace amdados {
 
 // Macros check vector/matrix sizes and produce error message with
@@ -200,6 +202,26 @@ public:
         Resize(mat.nrows, mat.ncols, false);
         std::copy(mat.begin(), mat.end(), begin());
     }
+
+	static Matrix load(allscale::utils::ArchiveReader& reader) {
+		int nrows = reader.read<int>();
+		int ncols = reader.read<int>();
+		Matrix matrix(nrows, ncols);
+		int size = reader.read<int>();
+		assert_eq(matrix.size, size) << "Expected Matrix sizes to match";
+		for(int i = 0; i < matrix.size; ++i) {
+			matrix.data[i] = reader.read<double>();
+		}
+		return matrix;
+	}
+	void store(allscale::utils::ArchiveWriter& writer) const {
+		writer.write(nrows);
+		writer.write(ncols);
+		writer.write(size);
+		for(int i = 0; i < size; ++i) {
+			writer.write(data[i]);
+		}
+	}
 
     // Deallocates and clears this object.
     void Clear()
