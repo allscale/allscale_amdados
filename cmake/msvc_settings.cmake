@@ -23,6 +23,8 @@ if(MSVC)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd\"4592\"")
 	# allow usage of math defines such as M_PI
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D_USE_MATH_DEFINES")
+	# disable warning regarding deprecated tr1 namespace (introduced with MSVC 2017 15.5.1)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING")
 
 	# remove NDEBUG from release flags
 	string(REPLACE "/DNDEBUG" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
@@ -31,6 +33,10 @@ if(MSVC)
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /DNDEBUG")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DNDEBUG")
 	endif()
+
+	# disable checked iterators
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /D_ITERATOR_DEBUG_LEVEL=0")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D_ITERATOR_DEBUG_LEVEL=0")
 
 	# properly configure how to link the MSVC runtime library, static <-> shared and debug <-> release
 	if(BUILD_SHARED_LIBS)
@@ -55,7 +61,7 @@ if(MSVC)
 	endif()
 
 	# solution configuration
-	set(CMAKE_CONFIGURATION_TYPES ${CMAKE_BUILD_TYPE} CACHE STRING "Visual Studio Solution Configuration" FORCE)
+	set(CMAKE_CONFIGURATION_TYPES Debug Release CACHE STRING "Visual Studio Solution Configuration" FORCE)
 
 	# no ZERO_CHECK target
 	set(CMAKE_SUPPRESS_REGENERATION true)
