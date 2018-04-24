@@ -258,7 +258,9 @@ void LoadSensorLocations(const Configuration   & conf,
     assert_true(sensors.size() == GridSize);
 
     // Clear the data structure.
-    sensors.forEach([](point_array_t & arr) { arr.clear(); });
+    pfor(point2d_t(0, 0), GridSize, [&sensors](const point2d_t& idx) {
+        sensors[idx].clear();
+    });
 
     // Read the sensor file sequentially.
     std::string filename = MakeFileName(conf, "sensors");
@@ -294,6 +296,7 @@ void LoadSensorMeasurements(const Configuration         & conf,
                             const Grid<point_array_t,2> & sensors,
                             Grid<Matrix,2>              & observations)
 {
+
     MY_TIME_IT("Loading sensor measurements ...")
     MY_INFO("%s", "---------------------------------------------------------")
     MY_INFO("%s", "B E W A R E: if you had run: amdados --scenario sensors")
@@ -322,7 +325,9 @@ void LoadSensorMeasurements(const Configuration         & conf,
     assert_true(observations.size() == GridSize);
 
     // Clear the data structure.
-    observations.forEach([](Matrix & m) { m.Clear(); });
+    pfor(point2d_t(0, 0), GridSize, [&observations](const point2d_t& idx) {
+        observations[idx].Clear();
+    });
 
     // Read the sensor file sequentially.
     std::string filename = MakeFileName(conf, "analytic");
@@ -343,7 +348,9 @@ void LoadSensorMeasurements(const Configuration         & conf,
         assert_true(last_timestamp + 1 == t);
 
         // Reset all the counters upon arrival of a new time-slice.
-        counters.forEach([](int & c) { c = 0; });
+        pfor(point2d_t(0, 0), GridSize, [&counters](const point2d_t& idx) {
+            counters[idx] = 0;
+        });
 
         // Read all the records of the time-slice.
         for (int i = 0; i < num; ++i) {
