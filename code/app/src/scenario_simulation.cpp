@@ -31,10 +31,6 @@ using ::allscale::api::user::algorithm::pfor;
 using ::allscale::api::user::data::Grid;
 using ::allscale::api::user::data::GridPoint;
 using ::allscale::api::user::data::Direction;
-using ::allscale::api::user::data::Direction::Up;
-using ::allscale::api::user::data::Direction::Down;
-using ::allscale::api::user::data::Direction::Left;
-using ::allscale::api::user::data::Direction::Right;
 
 // amdados_utils.cpp:
 point2d_t GetGridSize(const Configuration & conf);
@@ -225,10 +221,10 @@ void InitDependentParams(Configuration & conf)
                                        static_cast<double>( low_size.x));
 
     // Check some global constants.
-    static_assert((0 <= Up   ) && (Up    < NSIDES), "");
-    static_assert((0 <= Down ) && (Down  < NSIDES), "");
-    static_assert((0 <= Left ) && (Left  < NSIDES), "");
-    static_assert((0 <= Right) && (Right < NSIDES), "");
+    static_assert((0 <= Direction::Up   ) && (Direction::Up    < NSIDES), "");
+    static_assert((0 <= Direction::Down ) && (Direction::Down  < NSIDES), "");
+    static_assert((0 <= Direction::Left ) && (Direction::Left  < NSIDES), "");
+    static_assert((0 <= Direction::Right) && (Direction::Right < NSIDES), "");
     assert_true((Sx >= 3) && (Sy >= 3)) << "subdomain must be at least 3x3";
 
     // Ensure integer values for certain parameters.
@@ -286,12 +282,12 @@ void ApplyBoundaryCondition(domain_t & state, const point2d_t & idx)
     const long Ny = state.size().y, Sy = subdom_size.y;
 
     // Set the leftmost and rightmost.
-    if (idx.x == 0)      subdom.setBoundary(Left,  double_array_t(Sy, 0.0));
-    if (idx.x == Nx - 1) subdom.setBoundary(Right, double_array_t(Sy, 0.0));
+    if (idx.x == 0)      subdom.setBoundary(Direction::Left,  double_array_t(Sy, 0.0));
+    if (idx.x == Nx - 1) subdom.setBoundary(Direction::Right, double_array_t(Sy, 0.0));
 
     // Set the bottommost and topmost.
-    if (idx.y == 0)      subdom.setBoundary(Down, double_array_t(Sx, 0.0));
-    if (idx.y == Ny - 1) subdom.setBoundary(Up,   double_array_t(Sx, 0.0));
+    if (idx.y == 0)      subdom.setBoundary(Direction::Down, double_array_t(Sx, 0.0));
+    if (idx.y == Ny - 1) subdom.setBoundary(Direction::Up,   double_array_t(Sx, 0.0));
 }
 
 /**
@@ -487,9 +483,9 @@ void MatrixFromAllscale(Matrix & field,
     // Set up left-most points from the right boundary of the left peer.
     if (idx.x > 0) {
 #if MY_MULTISCALE_METHOD == 1
-        AdjustBoundary(boundary, dom[{idx.x-1, idx.y}].getBoundary(Right), Sy);
+        AdjustBoundary(boundary, dom[{idx.x-1, idx.y}].getBoundary(Direction::Right), Sy);
 #else // method == 2
-        boundary = dom[{idx.x-1, idx.y}].data.getBoundary(layer_no, Right);
+        boundary = dom[{idx.x-1, idx.y}].data.getBoundary(layer_no, Direction::Right);
 #endif
         assert_true(boundary.size() == size_t(Sy));
         for (int y = 0; y < Sy; ++y) field(0, y+1) = boundary[y];
@@ -500,9 +496,9 @@ void MatrixFromAllscale(Matrix & field,
     // Set up right-most points from the left boundary of the right peer.
     if (idx.x+1 < Nx) {
 #if MY_MULTISCALE_METHOD == 1
-        AdjustBoundary(boundary, dom[{idx.x+1, idx.y}].getBoundary(Left), Sy);
+        AdjustBoundary(boundary, dom[{idx.x+1, idx.y}].getBoundary(Direction::Left), Sy);
 #else // method == 2
-        boundary = dom[{idx.x+1, idx.y}].data.getBoundary(layer_no, Left);
+        boundary = dom[{idx.x+1, idx.y}].data.getBoundary(layer_no, Direction::Left);
 #endif
         assert_true(boundary.size() == size_t(Sy));
         for (int y = 0; y < Sy; ++y) field(Sx+1, y+1) = boundary[y];
@@ -513,9 +509,9 @@ void MatrixFromAllscale(Matrix & field,
     // Set up bottom-most points from the top boundary of the bottom peer.
     if (idx.y > 0) {
 #if MY_MULTISCALE_METHOD == 1
-        AdjustBoundary(boundary, dom[{idx.x, idx.y-1}].getBoundary(Up), Sx);
+        AdjustBoundary(boundary, dom[{idx.x, idx.y-1}].getBoundary(Direction::Up), Sx);
 #else // method == 2
-        boundary = dom[{idx.x, idx.y-1}].data.getBoundary(layer_no, Up);
+        boundary = dom[{idx.x, idx.y-1}].data.getBoundary(layer_no, Direction::Up);
 #endif
         assert_true(boundary.size() == size_t(Sx));
         for (int x = 0; x < Sx; ++x) field(x+1, 0) = boundary[x];
@@ -526,9 +522,9 @@ void MatrixFromAllscale(Matrix & field,
     // Set up top-most points from the bottom boundary of the top peer.
     if (idx.y+1 < Ny) {
 #if MY_MULTISCALE_METHOD == 1
-        AdjustBoundary(boundary, dom[{idx.x, idx.y+1}].getBoundary(Down), Sx);
+        AdjustBoundary(boundary, dom[{idx.x, idx.y+1}].getBoundary(Direction::Down), Sx);
 #else // method == 2
-        boundary = dom[{idx.x, idx.y+1}].data.getBoundary(layer_no, Down);
+        boundary = dom[{idx.x, idx.y+1}].data.getBoundary(layer_no, Direction::Down);
 #endif
         assert_true(boundary.size() == size_t(Sx));
         for (int x = 0; x < Sx; ++x) field(x+1, Sy+1) = boundary[x];

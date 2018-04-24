@@ -11,10 +11,6 @@ namespace amdados {
 using namespace ::allscale::utils;
 using ::allscale::api::user::algorithm::pfor;
 using ::allscale::api::user::data::Direction;
-using ::allscale::api::user::data::Direction::Up;
-using ::allscale::api::user::data::Direction::Down;
-using ::allscale::api::user::data::Direction::Left;
-using ::allscale::api::user::data::Direction::Right;
 
 // Number of subdomains in each dimension.
 const int NUM_DOMAINS_X = 13;
@@ -67,7 +63,7 @@ int GetId(point2d_t idx)
     bool ok1 = ((0 <= idx[_X_]) && (idx[_X_] < NUM_DOMAINS_X));
     bool ok2 = ((0 <= idx[_Y_]) && (idx[_Y_] < NUM_DOMAINS_Y));
     assert_true(ok1 && ok2);
-    return (idx[_X_] * NUM_DOMAINS_Y + idx[_Y_]);
+    return static_cast<int>(idx[_X_] * NUM_DOMAINS_Y + idx[_Y_]);
 }
 
 // Unique ID from subdomain location and its boundary side index.
@@ -90,16 +86,16 @@ void TestGrid()
     const bool TestYXOrder = false;
 
     // Origin and the number of subdomains in both directions.
-    const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
-    const int Oy = Origin[_Y_];  const int Ny = SubDomGridSize[_Y_];
+    const int Ox = static_cast<int>(Origin[_X_]);  const int Nx = static_cast<int>(SubDomGridSize[_X_]);
+    const int Oy = static_cast<int>(Origin[_Y_]);  const int Ny = static_cast<int>(SubDomGridSize[_Y_]);
 
     ::allscale::api::user::data::Grid<int,2> grid(SubDomGridSize);
 
     // Segmentation fault as expected.
     if (TestOutOfBounds)
     {
-        for (int x = -10*SubDomGridSize[_X_]; x < 10*SubDomGridSize[_X_]; ++x) {
-        for (int y = -10*SubDomGridSize[_Y_]; y < 10*SubDomGridSize[_Y_]; ++y) {
+        for (int x = static_cast<int>(-10*SubDomGridSize[_X_]); x < 10*SubDomGridSize[_X_]; ++x) {
+        for (int y = static_cast<int>(-10*SubDomGridSize[_Y_]); y < 10*SubDomGridSize[_Y_]; ++y) {
             grid[{x,y}] = x + y;
         }}
     }
@@ -248,20 +244,20 @@ void TestInterSubdomain()
     using namespace amdados;
 
     // Origin and the number of subdomains in both directions.
-    const int Ox = Origin[_X_];  const int Nx = SubDomGridSize[_X_];
-    const int Oy = Origin[_Y_];  const int Ny = SubDomGridSize[_Y_];
+    const int Ox = static_cast<int>(Origin[_X_]);  const int Nx = static_cast<int>(SubDomGridSize[_X_]);
+    const int Oy = static_cast<int>(Origin[_Y_]);  const int Ny = static_cast<int>(SubDomGridSize[_Y_]);
 
     // Index increments and corresponding directions of a neighbour (remote) subdomain.
     Direction remote_dir[4];
     point2d_t remote_idx[4];
 
-    remote_dir[Left ] = Right;  remote_idx[Left ] = point2d_t{-1,0};
-    remote_dir[Right] = Left;   remote_idx[Right] = point2d_t{+1,0};
-    remote_dir[Down ] = Up;     remote_idx[Down ] = point2d_t{0,-1};
-    remote_dir[Up   ] = Down;   remote_idx[Up   ] = point2d_t{0,+1};
+    remote_dir[Direction::Left ] = Direction::Right;  remote_idx[Direction::Left ] = point2d_t{-1,0};
+    remote_dir[Direction::Right] = Direction::Left;   remote_idx[Direction::Right] = point2d_t{+1,0};
+    remote_dir[Direction::Down ] = Direction::Up;     remote_idx[Direction::Down ] = point2d_t{0,-1};
+    remote_dir[Direction::Up   ] = Direction::Down;   remote_idx[Direction::Up   ] = point2d_t{0,+1};
 
-    EXPECT_TRUE(static_cast<int>(std::min(std::min(Left,Right), std::min(Down,Up))) == 0);
-    EXPECT_TRUE(static_cast<int>(std::max(std::max(Left,Right), std::max(Down,Up))) == 3);
+    EXPECT_TRUE(static_cast<int>(std::min(std::min(Direction::Left,Direction::Right), std::min(Direction::Down,Direction::Up))) == 0);
+    EXPECT_TRUE(static_cast<int>(std::max(std::max(Direction::Left,Direction::Right), std::max(Direction::Down,Direction::Up))) == 3);
 
     domain_t domain(SubDomGridSize);
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
@@ -277,26 +273,26 @@ void TestInterSubdomain()
 
         // Fill up each subdomain border by unique id, excluding (!) the corner points.
         for (int x = 1; x < SUBDOMAIN_X-1; ++x) {
-            subdom[{x,0}]          = GetId(idx, Down);
-            subdom[{x,SUBDOMAIN_Y-1}] = GetId(idx, Up);
+            subdom[{x,0}]          = GetId(idx, Direction::Down);
+            subdom[{x,SUBDOMAIN_Y-1}] = GetId(idx, Direction::Up);
         }
         for (int y = 1; y < SUBDOMAIN_Y-1; ++y) {
-            subdom[{0,y}]          = GetId(idx, Left);
-            subdom[{SUBDOMAIN_X-1,y}] = GetId(idx, Right);
+            subdom[{0,y}]          = GetId(idx, Direction::Left);
+            subdom[{SUBDOMAIN_X-1,y}] = GetId(idx, Direction::Right);
         }
     });
 
     pfor(Origin, SubDomGridSize, [&](const point2d_t & idx) {
         // For all the borders ...
-        for (Direction dir : { Up, Down, Left, Right }) {
+        for (Direction dir : { Direction::Up, Direction::Down, Direction::Left, Direction::Right }) {
             // Skip global border.
-            if ((dir == Left)  && (idx[_X_] == Ox))   continue;
-            if ((dir == Right) && (idx[_X_] == Nx-1)) continue;
-            if ((dir == Down)  && (idx[_Y_] == Oy))   continue;
-            if ((dir == Up)    && (idx[_Y_] == Ny-1)) continue;
+            if ((dir == Direction::Left)  && (idx[_X_] == Ox))   continue;
+            if ((dir == Direction::Right) && (idx[_X_] == Nx-1)) continue;
+            if ((dir == Direction::Down)  && (idx[_Y_] == Oy))   continue;
+            if ((dir == Direction::Up)    && (idx[_Y_] == Ny-1)) continue;
 
             // Check remote border has expected values.
-            int len = ((dir == Up) || (dir == Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
+            int len = ((dir == Direction::Up) || (dir == Direction::Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
             point2d_t neighbour_idx = idx + remote_idx[dir];
             Direction neighbour_dir = remote_dir[dir];
             std::vector<double> border = domain[neighbour_idx].getBoundary(neighbour_dir);
@@ -330,9 +326,9 @@ void TestSubdomainBorders()
         }}
 
         // For all the borders ...
-        for (Direction dir : { Up, Down, Left, Right }) {
+        for (Direction dir : { Direction::Up, Direction::Down, Direction::Left, Direction::Right }) {
             // Initialize and set border values.
-            int len = ((dir == Up) || (dir == Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
+            int len = ((dir == Direction::Up) || (dir == Direction::Down)) ? SUBDOMAIN_X : SUBDOMAIN_Y;
             std::vector<double> border(len);
             for (int k = 0; k < len; ++k) {
                 border[k] = k + GetId(idx, dir);
@@ -347,28 +343,28 @@ void TestSubdomainBorders()
 
             // Ckeck that border values were properly written by reading the subdomain directly.
             switch (dir) {
-                case Down: {
+                case Direction::Down: {
                     for (int x = 0; x < SUBDOMAIN_X; ++x) {
                         bool ok = (subdom[{x,0}] == border[x]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
-                case Up: {
+                case Direction::Up: {
                     for (int x = 0; x < SUBDOMAIN_X; ++x) {
                         bool ok = (subdom[{x,SUBDOMAIN_Y-1}] == border[x]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
-                case Left: {
+                case Direction::Left: {
                     for (int y = 0; y < SUBDOMAIN_Y; ++y) {
                         bool ok = (subdom[{0,y}] == border[y]);
                         EXPECT_TRUE(ok);
                     }
                 }
                 break;
-                case Right: {
+                case Direction::Right: {
                     for (int y = 0; y < SUBDOMAIN_Y; ++y) {
                         bool ok = (subdom[{SUBDOMAIN_X-1,y}] == border[y]);
                         EXPECT_TRUE(ok);
