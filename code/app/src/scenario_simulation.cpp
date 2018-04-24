@@ -570,8 +570,7 @@ const subdomain_t & SubdomainRoutineKalman(
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
-                            SubdomainContext    & ctx,
-                            AverageProfile      & diff_profile)
+                            SubdomainContext    & ctx)
 {
     const unsigned resolution = static_cast<unsigned>(LayerFine);
     assert_true(&curr_state != &next_state);
@@ -624,10 +623,6 @@ const subdomain_t & SubdomainRoutineKalman(
         ctx.Kalman.PropagateStateInverse(ctx.field, ctx.P, ctx.B, ctx.Q);
     }
 
-    // Accumulate history of discrepancies for debugging,
-    (void) diff_profile;
-    //diff_profile.Accumulate(idx, diff);
-
     // Filtering by Kalman filter.
     ctx.Kalman.SolveFilter(ctx.field, ctx.P, ctx.H, ctx.R, ctx.z);
 
@@ -662,8 +657,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
-                            SubdomainContext    & ctx,
-                            AverageProfile      & diff_profile)
+                            SubdomainContext    & ctx)
 {
     const unsigned resolution = static_cast<unsigned>(LayerLow);
     assert_true(&curr_state != &next_state);
@@ -714,10 +708,6 @@ const subdomain_t & SubdomainRoutineNoSensors(
         ApplyBoundaryCondition(next_state, idx);
     }
 
-    // Accumulate history of discrepancies for debugging.
-    (void) diff_profile;
-    //diff_profile.Accumulate(idx, diff);
-
     // Ensure non-negative (physically plausible) density.
     next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
 
@@ -746,8 +736,6 @@ void RunDataAssimilation(const Configuration         & conf,
     using ::allscale::api::core::FileIOManager;
     using ::allscale::api::core::Entry;
     using ::allscale::api::core::Mode;
-
-    AverageProfile diff_profile(conf);
 
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
     const size_t    Nt = conf.asUInt("Nt");
@@ -827,10 +815,10 @@ void RunDataAssimilation(const Configuration         & conf,
             if (contexts[idx].Nsensors > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], false, size_t(t),
-                            state, temp_field, contexts[idx], diff_profile);
+                            state, temp_field, contexts[idx]);
             } else {
                 return SubdomainRoutineNoSensors(conf, false, size_t(t),
-                            state, temp_field, contexts[idx], diff_profile);
+                            state, temp_field, contexts[idx]);
             }
         },
         // Process the external subdomains.
@@ -840,10 +828,10 @@ void RunDataAssimilation(const Configuration         & conf,
             if (contexts[idx].Nsensors > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
-                            state, temp_field, contexts[idx], diff_profile);
+                            state, temp_field, contexts[idx]);
             } else {
                 return SubdomainRoutineNoSensors(conf, true, size_t(t),
-                            state, temp_field, contexts[idx], diff_profile);
+                            state, temp_field, contexts[idx]);
             }
         },
         // Monitoring.
@@ -881,7 +869,6 @@ void RunDataAssimilation(const Configuration         & conf,
         )
     );
     file_manager.close(out_stream);
-    diff_profile.PrintProfile(conf, "subiter_diff");
     MY_INFO("%s", "\n\n")
 }
 
