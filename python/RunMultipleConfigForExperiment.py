@@ -32,7 +32,7 @@ import os, cmd
 from RandObservationsGenerator import InitDependentParams, Amdados2D
 from Utility import *
 
-GridSizes = [(2,2),(4,4)]
+GridSizes = [(2,2),(4,4), (8,8), (12,12), (16,16), (20,20), (24,24), (28,28), (32,32)]
 # Integration period in seconds.
 IntegrationPeriod = 100
 
