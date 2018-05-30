@@ -184,7 +184,7 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
                      const size2d_t & layer_size)
 {
     const int n = observations.NCols();
-    assert_true(z.Size() == n);
+    assert_eq(z.Size(), n);
     for (int i = 0; i < n; ++i) { z(i) = observations(timestep, i); }
 
     (void) H; (void) sensors; (void) layer_size;

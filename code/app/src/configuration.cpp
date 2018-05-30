@@ -27,7 +27,7 @@ Configuration::Configuration() : m_params()
 void Configuration::ReadConfigFile(const std::string & filename)
 {
     std::fstream f(filename, std::ios::in);
-    assert_true(f.good()) << "ERROR: failed to open configuration file"
+    assert_true(f.good()) << "ERROR: failed to open configuration file " << filename
                           << std::endl;
     int lineNo = 1;
     std::string line, token, name;

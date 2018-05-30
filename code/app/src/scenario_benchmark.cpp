@@ -94,8 +94,8 @@ namespace {
 
         // --- initialize observations ---
         int Nt = conf.asUInt("Nt");
-        for(int x = 0; x < Nx/GridSize.x; x++) {
-            for(int y = 0; y < Ny/GridSize.y; y++) {
+        for(int x = 0; x < GridSize.x; x++) {
+            for(int y = 0; y < GridSize.y; y++) {
 
                 // get index of current sensor / observation
                 point2d_t idx{x,y};
