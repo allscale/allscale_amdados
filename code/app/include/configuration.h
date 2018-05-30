@@ -57,5 +57,7 @@ public:
     void SetString(const char * param_name, const char * value = "");
 };
 
+void InitDependentParams(Configuration & conf);
+
 } // namespace amdados
 

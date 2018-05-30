@@ -19,14 +19,13 @@ namespace amdados {
 // amdados_utils.cpp:
 point2d_t GetGridSize(const Configuration & conf);
 
-namespace {
 
 using ::allscale::api::user::data::Grid;
 
 /**
  * Function converts global coordinates to the subdomain index on the grid.
  */
-inline point2d_t Glo2CellIndex(const point2d_t & p, const size2d_t & cell_size)
+point2d_t Glo2CellIndex(const point2d_t & p, const size2d_t & cell_size)
 {
     return point2d_t(p.x / cell_size.x,
                      p.y / cell_size.y);
@@ -35,11 +34,13 @@ inline point2d_t Glo2CellIndex(const point2d_t & p, const size2d_t & cell_size)
 /**
  * Function converts global coordinates to the local ones inside a subdomain.
  */
-inline point2d_t Glo2Sub(const point2d_t & p, const size2d_t & cell_size)
+point2d_t Glo2Sub(const point2d_t & p, const size2d_t & cell_size)
 {
     return point2d_t(p.x % cell_size.x,
                      p.y % cell_size.y);
 }
+
+namespace {
 
 /**
  * Function evaluates objective function and its gradient.
@@ -87,6 +88,8 @@ void EvaluateObjective(double & J, double_array_t & gradJ,
     std::transform(gradJ.begin(), gradJ.end(), gradJ.begin(),
                                     [=](double x){ return x/NN; });
 }
+
+} // anonymous namespace
 
 /**
  * Generates initial space distribution of sensor points.
@@ -147,8 +150,6 @@ void OptimizePointLocations(double_array_t & x, double_array_t & y)
         step *= 2.0;
     }
 }
-
-} // anonymous namespace
 
 /**
  * Function implements a special scenario of Amdados application,
