@@ -180,7 +180,7 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
                      const size2d_t & layer_size)
 {
     const int n = observations.NCols();
-    assert_true(z.Size() == n);
+    assert_eq(z.Size(), n);
     for (int i = 0; i < n; ++i) { z(i) = observations(timestep, i); }
 
     (void) H; (void) sensors; (void) layer_size;
@@ -197,76 +197,6 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
     MatVecMult(_z, H, subfield);    // _z = H * observations(t)
     assert_true(std::equal(_z.begin(), _z.end(), z.begin(),  z.end()));
 #endif
-}
-
-/**
- * Function initializes dependent parameters given the primary ones
- * specified by user.
- */
-void InitDependentParams(Configuration & conf)
-{
-    // Get resolution at the finest level by creating a temporary subdomain.
-    subdomain_t temp;
-    temp.setActiveLayer(LayerFine);
-    const size2d_t fine_size = temp.getActiveLayerSize();
-    const int Sx = static_cast<int>(fine_size.x);   // subdomain size x
-    const int Sy = static_cast<int>(fine_size.y);   // subdomain size y
-
-    // Compute the size ratio between fine and low resolution layers.
-    // Same ratio is expected in both dimensions.
-    temp.setActiveLayer(LayerLow);
-    const size2d_t low_size = temp.getActiveLayerSize();
-    assert_true(fine_size.x * low_size.y == fine_size.y * low_size.x);
-    conf.SetDouble("resolution_ratio", static_cast<double>(fine_size.x) /
-                                       static_cast<double>( low_size.x));
-
-    // Check some global constants.
-    static_assert((0 <= Direction::Up   ) && (Direction::Up    < NSIDES), "");
-    static_assert((0 <= Direction::Down ) && (Direction::Down  < NSIDES), "");
-    static_assert((0 <= Direction::Left ) && (Direction::Left  < NSIDES), "");
-    static_assert((0 <= Direction::Right) && (Direction::Right < NSIDES), "");
-    assert_true((Sx >= 3) && (Sy >= 3)) << "subdomain must be at least 3x3";
-
-    // Ensure integer values for certain parameters.
-    assert_true(conf.IsInteger("num_subdomains_x"));
-    assert_true(conf.IsInteger("num_subdomains_y"));
-    assert_true(conf.IsInteger("subdomain_x"));
-    assert_true(conf.IsInteger("subdomain_y"));
-    assert_true(conf.IsInteger("integration_nsteps"));
-
-    // Check the subdomain size: hard-coded value must match the parameter.
-    assert_true(conf.asInt("subdomain_x") == Sx)
-                        << "subdomain_x mismatch" << std::endl;
-    assert_true(conf.asInt("subdomain_y") == Sy)
-                        << "subdomain_y mismatch" << std::endl;
-
-    const point2d_t grid_size = GetGridSize(conf);
-    const int nx = grid_size.x * Sx;                // global X-size
-    const int ny = grid_size.y * Sy;                // global Y-size
-
-    const double D = conf.asDouble("diffusion_coef");
-    assert_true(D > 0.0);
-
-    conf.SetInt("global_problem_size", nx * ny);
-    const double dx = conf.asDouble("domain_size_x") / (nx - 1);
-    const double dy = conf.asDouble("domain_size_y") / (ny - 1);
-    assert_true((dx > 0) && (dy > 0));
-    conf.SetDouble("dx", dx);
-    conf.SetDouble("dy", dy);
-
-    // Deduce the optimal time step from the stability criteria.
-    const double dt_base = conf.asDouble("integration_period") /
-                           conf.asDouble("integration_nsteps");
-    const double max_vx = conf.asDouble("flow_model_max_vx");
-    const double max_vy = conf.asDouble("flow_model_max_vy");
-    const double dt = std::min(dt_base,
-                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
-                                  1.0/(std::fabs(max_vx)/dx +
-                                       std::fabs(max_vy)/dy + TINY) ));
-    assert_true(dt > TINY);
-    conf.SetDouble("dt", dt);
-    conf.SetInt("Nt", static_cast<int>(
-                        std::ceil(conf.asDouble("integration_period") / dt)));
 }
 
 /**
@@ -721,6 +651,8 @@ const subdomain_t & SubdomainRoutineNoSensors(
     return next_state[idx];
 }
 
+} // anonymous namespace
+
 /**
  * Using model matrix A, the function integrates advection-diffusion equation
  * forward in time inside individual subdomains and records all the solutions
@@ -872,7 +804,77 @@ void RunDataAssimilation(const Configuration         & conf,
     MY_INFO("%s", "\n\n")
 }
 
-} // anonymous namespace
+/**
+ * Function initializes dependent parameters given the primary ones
+ * specified by user.
+ */
+void InitDependentParams(Configuration & conf)
+{
+    // Get resolution at the finest level by creating a temporary subdomain.
+    subdomain_t temp;
+    temp.setActiveLayer(LayerFine);
+    const size2d_t fine_size = temp.getActiveLayerSize();
+    const int Sx = static_cast<int>(fine_size.x);   // subdomain size x
+    const int Sy = static_cast<int>(fine_size.y);   // subdomain size y
+
+    // Compute the size ratio between fine and low resolution layers.
+    // Same ratio is expected in both dimensions.
+    temp.setActiveLayer(LayerLow);
+    const size2d_t low_size = temp.getActiveLayerSize();
+    assert_true(fine_size.x * low_size.y == fine_size.y * low_size.x);
+    conf.SetDouble("resolution_ratio", static_cast<double>(fine_size.x) /
+                                       static_cast<double>( low_size.x));
+
+    // Check some global constants.
+    static_assert((0 <= Direction::Up   ) && (Direction::Up    < NSIDES), "");
+    static_assert((0 <= Direction::Down ) && (Direction::Down  < NSIDES), "");
+    static_assert((0 <= Direction::Left ) && (Direction::Left  < NSIDES), "");
+    static_assert((0 <= Direction::Right) && (Direction::Right < NSIDES), "");
+    assert_true((Sx >= 3) && (Sy >= 3)) << "subdomain must be at least 3x3";
+
+    // Ensure integer values for certain parameters.
+    assert_true(conf.IsInteger("num_subdomains_x"));
+    assert_true(conf.IsInteger("num_subdomains_y"));
+    assert_true(conf.IsInteger("subdomain_x"));
+    assert_true(conf.IsInteger("subdomain_y"));
+    assert_true(conf.IsInteger("integration_nsteps"));
+
+    // Check the subdomain size: hard-coded value must match the parameter.
+    assert_true(conf.asInt("subdomain_x") == Sx)
+                        << "subdomain_x mismatch" << std::endl;
+    assert_true(conf.asInt("subdomain_y") == Sy)
+                        << "subdomain_y mismatch" << std::endl;
+
+    const point2d_t grid_size = GetGridSize(conf);
+    const int nx = grid_size.x * Sx;                // global X-size
+    const int ny = grid_size.y * Sy;                // global Y-size
+
+    const double D = conf.asDouble("diffusion_coef");
+    assert_true(D > 0.0);
+
+    conf.SetInt("global_problem_size", nx * ny);
+    const double dx = conf.asDouble("domain_size_x") / (nx - 1);
+    const double dy = conf.asDouble("domain_size_y") / (ny - 1);
+    assert_true((dx > 0) && (dy > 0));
+    conf.SetDouble("dx", dx);
+    conf.SetDouble("dy", dy);
+
+    // Deduce the optimal time step from the stability criteria.
+    const double dt_base = conf.asDouble("integration_period") /
+                           conf.asDouble("integration_nsteps");
+    const double max_vx = conf.asDouble("flow_model_max_vx");
+    const double max_vy = conf.asDouble("flow_model_max_vy");
+    const double dt = std::min(dt_base,
+                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
+                                  1.0/(std::fabs(max_vx)/dx +
+                                       std::fabs(max_vy)/dy + TINY) ));
+    assert_true(dt > TINY);
+    conf.SetDouble("dt", dt);
+    conf.SetInt("Nt", static_cast<int>(
+                        std::ceil(conf.asDouble("integration_period") / dt)));
+}
+
+
 
 /**
  * The main function of this application runs simulation with data

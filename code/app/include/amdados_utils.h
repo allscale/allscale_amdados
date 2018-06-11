@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "geometry.h"
+
 namespace amdados {
 
 #if defined(_WIN32) || defined(WIN32) || defined(_WIN64) || defined(WIN64)
@@ -68,6 +70,8 @@ void CheckFileExists(const Configuration & conf, const std::string & filename);
 uint64_t RandomSeed();
 
 std::string MakeFileName(const Configuration & conf, const std::string & what);
+
+point2d_t GetGridSize(const Configuration & conf);
 
 } // namespace amdados
 

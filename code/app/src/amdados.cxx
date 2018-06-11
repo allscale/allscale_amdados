@@ -45,6 +45,7 @@ void PrintHelp()
 
 void ScenarioSimulation(const std::string &);
 void ScenarioSensors(const std::string &);
+void ScenarioBenchmark(const std::string&, int size);
 
 } // namespace amdados
 
@@ -75,6 +76,13 @@ int main(int argc, char ** argv)
         if (scenario == "sensors") {
             MY_INFO("%s", "SCENARIO: 'sensors'")
             amdados::ScenarioSensors(config_file);
+        } else if (scenario.substr(0,9) == "benchmark") {
+            MY_INFO("%s", "SCENARIO: 'benchmark'")
+            int N = 10;
+            if (scenario.size() > 9 && scenario[9] == ':') {
+                N = atoi(scenario.c_str() + 10);
+            }
+            amdados::ScenarioBenchmark(config_file, N);
         } else {
             MY_INFO("%s", "SCENARIO: 'simulation'")
             amdados::ScenarioSimulation(config_file);

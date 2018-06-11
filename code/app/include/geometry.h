@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "allscale/api/user/data/adaptive_grid.h"
+
 namespace amdados {
 
 // I M P O R T A N T: cell layout must agree with the parameters specified
