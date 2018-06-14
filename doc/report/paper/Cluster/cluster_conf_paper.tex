@@ -781,8 +781,8 @@ stencil(state_field, T,
 });
 \end{lstlisting}
 
-Parallel DD based solvers are based on the paradigm of distributing the problem across compute cores, solving each state independently and synchronizing solution at intervals (generally each timestep). Listing \ref{stencAllSc} presents the implementation of a space-time decomposition of the problem that provides parallel constructs over the time dimension (T) and the two-dimensional spatial dimension, represented by each subdomain. Within this stencil template, an update operation (in this case a function to compute, or propagate forward, local subdomain solution) is applied to each element of the array. The space-time extents are defined by the \textit{state\_field} (AllScale grid structure containing information on the entire global domain) and the time dimension, \textit{T}. Within this decomposition, a parallel loop over each timestep, \textit{t} and subdomain \textit{state} is conducted. For each update, the user-defined update operation is combining the previous value of the solution within a locally confined area surrounding the targeted subdomain to obtain the updated value. Since each subdomain solution are independent for a single timestep and depend only on direct neighbours for solution synchronization, this provides a valuable resource for parallelism within a space-time decomposition. 
 
+Parallel DD based solvers are based on the paradigm of distributing the problem across compute cores, solving each state independently and synchronizing solution at intervals (generally each timestep). Listing \ref{stencAllSc} presents the implementation of a space-time decomposition of the problem that provides parallel constructs over the time dimension (T) and the two-dimensional spatial dimension, represented by each subdomain. Within this stencil template, an update operation (in this case a function to compute, or propagate forward, local subdomain solution) is applied to each element of the array. The space-time extents are defined by the \textit{state\_field} (AllScale grid structure containing information on the entire global domain) and the time dimension, \textit{T}. Within this decomposition, a parallel loop over each timestep, \textit{t} and subdomain \textit{state} is conducted. For each update, the user-defined update operation is combining the previous value of the solution within a locally confined area surrounding the targeted subdomain to obtain the updated value. Since each subdomain solution are independent for a single timestep and depend only on direct neighbours for solution synchronization, this provides a valuable resource for parallelism within a space-time decomposition. 
 
 \begin{lstlisting}[caption=AllScale boundary exchange implementation, label=boundAllScale]
 // for each subdomain update boundaries in each direction
@@ -836,7 +836,7 @@ Exchange of boundary information to maintain solution fidelity is central to DD 
 
 As a comparison, Listing \ref{boundMPI} presents a section of code demonstrating how boundary exchange in an MPI implementation of the code may look. Within this paradigm, the application loops over each boundary (where neighbour domain exists), packs boundary data and sends to its neighbour via an MPI\_Send communication. The neighbouring domain must receive the data  via a  corresponding MPI\_Recv call. Further care must be taken in the order of MPI\_Send/MPI\_Recv calls to avoid blocking by a process awaiting communication. The simplified coding structure of the AllScale API removes many of these manual synchronization requirements greatly reducing coding complexity.
 
-Apparent is the greatly simplified coding implementations enabled by the AllScale API. Applying operations to all elements is similar to a serial application with a parallel for (\textit{pfor}) operator substituting the classical for operator. Other common parallel operations such as data exchange between separate grids are also greatly simplified. By following the templates provided by the AllScale SDK it is evident that users can develop a huge range of domain decomposition based applications with little knowledge of HPC or parallel computing concepts (i.e. simply by learning AllScale specific development skills). 
+Apparent is the greatly simplified coding implementations enabled by the AllScale API. Applying operations to all elements is similar to a serial application with a parallel for (\textit{pfor}) operator substituting the classical for operator. Other common parallel operations such as data exchange between separate grids are also greatly simplified. Following the templates provided by the AllScale SDK users can develop a huge range of domain decomposition based applications with little knowledge of HPC or parallel computing concepts (i.e. simply by learning usage of AllScale API). 
 
 \begin{lstlisting}[caption= Sample MPI implementation of boundary exchange and synchronization within a DD problem
 , label=boundMPI]
@@ -917,9 +917,125 @@ This study demonstrates the capabilities of the AllScale API implementation and 
 The application is currently limited to shared memory parallelism and we aim to release a distributed memory parallel version in June 2018. In particular, large scale experiments will be conducted to evaluate 1) scalability of the code at the many 1000 core level, 2) performance of load balancing (data assimilation provides a valuable test-case due to the very different computational expense of subdomains depending on whether observation exists or not) and 3) detailed evaluation of the performance of the recursive parallel space-time decomposition
 
 %% Bibliography
-\bibliographystyle{IEEEtran}
-\bibliography{masterbib}
+%\bibliographystyle{IEEEtran}
+%\bibliography{masterbib}
 %\bibliography{references}
+% Generated by IEEEtran.bst, version: 1.13 (2008/09/30)
+\begin{thebibliography}{10}
+\providecommand{\url}[1]{#1}
+\csname url@samestyle\endcsname
+\providecommand{\newblock}{\relax}
+\providecommand{\bibinfo}[2]{#2}
+\providecommand{\BIBentrySTDinterwordspacing}{\spaceskip=0pt\relax}
+\providecommand{\BIBentryALTinterwordstretchfactor}{4}
+\providecommand{\BIBentryALTinterwordspacing}{\spaceskip=\fontdimen2\font plus
+\BIBentryALTinterwordstretchfactor\fontdimen3\font minus
+  \fontdimen4\font\relax}
+\providecommand{\BIBforeignlanguage}[2]{{%
+\expandafter\ifx\csname l@#1\endcsname\relax
+\typeout{** WARNING: IEEEtran.bst: No hyphenation pattern has been}%
+\typeout{** loaded for the language `#1'. Using the pattern for}%
+\typeout{** the default language instead.}%
+\else
+\language=\csname l@#1\endcsname
+\fi
+#2}}
+\providecommand{\BIBdecl}{\relax}
+\BIBdecl
+
+\bibitem{guo2009modeling}
+W.~Guo, Y.~Wang, M.~Xie, and Y.~Cui, ``Modeling oil spill trajectory in coastal
+  waters based on fractional brownian motion,'' \emph{Marine Pollution
+  Bulletin}, vol.~58, no.~9, pp. 1339--1346, 2009.
+
+\bibitem{odonncha2013physical}
+F.~{O'D}onncha, M.~Hartnett, and S.~Nash, ``Physical and numerical
+  investigation of the hydrodynamic implications of aquaculture farms,''
+  \emph{Aquacult. Eng.}, vol.~52, pp. 14--26, 2013.
+
+\bibitem{koziy1998three}
+L.~Koziy, V.~Maderich, N.~Margvelashvili, and M.~Zheleznyak,
+  ``Three-dimensional model of radionuclide dispersion in estuaries and shelf
+  seas,'' \emph{Environmental Modelling \& Software}, vol.~13, no. 5-6, pp.
+  413--420, 1998.
+
+\bibitem{michalakes2001development}
+J.~Michalakes, S.~Chen, J.~Dudhia, L.~Hart, J.~Klemp, J.~Middlecoff, and
+  W.~Skamarock, ``Development of a next generation regional weather research
+  and forecast model,'' in \emph{Developments in Teracomputing: Proceedings of
+  the Ninth ECMWF Workshop on the use of high performance computing in
+  meteorology}, vol.~1.\hskip 1em plus 0.5em minus 0.4em\relax World
+  Scientific, 2001, pp. 269--276.
+
+\bibitem{hu2013scalable}
+Y.~Hu, X.~Huang, X.~Wang, H.~Fu, S.~Xu, H.~Ruan, W.~Xue, and G.~Yang, ``A
+  scalable barotropic mode solver for the parallel ocean program,'' in
+  \emph{European Conference on Parallel Processing}.\hskip 1em plus 0.5em minus
+  0.4em\relax Springer, 2013, pp. 739--750.
+
+\bibitem{hammond2014evaluating}
+G.~E. Hammond, P.~C. Lichtner, and R.~Mills, ``Evaluating the performance of
+  parallel subsurface simulators: An illustrative example with pflotran,''
+  \emph{Water resources research}, vol.~50, no.~1, pp. 208--228, 2014.
+
+\bibitem{melvin2017lfric}
+T.~Melvin, S.~Mullerworth, R.~Ford, C.~Maynard, and M.~Hobson, ``Lfric:
+  Building a new unified model,'' in \emph{EGU General Assembly Conference
+  Abstracts}, vol.~19, 2017, p. 13021.
+
+\newpage
+
+\bibitem{allscale_architecure_2017}
+H.~Jordan, R.~Lakymchuk, T.~Fahringer, P.~Thoman, T.~Heller, X.~Aguilar,
+  K.~Hasanov, K.~Dichev, E.~Ragnoli, and B.~Leonard, ``D2.3  allscale system
+  architecture,'' AllScale: An Exascale Programming, Multi-objective
+  Optimisation and Resilience Management Environment Based on Nested Recursive
+  Parallelism. Project Number 671603, Tech. Rep., 2017.
+
+\bibitem{Hundsdorfer03}
+W.~Hundsdorfer and J.~G. Verwer, \emph{Numerical solution of time-dependent
+  advection-diffusion-reaction equations}.\hskip 1em plus 0.5em minus
+  0.4em\relax Springer Science \& Business Media, 2013, vol.~33.
+
+\bibitem{verhaegen1986numerical}
+M.~Verhaegen and P.~Van~Dooren, ``Numerical aspects of different kalman filter
+  implementations,'' \emph{IEEE Transactions on Automatic Control}, vol.~31,
+  no.~10, pp. 907--917, 1986.
+
+\bibitem{Miyaoka17}
+T.~Y. Miyaoka, J.~F. d. C.~A. Meyer, and J.~SOUZA, ``A general boundary
+  condition with linear flux for advection-diffusion models,'' \emph{TEMA
+  (S{\~a}o Carlos)}, vol.~18, no.~2, pp. 253--272, 2017.
+
+\bibitem{Sauer11}
+T.~Sauer, \emph{Numerical Analysis (2nd)}.\hskip 1em plus 0.5em minus
+  0.4em\relax Addison-Wesley, New Jersey, 2012.
+
+\bibitem{Butcher03}
+J.~C. Butcher, \emph{Numerical methods for ordinary differential
+  equations}.\hskip 1em plus 0.5em minus 0.4em\relax John Wiley \& Sons, 2016.
+
+\bibitem{Crank47}
+J.~Crank and P.~Nicolson, ``A practical method for numerical evaluation of
+  solutions of partial differential equations of the heat-conduction type,''
+  \emph{Adv. Comput. Math}, vol.~6, pp. 207--226, 1947.
+
+\bibitem{Thomas95}
+J.~W. Thomas, \emph{Numerical partial differential equations: finite difference
+  methods}.\hskip 1em plus 0.5em minus 0.4em\relax Springer Science \& Business
+  Media, 2013, vol.~22.
+
+\bibitem{Welch06}
+G.~Welch and G.~Bishop, ``An introduction to the kalman filter. university of
+  north carolina at chapel hill, department of computer science,'' TR 95-041,
+  Tech. Rep., 2004.
+
+\bibitem{mahmoud2013distributed}
+M.~S. Mahmoud and H.~M. Khalid, ``Distributed kalman filtering: a bibliographic
+  review,'' \emph{IET Control Theory \& Applications}, vol.~7, no.~4, pp.
+  483--501, 2013.
+
+\end{thebibliography}
 
 
 
