@@ -679,7 +679,7 @@ void RunDataAssimilation(const Configuration         & conf,
     domain_t         state_field(GridSize); // grid if sub-domains
 
     // Initialize the observation and model covariance matrices.
-    pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
+    pfor(point2d_t(0,0), GridSize, [&,Nt,Nsubiter,conf](const point2d_t & idx) {
         // Zero field at the beginning for all the resolutions.
         static_assert(LayerFine <= LayerLow, "");
         for (int layer = LayerFine; layer <= LayerLow; ++layer) {
@@ -740,7 +740,7 @@ void RunDataAssimilation(const Configuration         & conf,
     ::allscale::api::user::algorithm::stencil(
         state_field, Nt * Nsubiter,
         // Process the internal subdomains.
-        [&](time_t t, const point2d_t & idx, const domain_t & state)
+        [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
             assert_true(t >= 0);
@@ -754,7 +754,7 @@ void RunDataAssimilation(const Configuration         & conf,
             }
         },
         // Process the external subdomains.
-        [&](time_t t, const point2d_t & idx, const domain_t & state)
+        [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
             if (contexts[idx].Nsensors > 0) {
@@ -778,7 +778,7 @@ void RunDataAssimilation(const Configuration         & conf,
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
-            [&](time_t t, const point2d_t & idx, const subdomain_t & cell) {
+            [&,Nsubiter](time_t t, const point2d_t & idx, const subdomain_t & cell) {
                 t /= time_t(Nsubiter);
                 // Important: we save field at the finest resolution.
                 subdomain_t temp;
