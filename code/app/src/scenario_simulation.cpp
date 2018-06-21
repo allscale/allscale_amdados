@@ -737,7 +737,7 @@ void RunDataAssimilation(const Configuration         & conf,
 
     // Time integration forward in time. We want to make Nt (normal) iterations
     // and Nsubiter sub-iterations within each (normal) iteration.
-    ::allscale::api::user::algorithm::stencil(
+    ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
         // Process the internal subdomains.
         [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
@@ -778,25 +778,25 @@ void RunDataAssimilation(const Configuration         & conf,
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
-            [&,Nsubiter](time_t t, const point2d_t & idx, const subdomain_t & cell) {
-                t /= time_t(Nsubiter);
-                // Important: we save field at the finest resolution.
-                subdomain_t temp;
-                temp = cell;
-                while (temp.getActiveLayer() != LayerFine) {
-                    temp.refine([](const double & elem) { return elem; });
-                }
-                const size2d_t finest_layer_size = temp.getActiveLayerSize();
-                // Write the subdomain into file.
-                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
-                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
-                    out_stream.atomic([=](auto & file) {
-                        file.write(static_cast<float>(t));
-                        file.write(static_cast<float>(glo.x));
-                        file.write(static_cast<float>(glo.y));
-                        file.write(static_cast<float>(val));
-                    });
-                });
+            [&,Nsubiter](__attribute__((unused)) time_t t, __attribute__((unused)) const point2d_t & idx, __attribute__((unused)) const subdomain_t & cell) {
+//                t /= time_t(Nsubiter);
+//                // Important: we save field at the finest resolution.
+//                subdomain_t temp;
+//                temp = cell;
+//                while (temp.getActiveLayer() != LayerFine) {
+//                    temp.refine([](const double & elem) { return elem; });
+//                }
+//                const size2d_t finest_layer_size = temp.getActiveLayerSize();
+//                // Write the subdomain into file.
+//                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
+//                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
+//                    out_stream.atomic([=](auto & file) {
+//                        file.write(static_cast<float>(t));
+//                        file.write(static_cast<float>(glo.x));
+//                        file.write(static_cast<float>(glo.y));
+//                        file.write(static_cast<float>(val));
+//                    });
+//                });
             }
         )
     );
