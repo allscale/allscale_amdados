@@ -792,7 +792,6 @@ void RunDataAssimilation(const Configuration         & conf,
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
-            [&,Nsubiter](time_t t, const point2d_t & idx, const subdomain_t & cell) {
             [&,Nsubiter](__attribute__((unused)) time_t t, __attribute__((unused)) const point2d_t & idx, __attribute__((unused)) const subdomain_t & cell) {
 //                t /= time_t(Nsubiter);
 //                // Important: we save field at the finest resolution.

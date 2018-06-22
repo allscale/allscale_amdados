@@ -46,7 +46,7 @@ if(NOT TARGET allscale)
             #GIT_TAG 13ca6543fc2a8599eba63e11cbcc9a646bbd8401
             #SOURCE_DIR ${PROJECT_SOURCE_DIR}/../api/allscale_api/
 			GIT_REPOSITORY https://github.com/allscale/allscale_api
-			#GIT_TAG 4c1fc42a1cf9eca74e7edd85af096fc092b05f50
+			GIT_TAG be671715eb7d10aa721238a5ab3b93a1b3b2225d
 			CONFIGURE_COMMAND ""
 			BUILD_COMMAND ""
 			INSTALL_COMMAND ""
