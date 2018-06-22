@@ -737,12 +737,20 @@ void RunDataAssimilation(const Configuration         & conf,
 
     // Time integration forward in time. We want to make Nt (normal) iterations
     // and Nsubiter sub-iterations within each (normal) iteration.
-    ::allscale::api::user::algorithm::stencil(
+    ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
         // Process the internal subdomains.
         [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
+            // define requirements
+            allscale::api::core::sema::needs_write_access_on(contexts[idx]);
+            allscale::api::core::sema::needs_read_access_on(sensors[idx]);
+            allscale::api::core::sema::needs_read_access_on(observations[idx]);
+
+            // TODO: add state dependencies to neighbors
+            allscale::api::core::sema::needs_read_access_on(state[idx]);
+
             assert_true(t >= 0);
             if (contexts[idx].Nsensors > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
@@ -757,6 +765,12 @@ void RunDataAssimilation(const Configuration         & conf,
         [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
+            // define requirements
+            allscale::api::core::sema::needs_write_access_on(contexts[idx]);
+
+            // TODO: add state dependencies to neighbors
+            allscale::api::core::sema::needs_read_access_on(state[idx]);
+
             if (contexts[idx].Nsensors > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
@@ -779,24 +793,24 @@ void RunDataAssimilation(const Configuration         & conf,
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
             [&,Nsubiter](time_t t, const point2d_t & idx, const subdomain_t & cell) {
-                t /= time_t(Nsubiter);
-                // Important: we save field at the finest resolution.
-                subdomain_t temp;
-                temp = cell;
-                while (temp.getActiveLayer() != LayerFine) {
-                    temp.refine([](const double & elem) { return elem; });
-                }
-                const size2d_t finest_layer_size = temp.getActiveLayerSize();
-                // Write the subdomain into file.
-                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
-                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
-                    out_stream.atomic([=](auto & file) {
-                        file.write(static_cast<float>(t));
-                        file.write(static_cast<float>(glo.x));
-                        file.write(static_cast<float>(glo.y));
-                        file.write(static_cast<float>(val));
-                    });
-                });
+//                t /= time_t(Nsubiter);
+//                // Important: we save field at the finest resolution.
+//                subdomain_t temp;
+//                temp = cell;
+//                while (temp.getActiveLayer() != LayerFine) {
+//                    temp.refine([](const double & elem) { return elem; });
+//                }
+//                const size2d_t finest_layer_size = temp.getActiveLayerSize();
+//                // Write the subdomain into file.
+//                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
+//                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
+//                    out_stream.atomic([=](auto & file) {
+//                        file.write(static_cast<float>(t));
+//                        file.write(static_cast<float>(glo.x));
+//                        file.write(static_cast<float>(glo.y));
+//                        file.write(static_cast<float>(val));
+//                    });
+//                });
             }
         )
     );
