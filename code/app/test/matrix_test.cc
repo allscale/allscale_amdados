@@ -22,7 +22,11 @@
 #define ARMA_DONT_USE_SUPERLU
 #define ARMA_DONT_USE_HDF5
 #define ARMA_DONT_USE_OPENMP
-#include "../../../api/armadillo/include/armadillo"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+	#include "../../../api/armadillo/include/armadillo"
+#pragma GCC diagnostic pop
 
 using namespace ::amdados;
 
