@@ -806,9 +806,9 @@ void RunDataAssimilation(const Configuration         & conf,
         )
     );
 
+	std::string filename = MakeFileName(conf, "field");
 	::allscale::api::user::algorithm::async([=,&state_field](){
 		// Open file manager and the output file for writing.
-		std::string filename = MakeFileName(conf, "field");
 		FileIOManager & file_manager = FileIOManager::getInstance();
 		Entry stream_entry = file_manager.createEntry(filename, Mode::Text);
 		auto out_stream = file_manager.openOutputStream(stream_entry);
@@ -832,8 +832,8 @@ void RunDataAssimilation(const Configuration         & conf,
 		}
     		file_manager.close(out_stream);
 		// need to output result file name for the CI system to pick it up
-		std::cout << "Wrote result data to " << filename << std::endl;
 	}).wait();
+	std::cout << "Wrote result data to " << filename << std::endl;
 
     MY_INFO("%s", "\n\n")
 }
