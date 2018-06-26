@@ -38,11 +38,12 @@ void CheckFileExists(const Configuration &, const std::string &) {}
  */
 uint64_t RandomSeed()
 {
-    using hrclock_t = std::chrono::high_resolution_clock;
-    uint64_t prev = hrclock_t::now().time_since_epoch().count();
-    uint64_t seed = 0;
-    while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
-    return seed;
+    //using hrclock_t = std::chrono::high_resolution_clock;
+    //uint64_t prev = hrclock_t::now().time_since_epoch().count();
+    //uint64_t seed = 0;
+    //while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
+    //return seed;
+	return 2063;
 }
 
 /**

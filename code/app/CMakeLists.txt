@@ -20,3 +20,7 @@ foreach(test ${app_tests})
 endforeach(test)
 
 configure_file(${CMAKE_SOURCE_DIR}/../amdados.conf ${CMAKE_CURRENT_BINARY_DIR}/amdados.conf COPYONLY)
+configure_file(../../scripts/verify_output.sh.in ${PROJECT_BINARY_DIR}/verify_output.sh @ONLY IMMEDIATE)
+
+# create empty output folder for result file generation
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/app/output")

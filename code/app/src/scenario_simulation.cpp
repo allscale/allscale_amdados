@@ -729,12 +729,6 @@ void RunDataAssimilation(const Configuration         & conf,
         ctx.Nsensors = sensors[idx].size();
     });
 
-    // Open file manager and the output file for writing.
-    std::string filename = MakeFileName(conf, "field");
-    FileIOManager & file_manager = FileIOManager::getInstance();
-    Entry stream_entry = file_manager.createEntry(filename, Mode::Binary);
-    auto out_stream = file_manager.openOutputStream(stream_entry);
-
     // Time integration forward in time. We want to make Nt (normal) iterations
     // and Nsubiter sub-iterations within each (normal) iteration.
     ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
@@ -805,16 +799,42 @@ void RunDataAssimilation(const Configuration         & conf,
 //                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
 //                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
 //                    out_stream.atomic([=](auto & file) {
-//                        file.write(static_cast<float>(t));
-//                        file.write(static_cast<float>(glo.x));
-//                        file.write(static_cast<float>(glo.y));
-//                        file.write(static_cast<float>(val));
+//                        file << t << " " << glo.x << " " << glo.y << " " << val << "\n";
 //                    });
 //                });
             }
         )
     );
-    file_manager.close(out_stream);
+
+	::allscale::api::user::algorithm::async([=,&state_field](){
+		// Open file manager and the output file for writing.
+		std::string filename = MakeFileName(conf, "field");
+		FileIOManager & file_manager = FileIOManager::getInstance();
+		Entry stream_entry = file_manager.createEntry(filename, Mode::Text);
+		auto out_stream = file_manager.openOutputStream(stream_entry);
+
+		for(int i = 0; i < GridSize.x; ++i) {
+			for(int j = 0; j < GridSize.y; ++j) {
+				const point2d_t idx{ i,j };
+				const int t = Nt - 1;
+				subdomain_t temp;
+				temp = state_field[idx];
+				while(temp.getActiveLayer() != LayerFine) {
+					temp.refine([](const double & elem) { return elem; });
+				}
+				const size2d_t finest_layer_size = temp.getActiveLayerSize();
+				// Write the subdomain into file.
+				temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
+					point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
+					out_stream << t << " " << glo.x << " " << glo.y << " " << val << "\n";
+				});
+			}
+		}
+    		file_manager.close(out_stream);
+		// need to output result file name for the CI system to pick it up
+		std::cout << "Wrote result data to " << filename << std::endl;
+	}).wait();
+
     MY_INFO("%s", "\n\n")
 }
 
