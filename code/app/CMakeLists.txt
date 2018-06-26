@@ -18,3 +18,5 @@ glob_tests(app_tests test)
 foreach(test ${app_tests})
 	add_module_unittest(app ${test})
 endforeach(test)
+
+configure_file(${CMAKE_SOURCE_DIR}/../amdados.conf ${CMAKE_CURRENT_BINARY_DIR}/amdados.conf COPYONLY)
