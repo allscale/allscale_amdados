@@ -22,7 +22,6 @@ void MatMult(Matrix & result, const Matrix & A, const Matrix & B)
     const int nrows = A.NRows();
     const int msize = A.NCols();
     const int ncols = B.NCols();
-    assert_true(result.IsDistinct(A) && result.IsDistinct(B));
     assert_true((result.NRows() == nrows) &&
                 (result.NCols() == ncols) && (msize == B.NRows()));
     for (int r = 0; r < nrows; ++r) {
@@ -45,7 +44,6 @@ void MatMultTr(Matrix & result, const Matrix & A, const Matrix & B)
     const int nrows = A.NRows();
     const int ncols = B.NRows();
     const int msize = B.NCols();
-    assert_true(result.IsDistinct(A) && result.IsDistinct(B));
     assert_true((result.NRows() == nrows) &&
                 (result.NCols() == ncols) && (A.NCols() == msize));
     for (int r = 0; r < nrows; ++r) {
@@ -63,7 +61,6 @@ void MatVecMult(VectorView & result, const Matrix & A, const VectorView & v)
 {
     const int nrows = A.NRows();
     const int ncols = A.NCols();
-    assert_true(result.IsDistinct(v));
     assert_true((result.Size() == nrows) && (v.Size() == ncols));
     for (int r = 0; r < nrows; ++r) {
         double sum = 0.0;
@@ -138,7 +135,7 @@ void GetTransposed(Matrix & At, const Matrix & A)
 {
     const int nrows = A.NRows();
     const int ncols = A.NCols();
-    assert_true(At.IsDistinct(A) && A.SameSizeTr(At));
+	assert_true(A.SameSizeTr(At));
     for (int r = 0; r < nrows; ++r) {
     for (int c = 0; c < ncols; ++c) { At(c,r) = A(r,c); }}
 }

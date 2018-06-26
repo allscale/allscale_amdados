@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <allscale/utils/serializer.h>
 
 namespace amdados {
@@ -25,145 +27,98 @@ namespace amdados {
 #endif
 
 //=============================================================================
-// Base class for any vector or matrix which cannot be instantiated on its own
-// but can be used as a light-weight, vector-like view to derived class.
+// VectorView class, which is instantiated as a Vector and also serves as a
+// base class for Matrix
 //=============================================================================
 class VectorView
 {
 protected:
-    double * data;                      // content
-    int      size;                      // vector length
 
-protected:
-    VectorView() : data(nullptr), size(0) {}
-    VectorView(const VectorView &) = delete;
+	// content of this vector, memory management done by STL.
+    std::vector<double> data;
 
 public:
-    // Copy operator expects preallocated object as memory
-    // (re)allocation is not allowed for viewer class.
-    VectorView & operator=(const VectorView & vec)
-    {
-        if (IsDistinct(vec)) {
-            assert_true(SameSize(vec));
-            std::copy(vec.begin(), vec.end(), begin());
-        }
-        return (*this);
-    }
 
-    // Indexing operator provides read only access to vector element.
+	// default constructor.
+    VectorView() : data() {}
+
+	// constructor, ensures data can fit size elements.
+	VectorView(int size) : data(size) {}
+
+	VectorView(const VectorView &) = default;
+
+	VectorView(VectorView&& other) {
+		data.swap(other.data);
+	}
+
+	~VectorView() = default;
+
+    // Indexing operator provides read only access to vector elements.
+	// Using a call operator here for unified element access with
+	// multi-dimensional indices (e.g. (i,y)) in subclasses.
     const double & operator()(int i) const
     {
 #ifndef NDEBUG
-        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(size)))
+        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(data.size())))
             assert_true(0);
 #endif
         return data[i];
     }
 
-    // Indexing operator provides read/write access to vector element.
+    // Indexing operator provides read/write access to vector elements.
+	// Using a call operator here for unified element access with
+	// multi-dimensional indices (e.g. (i,y)) in subclasses.
     double & operator()(int i)
     {
 #ifndef NDEBUG
-        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(size)))
+        if (!(static_cast<unsigned>(i) < static_cast<unsigned>(data.size())))
             assert_true(0);
 #endif
         return data[i];
     }
 
     // Functions for iterating the (constant) vector.
-    double * begin() { return data; }
-    double * end()   { return data + size; }
+    double * begin() { return &*data.begin(); }
+    double * end()   { return &*data.end(); }
 
-    const double * begin() const { return data; }
-    const double * end()   const { return data + size; }
+    const double * begin() const { return &*data.cbegin(); }
+    const double * end()   const { return &*data.cend(); }
 
     // Function returns the size of this vector (view).
-    int Size() const { return size; }
+    int Size() const { return data.size(); }
 
     // Function returns "true" if both vectors have the same length.
-    bool SameSize(const VectorView & v) const { return (size == v.size); }
-
-    // Function returns "true" if specified vector-view does not
-    // refer to the same object.
-    bool IsDistinct(const VectorView & v) const { return (data != v.data); }
+	// TODO: Quite expensive operation, maybe replace with something faster.
+    bool SameSize(const VectorView & v) const { return (data.size() == v.data.size()); }
 
     // Returns "true" if this vector-view refers to an empty object.
-    bool Empty() const { return (data == nullptr); }
+    bool Empty() const { return (data.empty()); }
+
+	// Deletes the content of this VectorView.
+	void Clear() {
+		data.clear();
+	}
+
+	// Resizes the content to fit the given size, optionally also clearing the content.
+	void Resize(int new_size, bool fillzero = true) {
+		if(fillzero) {
+			data.clear();
+		}
+		data.resize(new_size);
+	}
+
+	VectorView & operator=(const VectorView & vec)
+	{
+		data = vec.data;
+		return *this;
+	}
+
 };
 
 //=============================================================================
 // Simple vector-like wrapper around a raw array of constant size.
 //=============================================================================
-class Vector : public VectorView
-{
-private:
-    using VectorView::data;
-    using VectorView::size;
-
-public:
-    // Default constructor.
-    Vector() : VectorView()
-    {
-        data = nullptr;
-        size = 0;
-    }
-
-    // Default constructor creates vector filled by zeros.
-    Vector(int vec_size) : VectorView()
-    {
-        data = nullptr;
-        size = 0;
-        Resize(vec_size);
-    }
-
-    // Copy constructor (allocates memory).
-    Vector(const Vector & vec) : VectorView()
-    {
-        data = nullptr;
-        size = 0;
-        Resize(vec.size, false);
-        std::copy(vec.begin(), vec.end(), begin());
-    }
-
-    // Deallocates and clears this object.
-    void Clear()
-    {
-        if (data != nullptr) { delete [] data; }
-        data = nullptr;
-        size = 0;
-    }
-
-    // Resizes this vector and optionally fills it up by zeros.
-    void Resize(int new_size, bool fillzero = true)
-    {
-        if (size != new_size) {
-            Clear();
-            if (new_size > 0) {
-                data = new double[new_size];
-                size = new_size;
-            }
-        }
-        if (fillzero) std::fill(begin(), end(), 0.0);
-    }
-
-    // Destructor frees allocated memory.
-    ~Vector()
-    {
-        Clear();
-    }
-
-    // Copy operator reallocates vector if needed.
-    VectorView & operator=(const VectorView & vec)
-    {
-        if (IsDistinct(vec)) {
-            if (!SameSize(vec)) {
-                Resize(vec.Size(), false);
-            }
-            std::copy(vec.begin(), vec.end(), begin());
-        }
-        return (*this);
-    }
-};
+using Vector = VectorView;
 
 //=============================================================================
 // Simple matrix-like wrapper around a raw array of constant size.
@@ -173,102 +128,56 @@ public:
 class Matrix : public VectorView
 {
 private:
-    using VectorView::data;
-    using VectorView::size;
     int nrows;                  ///< number of rows
     int ncols;                  ///< number of columns
 
 public:
     // Default constructor.
-    Matrix() : VectorView(), nrows(0), ncols(0)
-    {
-        data = nullptr;
-        size = 0;
-    }
+    Matrix() : VectorView(), nrows(0), ncols(0) { }
 
     // Default constructor creates matrix filled by zeros.
-    Matrix(int numrows, int numcols) : VectorView(), nrows(0), ncols(0)
-    {
-        data = nullptr;
-        size = 0;
-        Resize(numrows, numcols);
-    }
+    Matrix(int numrows, int numcols) : VectorView(numrows*numcols), nrows(numrows), ncols(numcols) { }
 
     // Copy constructor. Note, user can copy a matrix but not a vector.
-    Matrix(const Matrix & mat) : VectorView(), nrows(0), ncols(0)
-    {
-        data = nullptr;
-        size = 0;
-        Resize(mat.nrows, mat.ncols, false);
-        std::copy(mat.begin(), mat.end(), begin());
-    }
+    Matrix(const Matrix & mat) : VectorView(mat), nrows(mat.nrows), ncols(mat.ncols) { }
 
-	static Matrix load(allscale::utils::ArchiveReader& reader) {
-		int nrows = reader.read<int>();
-		int ncols = reader.read<int>();
-		Matrix matrix(nrows, ncols);
-		int size = reader.read<int>();
-		assert_eq(matrix.size, size) << "Expected Matrix sizes to match";
-		for(int i = 0; i < matrix.size; ++i) {
-			matrix.data[i] = reader.read<double>();
-		}
-		return matrix;
-	}
-	void store(allscale::utils::ArchiveWriter& writer) const {
-		writer.write(nrows);
-		writer.write(ncols);
-		writer.write(size);
-		for(int i = 0; i < size; ++i) {
-			writer.write(data[i]);
-		}
+	// Move constructor.
+	Matrix(Matrix && mat) : VectorView(std::move(mat)), nrows(mat.nrows), ncols(mat.ncols)
+	{
+		mat.nrows = 0;
+		mat.ncols = 0;
 	}
 
-    // Deallocates and clears this object.
+	// Deallocates and clears this object.
     void Clear()
     {
-        if (data != nullptr) { delete [] data; }
-        data = nullptr;
-        size = nrows = ncols = 0;
+		VectorView::Clear();
+		nrows = 0;
+		ncols = 0;
     }
 
-    // Resizes this matrix and optionally fills it up by zeros.
+    // Resizes this matrix and optionally clears the contents.
     void Resize(int numrows, int numcols, bool fillzero = true)
     {
-        if ((nrows != numrows) || (ncols != numcols)) {
-            Clear();
-            if ((numrows > 0) && (numcols > 0)) {
-                size = numrows * numcols;
-                nrows = numrows;
-                ncols = numcols;
-                assert_true(size > 0);
-                data = new double[size];
-            }
-        }
-        if (fillzero) std::fill(begin(), end(), 0.0);
+		VectorView::Resize(numrows*numcols, fillzero);
+        nrows = numrows;
+        ncols = numcols;
     }
 
-    // Destructor frees allocated memory.
-    ~Matrix()
-    {
-        Clear();
-    }
-
-    // Copy operator reallocates matrix if needed.
+	~Matrix() = default;
+    
+    // Copy operator
     Matrix & operator=(const Matrix & mat)
     {
-        if (IsDistinct(mat)) {
-            if (!SameSize(mat)) {
-                Resize(mat.nrows, mat.ncols, false);
-            }
-            std::copy(mat.begin(), mat.end(), begin());
-        }
-        return (*this);
+		VectorView::operator=(mat);
+		nrows = mat.nrows;
+		ncols = mat.ncols;
+        return *this;
     }
 
-    // Note, user can copy a matrix but not a vector.
-    VectorView & operator=(const VectorView &) = delete;
-
     // Indexing operator provides read only access to matrix element.
+	// Using a call operator here for unified element access with
+	// single-dimensional indices (e.g. (i)) in parent class.
     const double & operator()(int r, int c) const
     {
 #ifndef NDEBUG
@@ -276,10 +185,12 @@ public:
               (static_cast<unsigned>(c) < static_cast<unsigned>(ncols))))
             assert_true(0);
 #endif
-        return data[r * ncols + c];
+        return VectorView::operator()(r * ncols + c);
     }
 
     // Indexing operator provides read/write access to matrix element.
+	// Using a call operator here for unified element access with
+	// single-dimensional indices (e.g. (i)) in parent class.
     double & operator()(int r, int c)
     {
 #ifndef NDEBUG
@@ -287,22 +198,25 @@ public:
               (static_cast<unsigned>(c) < static_cast<unsigned>(ncols))))
             assert_true(0);
 #endif
-        return data[r * ncols + c];
+        return VectorView::operator()(r * ncols + c);
     }
 
-    // Functions return the number of rows, the number of columns and
-    // the total number of matrix elements respectively.
+    // Returns the number of rows of this matrix.
     int NRows() const { return nrows; }
-    int NCols() const { return ncols; }
-    int Size()  const { return size;  }
 
-    // Returns "true" if both matrices have the same size.
+	// Returns the number of columns of this matrix.
+    int NCols() const { return ncols; }
+
+	// Returns the total number of elements of this matrix.
+    int Size()  const { return nrows*ncols;  }
+
+    // Returns "true" if both matrices have the same number of rows and columns, respectively.
     bool SameSize(const Matrix & mat) const
     {
         return ((nrows == mat.nrows) && (ncols == mat.ncols));
     }
 
-    // Returns "true" if this matrix has the same size as transposed(mat).
+    // Returns "true" if this matrix has the same number of rows and columns as transposed(mat).
     bool SameSizeTr(const Matrix & mat) const
     {
         return ((nrows == mat.ncols) && (ncols == mat.nrows));
@@ -310,6 +224,23 @@ public:
 
     // Returns "true" if matrix is square.
     bool IsSquare() const { return (nrows == ncols); }
+
+	// Serialization: Load a given Matrix
+	static Matrix load(allscale::utils::ArchiveReader& reader) {
+		Matrix res;
+		res.nrows = reader.read<int>();
+		res.ncols = reader.read<int>();
+		res.data = reader.read<std::vector<double>>();
+		return res;
+	}
+
+	// Serialization: Store this Matrix
+	void store(allscale::utils::ArchiveWriter& writer) const {
+		writer.write(nrows);
+		writer.write(ncols);
+		writer.write(data);
+	}
+
 };
 
 void MatMult(Matrix & result, const Matrix & A, const Matrix & B);
