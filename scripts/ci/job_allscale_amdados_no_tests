@@ -54,3 +54,6 @@ cmake "$WORKSPACE/code" \
 	"$ALLSCALE_CMAKE"
 
 /usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h make -j "$NPROC" app_amdados
+
+# -------------------------------------------- Run Application Tests
+/usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h ./verify_output.sh 2

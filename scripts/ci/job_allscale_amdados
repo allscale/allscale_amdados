@@ -58,4 +58,7 @@ cmake "$WORKSPACE/code" \
 # -------------------------------------------------- Run Unit Tests
 ulimit -t 14400
 
-/usr/bin/time -v nice -n "$NICE_LEVEL" make test ARGS="-j $NPROC"
+/usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h make test ARGS="-j $NPROC"
+
+# -------------------------------------------- Run Application Tests
+/usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h ./verify_output.sh 2
