@@ -30,6 +30,7 @@ if [ ! -z "$RUNNING_IN_ALLSCALE_RUNTIME" ]; then
 fi
 
 # run application, capture output to get output file name
+cd @PROJECT_BINARY_DIR@/app
 OUTPUT=$(NUM_WORKERS="$NPROC" /usr/bin/time -v @PROJECT_BINARY_DIR@/app/amdados $ADDITIONAL_ARGUMENTS --scenario benchmark:${CASE} --config @PROJECT_BINARY_DIR@/app/amdados.conf | tee /dev/tty)
 # grep for filename in output
 FILENAME=`echo $OUTPUT | grep -o '\(field_Nx[0-9][0-9]*_Ny[0-9][0-9]*_Nt[0-9][0-9]*\.bin\)'`
