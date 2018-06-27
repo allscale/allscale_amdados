@@ -24,6 +24,7 @@
 #define ARMA_DONT_USE_OPENMP
 
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 	#include "../../../api/armadillo/include/armadillo"
 #pragma GCC diagnostic pop
