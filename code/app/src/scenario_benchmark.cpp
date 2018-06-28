@@ -5,11 +5,13 @@
 
 #include <chrono>
 #include <iostream>
+#include <map>
 
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
+#include "allscale/utils/vector.h"
 
 #include "../include/geometry.h"
 #include "../include/amdados_utils.h"
@@ -45,8 +47,11 @@ namespace {
     void GenerateSensorData(const Configuration& conf, Grid<point_array_t,2>& sensors, Grid<Matrix,2>& observations) {
 
         // Clear the data structure.
-        sensors.forEach([](point_array_t & arr) { arr.clear(); });
-        observations.forEach([](Matrix & m) { m.Clear(); });
+		assert_eq(sensors.size(), observations.size());
+		::allscale::api::user::algorithm::pfor({ 0,0 }, sensors.size(), [&sensors,&observations](const auto& index) {
+			sensors[index].clear();
+			observations[index].Clear();
+		});
 
         // Define useful constants.
         const point2d_t GridSize = GetGridSize(conf);
@@ -78,48 +83,47 @@ namespace {
         InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);
 
-        // Save (scaled) sensor locations.
+		// temporary sensor location storage
+		std::map<point2d_t, std::vector<point2d_t>> locations;
+
+        // Save (scaled) sensor locations to temporary storage.
         for (int k = 0; k < Nobs; ++k) {
             int xk = ScaleCoord(x[k], Nx);
             int yk = ScaleCoord(y[k], Ny);
-
             // insert sensor position
             point2d_t pt{xk,yk};
             point2d_t idx = allscale::utils::elementwiseDivision(pt,finest_layer_size);
             assert_true((0 <= idx.x) && (idx.x < GridSize.x));
             assert_true((0 <= idx.y) && (idx.y < GridSize.y));
-            sensors[idx].push_back(pt % finest_layer_size);
+
+			locations[idx].push_back(pt % finest_layer_size);
         }
 
+		int Nt = conf.asUInt("Nt");
+		::allscale::api::user::algorithm::pfor({ 0,0 }, GridSize, [&sensors,&observations, locations, Nt](const auto& idx) {
 
-        // --- initialize observations ---
-        int Nt = conf.asUInt("Nt");
-        for(int x = 0; x < GridSize.x; x++) {
-            for(int y = 0; y < GridSize.y; y++) {
+			allscale::api::core::sema::needs_write_access_on(sensors[idx]);
+			allscale::api::core::sema::needs_write_access_on(observations[idx]);
 
-                // get index of current sensor / observation
-                point2d_t idx{x,y};
+			// copy sensor positions from temporary to simulation storage
+			if(locations.find(idx) != locations.end()) {
+				sensors[idx] = locations.at(idx);
+			}
 
-                // the the positions of the observations
-                auto& positions = sensors[idx];
+			// insert observations
+			const auto num_observations = sensors[idx].size();
+			Matrix& m = observations[idx];
+			m.Resize(Nt, num_observations);
 
-                // insert observation
-                auto num_observations = positions.size();
-                Matrix& m = observations[idx];
-                if (m.Empty()) {
-                    m.Resize(Nt,num_observations);
-                }
+			if(num_observations > 0) {
+				// fill in observation values
+				int t_step = Nt / num_observations;
+				for(std::size_t cnt = 0; cnt < num_observations; cnt++) {
+					m(t_step * cnt, cnt) = 1.0f;
+				}
+			}
 
-                // if there are no observations, continue processing
-                if (num_observations == 0) continue;
-
-                // fill in observation values
-                int t_step = Nt / num_observations;
-                for(std::size_t cnt=0; cnt < num_observations; cnt++) {
-                    m(t_step * cnt,cnt) = 1.0f;
-                }
-            }
-        }
+		});
 
     }
 
