@@ -784,7 +784,7 @@ void RunDataAssimilation(const Configuration         & conf,
             }
         },
         // Process the external subdomains.
-        [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
+        [&,conf, Nsubiter, Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
             // define requirements
