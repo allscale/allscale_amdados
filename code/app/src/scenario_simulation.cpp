@@ -765,14 +765,6 @@ void RunDataAssimilation(const Configuration         & conf,
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
-            // define requirements
-            allscale::api::core::sema::needs_write_access_on(contexts[idx]);
-            allscale::api::core::sema::needs_read_access_on(sensors[idx]);
-            allscale::api::core::sema::needs_read_access_on(observations[idx]);
-
-            // TODO: add state dependencies to neighbors
-            allscale::api::core::sema::needs_read_access_on(state[idx]);
-
             assert_true(t >= 0);
             if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
@@ -787,12 +779,6 @@ void RunDataAssimilation(const Configuration         & conf,
         [&,conf, Nsubiter, Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
-            // define requirements
-            allscale::api::core::sema::needs_write_access_on(contexts[idx]);
-
-            // TODO: add state dependencies to neighbors
-            allscale::api::core::sema::needs_read_access_on(state[idx]);
-
             if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
