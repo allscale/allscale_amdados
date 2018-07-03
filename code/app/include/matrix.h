@@ -113,6 +113,16 @@ public:
 		return *this;
 	}
 
+	friend std::ostream& operator<<(std::ostream& out, const VectorView& vv) {
+		out << "VectorView [ ";
+		out << "1x" << vv.Size();
+		for(const auto& e : vv.data) {
+			out << ", " << e;
+		}
+		out << " ]" << std::endl;
+		return out;
+	}
+
 };
 
 //=============================================================================
@@ -224,6 +234,15 @@ public:
 
     // Returns "true" if matrix is square.
     bool IsSquare() const { return (nrows == ncols); }
+
+	friend std::ostream& operator<<(std::ostream& out, const Matrix& m) {
+		out << "Matrix [ ";
+		out << m.NRows() << "x";
+		out << m.NCols() << "; ";
+		out << m.data;
+		out << " ]" << std::endl;
+		return out;
+	}
 
 	// Serialization: Load a given Matrix
 	static Matrix load(allscale::utils::ArchiveReader& reader) {

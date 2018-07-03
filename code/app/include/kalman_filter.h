@@ -33,6 +33,22 @@ KalmanFilter()
 {
 }
 
+friend std::ostream& operator<<(std::ostream& out, const KalmanFilter& kf) {
+	out << "KalmanFilter: [ ";
+	out << kf.m_chol << ", ";
+	out << kf.m_lu << ", ";
+	out << kf.m_x_tmp << ", ";
+	out << kf.m_y << ", ";
+	out << kf.m_invSy << ", ";
+	out << kf.m_S << ", ";
+	out << kf.m_P_tmp << ", ";
+	out << kf.m_PHt << ", ";
+	out << kf.m_HP << ", ";
+	out << kf.m_invSHP << ", ";
+	out << " ]" << std::endl;
+	return out;
+}
+
 //-----------------------------------------------------------------------------
 // Function propagates state and covariance one timestep ahead and obtains
 // prior estimations: x_prior = A*x, P_prior = A*P*A^t + Q, where A is

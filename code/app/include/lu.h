@@ -27,6 +27,14 @@ LUdecomposition() : m_LU(), m_Perm()
 {
 }
 
+friend std::ostream& operator<<(std::ostream& out, const LUdecomposition& lud) {
+	out << "LUdecomposition: [ ";
+	out << lud.m_LU;
+	for(const auto& e : lud.m_Perm) { out << ", " << e; }
+	out << " ]" << std::endl;
+	return out;
+}
+
 //-----------------------------------------------------------------------------
 // Function computes and stores LU decomposition: M = L*U.
 // The decomposition P*M = L*U is based on so called partial pivoting of matrix

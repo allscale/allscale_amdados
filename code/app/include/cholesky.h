@@ -28,6 +28,13 @@ Cholesky() : m_L()
 {
 }
 
+friend std::ostream& operator<<(std::ostream& out, const Cholesky& c) {
+	out << "Cholesky: [ ";
+	out << c.m_L;
+	out << " ]" << std::endl;
+	return out;
+}
+
 //-----------------------------------------------------------------------------
 // Function computes and stores Cholesky decomposition
 // of a positive-definite symmetric matrix: A = L * L^t.

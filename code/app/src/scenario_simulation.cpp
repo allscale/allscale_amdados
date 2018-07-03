@@ -59,6 +59,20 @@ struct Boundary
     double rel_diff;       // relative difference across in-flow borders
     bool   inflow[NSIDES]; // true, if flow is coming in along a side
     bool   outer[NSIDES];  // true, if side belongs to domain's outer boundary
+
+	friend std::ostream& operator<<(std::ostream& out, const Boundary& b) {
+		out << "Boundary: [ ";
+		for(const auto& e : b.myself) { out << " " << e; }
+		out << ", ";
+		for(const auto& e : b.remote) { out << " " << e; }
+		out << ", " << b.rel_diff;
+		for(int i = 0; i < NSIDES; ++i) { out << " " << b.inflow[i]; }
+		out << ", ";
+		for(int i = 0; i < NSIDES; ++i) { out << " " << b.outer[i]; }
+		out << " ]" << std::endl;
+		return out;
+	}
+
 };
 
 typedef std::pair<double,double> flow_t;    // flow components (flow_x, flow_y)
@@ -99,6 +113,31 @@ struct SubdomainContext
         , sensors(), LU(), tmp_field()
         , idx(-1,-1), Nt(0), Nsubiter(0), Nsensors(0), flow(0.0, 0.0)
     {}
+
+	friend std::ostream& operator<<(std::ostream& out, const SubdomainContext& ctx) {
+		out << "SubdomainContext: [ ";
+		out << ctx.field << ", ";
+		out << ctx.boundaries << ", ";
+		out << ctx.Kalman << ", ";
+		out << ctx.B << ", ";
+		out << ctx.P << ", ";
+		out << ctx.Q << ", ";
+		out << ctx.H << ", ";
+		out << ctx.R << ", ";
+		out << ctx.z;
+		for(const auto& e : ctx.sensors) { out << ", " << e; }
+		out << ctx.LU << ", ";
+		out << ctx.tmp_field << ", ";
+		out << ctx.idx << ", ";
+		out << ctx.Nt << ", ";
+		out << ctx.Nsubiter << ", ";
+		out << ctx.Nsensors << ", ";
+		out << ctx.flow.first << ", ";
+		out << ctx.flow.second;
+		out << " ]" << std::endl;
+		return out;
+	}
+
 };
 
 // The whole domain where instead of grid cells we place sub-domain data.
@@ -675,8 +714,8 @@ void RunDataAssimilation(const Configuration         & conf,
     const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
-    domain_t         temp_field(GridSize);  // grid if sub-domains
-    domain_t         state_field(GridSize); // grid if sub-domains
+    domain_t         temp_field(GridSize);  // grid of sub-domains
+    domain_t         state_field(GridSize); // grid of sub-domains
 
     // Initialize the observation and model covariance matrices.
     pfor(point2d_t(0,0), GridSize, [&,Nt,Nsubiter,conf](const point2d_t & idx) {
