@@ -100,10 +100,6 @@ struct SubdomainContext
     LUdecomposition LU;         // used for state propagation without sensors
     Matrix          tmp_field;  // used for state propagation without sensors
 
-    point2d_t     idx;          // subdomain's position on the grid
-    size_t        Nt;           // number of time integration steps
-    size_t        Nsubiter;     // number of sub-iterations
-    size_t        Nsensors;     // convenience variable = sensors.size()
     flow_t        flow;         // current flow vector (vel_x, vel_y)
 
     SubdomainContext()
@@ -111,7 +107,7 @@ struct SubdomainContext
         , Kalman(), B()
         , P(), Q(), H(), R(), z()
         , sensors(), LU(), tmp_field()
-        , idx(-1,-1), Nt(0), Nsubiter(0), Nsensors(0), flow(0.0, 0.0)
+        , flow(0.0, 0.0)
     {}
 
 	friend std::ostream& operator<<(std::ostream& out, const SubdomainContext& ctx) {
@@ -128,10 +124,6 @@ struct SubdomainContext
 		for(const auto& e : ctx.sensors) { out << ", " << e; }
 		out << ctx.LU << ", ";
 		out << ctx.tmp_field << ", ";
-		out << ctx.idx << ", ";
-		out << ctx.Nt << ", ";
-		out << ctx.Nsubiter << ", ";
-		out << ctx.Nsensors << ", ";
 		out << ctx.flow.first << ", ";
 		out << ctx.flow.second;
 		out << " ]" << std::endl;
@@ -449,6 +441,7 @@ void MatrixFromAllscale(Matrix & field,
 
     double_array_t boundary;    // placeholder of boundary points
 
+
     // Set up left-most points from the right boundary of the left peer.
     if (idx.x > 0) {
 #if MY_MULTISCALE_METHOD == 1
@@ -539,14 +532,14 @@ const subdomain_t & SubdomainRoutineKalman(
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
-                            SubdomainContext    & ctx)
+                            SubdomainContext    & ctx, 
+                            const point2d_t     & idx,
+                            const size_t          Nsubiter,
+                            const size_t          Nt)
 {
     const unsigned resolution = static_cast<unsigned>(LayerFine);
     assert_true(&curr_state != &next_state);
     assert_true(curr_state.size() == next_state.size());
-
-    // Index (position) of the current subdomain.
-    const point2d_t idx = ctx.idx;
 
     // Important: synchronize active layers, otherwise when we exchange data
     // at the borders of neighbour subdomains the size mismatch can happen.
@@ -557,15 +550,15 @@ const subdomain_t & SubdomainRoutineKalman(
 
     // Get the discrete time (index of iteration) in the range [0..Nt) and
     // the index of sub-iteration in the range [0..Nsubiter).
-    assert_true(timestamp < ctx.Nt * ctx.Nsubiter);
-    const size_t t_discrete = timestamp / ctx.Nsubiter;
-    const size_t sub_iter   = timestamp % ctx.Nsubiter;
+    assert_true(timestamp < Nt * Nsubiter);
+    const size_t t_discrete = timestamp / Nsubiter;
+    const size_t sub_iter   = timestamp % Nsubiter;
 
 #ifdef AMDADOS_DEBUGGING    // printing progress
     if ((idx == point2d_t(0,0)) && (sub_iter == 0)) {
-        if (t_discrete == 0) std::cout << "Nt: " << ctx.Nt << std::endl;
+        if (t_discrete == 0) std::cout << "Nt: " << Nt << std::endl;
         std::cout << "\rtime: " << t_discrete << std::flush;
-        if (t_discrete + 1 == ctx.Nt) std::cout << std::endl << std::flush;
+        if (t_discrete + 1 == Nt) std::cout << std::endl << std::flush;
     }
 #endif
 
@@ -626,14 +619,14 @@ const subdomain_t & SubdomainRoutineNoSensors(
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
-                            SubdomainContext    & ctx)
+                            SubdomainContext    & ctx,
+                            const point2d_t     & idx,
+                            const size_t          Nsubiter,
+                            const size_t          Nt)
 {
     const unsigned resolution = static_cast<unsigned>(LayerLow);
     assert_true(&curr_state != &next_state);
     assert_true(curr_state.size() == next_state.size());
-
-    // Index (position) of the current subdomain.
-    const point2d_t idx = ctx.idx;
 
     // Important: synchronize active layers, otherwise when we exchange data
     // at the borders of neighbour subdomains the size mismatch can happen.
@@ -644,15 +637,15 @@ const subdomain_t & SubdomainRoutineNoSensors(
 
     // Get the discrete time (index of iteration) in the range [0..Nt) and
     // the index of sub-iteration in the range [0..Nsubiter).
-    assert_true(timestamp < ctx.Nt * ctx.Nsubiter);
-    const size_t t_discrete = timestamp / ctx.Nsubiter;
-    const size_t sub_iter   = timestamp % ctx.Nsubiter;  (void) sub_iter;
+    assert_true(timestamp < Nt * Nsubiter);
+    const size_t t_discrete = timestamp / Nsubiter;
+    const size_t sub_iter   = timestamp % Nsubiter;  (void) sub_iter;
 
 #ifdef AMDADOS_DEBUGGING    // printing progress
     if ((idx == point2d_t(0,0)) && (sub_iter == 0)) {
-        if (t_discrete == 0) std::cout << "Nt: " << ctx.Nt << std::endl;
+        if (t_discrete == 0) std::cout << "Nt: " << Nt << std::endl;
         std::cout << "\rtime: " << t_discrete << std::flush;
-        if (t_discrete + 1 == ctx.Nt) std::cout << std::endl << std::flush;
+        if (t_discrete + 1 == Nt) std::cout << std::endl << std::flush;
     }
 #endif
 
@@ -664,7 +657,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
 
     // Prior estimation.
     InverseModelMatrix(ctx.B, conf, ctx.flow, layer_size,
-                       resolution, ctx.Nsubiter);
+                       resolution, Nsubiter);
     ctx.tmp_field = ctx.field;              // copy state into a temporary one
     ctx.LU.Init(ctx.B);                     // decompose: B = L*U
     ctx.LU.Solve(ctx.field, ctx.tmp_field); // new_field = B^{-1}*old_field
@@ -718,7 +711,7 @@ void RunDataAssimilation(const Configuration         & conf,
     domain_t         state_field(GridSize); // grid of sub-domains
 
     // Initialize the observation and model covariance matrices.
-    pfor(point2d_t(0,0), GridSize, [&,Nt,Nsubiter,conf](const point2d_t & idx) {
+    pfor(point2d_t(0,0), GridSize, [&,conf](const point2d_t & idx) {
         // Zero field at the beginning for all the resolutions.
         static_assert(LayerFine <= LayerLow, "");
         for (int layer = LayerFine; layer <= LayerLow; ++layer) {
@@ -762,10 +755,6 @@ void RunDataAssimilation(const Configuration         & conf,
             ComputeH(sensors[idx], layer_size, ctx.H);
             InitialCovar(conf, ctx.P);
         }
-        ctx.idx = idx;
-        ctx.Nt = Nt;
-        ctx.Nsubiter = Nsubiter;
-        ctx.Nsensors = sensors[idx].size();
     });
 
     // Time integration forward in time. We want to make Nt (normal) iterations
@@ -773,7 +762,7 @@ void RunDataAssimilation(const Configuration         & conf,
     ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
         // Process the internal subdomains.
-        [&,conf](time_t t, const point2d_t & idx, const domain_t & state)
+        [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
             // define requirements
@@ -785,13 +774,13 @@ void RunDataAssimilation(const Configuration         & conf,
             allscale::api::core::sema::needs_read_access_on(state[idx]);
 
             assert_true(t >= 0);
-            if (contexts[idx].Nsensors > 0) {
+            if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], false, size_t(t),
-                            state, temp_field, contexts[idx]);
+                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             } else {
                 return SubdomainRoutineNoSensors(conf, false, size_t(t),
-                            state, temp_field, contexts[idx]);
+                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             }
         },
         // Process the external subdomains.
@@ -804,13 +793,13 @@ void RunDataAssimilation(const Configuration         & conf,
             // TODO: add state dependencies to neighbors
             allscale::api::core::sema::needs_read_access_on(state[idx]);
 
-            if (contexts[idx].Nsensors > 0) {
+            if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
-                            state, temp_field, contexts[idx]);
+                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             } else {
                 return SubdomainRoutineNoSensors(conf, true, size_t(t),
-                            state, temp_field, contexts[idx]);
+                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             }
         },
         // Monitoring.
