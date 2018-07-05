@@ -229,8 +229,8 @@ void ScenarioSensors(const std::string & config_file)
 
         // Generate pseudo-random sensor locations.
         const int Nobs = std::max(Round(fraction * problem_size), 1);
-        std::cout << "fraction of sensor points = " << fraction
-                  << ", #observations = " << Nobs << std::endl;
+		std::cout << "fraction of sensor points = " << fraction;
+	    std::cout << ", #observations = " << Nobs << std::endl;
         double_array_t x(Nobs), y(Nobs);
         InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);

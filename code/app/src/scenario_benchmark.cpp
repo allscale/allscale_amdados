@@ -46,13 +46,6 @@ namespace {
 
     void GenerateSensorData(const Configuration& conf, Grid<point_array_t,2>& sensors, Grid<Matrix,2>& observations) {
 
-        // Clear the data structure.
-		assert_eq(sensors.size(), observations.size());
-		::allscale::api::user::algorithm::pfor({ 0,0 }, sensors.size(), [&sensors,&observations](const auto& index) {
-			sensors[index].clear();
-			observations[index].Clear();
-		});
-
         // Define useful constants.
         const point2d_t GridSize = GetGridSize(conf);
         const double fraction =
@@ -77,8 +70,8 @@ namespace {
 
         // Generate pseudo-random sensor locations.
         const int Nobs = std::max(Round(fraction * problem_size), 1);
-        std::cout << "\tfraction of sensor points = " << fraction
-                  << ", #observations = " << Nobs << std::endl;
+		std::cout << "\tfraction of sensor points = " << fraction;
+        std::cout << ", #observations = " << Nobs << std::endl;
         double_array_t x(Nobs), y(Nobs);
         InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);
@@ -100,10 +93,18 @@ namespace {
         }
 
 		int Nt = conf.asUInt("Nt");
-		::allscale::api::user::algorithm::pfor({ 0,0 }, GridSize, [&sensors,&observations, locations, Nt](const auto& idx) {
+
+		assert_eq(sensors.size(), observations.size());
+		assert_eq(sensors.size(), GridSize);
+
+		::allscale::api::user::algorithm::pfor({ 0,0 }, GridSize, [&sensors, &observations, locations, Nt](const auto& idx) {
 
 			allscale::api::core::sema::needs_write_access_on(sensors[idx]);
 			allscale::api::core::sema::needs_write_access_on(observations[idx]);
+
+			// Clear the data structures.
+			sensors[idx].clear();
+			observations[idx].Clear();
 
 			// copy sensor positions from temporary to simulation storage
 			if(locations.find(idx) != locations.end()) {
@@ -156,7 +157,9 @@ void ScenarioBenchmark(const std::string& config_file, int problem_size)
 
     // print some status info for the user
     int steps = conf.asUInt("Nt");
-    std::cout << "Running benchmark based on configuration file \"" << config_file << "\" with domain size " << problem_size << "x" << problem_size << " for " << steps << " time steps ...\n";
+	std::cout << "Running benchmark based on configuration file \"" << config_file;
+	std::cout << "\" with domain size " << problem_size << "x" << problem_size;
+	std::cout << " for " << steps << " time steps ...\n";
 
     // --- generate sensor data ---
     std::cout << "Generating artificial sensory input data ...\n";

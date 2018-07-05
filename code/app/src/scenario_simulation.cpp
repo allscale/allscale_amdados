@@ -528,7 +528,6 @@ const subdomain_t & SubdomainRoutineKalman(
                             const Configuration & conf,
                             const point_array_t & sensors,
                             const Matrix        & observations,
-                            const bool            external,
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
@@ -592,7 +591,7 @@ const subdomain_t & SubdomainRoutineKalman(
     AllscaleFromMatrix(next_state[idx], ctx.field);
 
     // Ensure boundary conditions on the outer border.
-    if (external) {
+    if (idx.x == 0 || idx.x == (next_state.size().x-1) || idx.y == 0 || (idx.y == next_state.size().y-1)) {
         ApplyBoundaryCondition(next_state, idx);
     }
 
@@ -615,7 +614,6 @@ const subdomain_t & SubdomainRoutineKalman(
  */
 const subdomain_t & SubdomainRoutineNoSensors(
                             const Configuration & conf,
-                            const bool            external,
                             const size_t          timestamp,
                             const domain_t      & curr_state,
                             domain_t            & next_state,
@@ -666,7 +664,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
     AllscaleFromMatrix(next_state[idx], ctx.field);
 
     // Ensure boundary conditions on the outer border.
-    if (external) {
+	if(idx.x == 0 || idx.x == (next_state.size().x - 1) || idx.y == 0 || (idx.y == next_state.size().y - 1)) {
         ApplyBoundaryCondition(next_state, idx);
     }
 
@@ -704,7 +702,7 @@ void RunDataAssimilation(const Configuration         & conf,
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
     const size_t    Nt = conf.asUInt("Nt");
     const size_t    Nsubiter = conf.asUInt("num_sub_iter");
-    const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
+	__attribute__((unused)) const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
     domain_t         temp_field(GridSize);  // grid of sub-domains
@@ -714,14 +712,14 @@ void RunDataAssimilation(const Configuration         & conf,
     pfor(point2d_t(0,0), GridSize, [&,conf](const point2d_t & idx) {
         // Zero field at the beginning for all the resolutions.
         static_assert(LayerFine <= LayerLow, "");
-        for (int layer = LayerFine; layer <= LayerLow; ++layer) {
-            state_field[idx].setActiveLayer(layer);
-             temp_field[idx].setActiveLayer(layer);
-            state_field[idx].forAllActiveNodes([](double & v) { v = 0.0; });
-             temp_field[idx].forAllActiveNodes([](double & v) { v = 0.0; });
-            ApplyBoundaryCondition(state_field, idx);
-            ApplyBoundaryCondition( temp_field, idx);
-        }
+        //for (int layer = LayerFine; layer <= LayerLow; ++layer) {
+        //    state_field[idx].setActiveLayer(layer);
+        //     temp_field[idx].setActiveLayer(layer);
+        //    state_field[idx].forAllActiveNodes([](double & v) { v = 0.0; });
+        //     temp_field[idx].forAllActiveNodes([](double & v) { v = 0.0; });
+        //    ApplyBoundaryCondition(state_field, idx);
+        //    ApplyBoundaryCondition( temp_field, idx);
+        //}
 
         // If there is at least one sensor in a subdomain, then we operate at
         // the fine resolution, otherwise at the low resolution.
@@ -761,41 +759,27 @@ void RunDataAssimilation(const Configuration         & conf,
     // and Nsubiter sub-iterations within each (normal) iteration.
     ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
-        // Process the internal subdomains.
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
-            assert_true(t >= 0);
             if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
-                            observations[idx], false, size_t(t),
+                            observations[idx], size_t(t),
                             state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             } else {
-                return SubdomainRoutineNoSensors(conf, false, size_t(t),
-                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
-            }
-        },
-        // Process the external subdomains.
-        [&,conf, Nsubiter, Nt](time_t t, const point2d_t & idx, const domain_t & state)
-        -> const subdomain_t &  // cell is not copy-constructible, so '&'
-        {
-            if (contexts[idx].sensors.size() > 0) {
-                return SubdomainRoutineKalman(conf, sensors[idx],
-                            observations[idx], true, size_t(t),
-                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
-            } else {
-                return SubdomainRoutineNoSensors(conf, true, size_t(t),
+                return SubdomainRoutineNoSensors(conf, size_t(t),
                             state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             }
         },
         // Monitoring.
         ::allscale::api::user::algorithm::observer(
             // Time filter: choose time-slices evenly distributed on time axis.
-            [=](time_t t) {
+            [=](__attribute__((unused)) time_t t) {
                 // Filter out the first sub-iteration, skip the others.
-                if ((t % time_t(Nsubiter)) != 0) return false;
-                t /= time_t(Nsubiter);
-                return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
+                //if ((t % time_t(Nsubiter)) != 0) return false;
+                //t /= time_t(Nsubiter);
+                //return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
+				return false;
             },
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
