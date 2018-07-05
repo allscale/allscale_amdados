@@ -591,9 +591,7 @@ const subdomain_t & SubdomainRoutineKalman(
     AllscaleFromMatrix(next_state[idx], ctx.field);
 
     // Ensure boundary conditions on the outer border.
-    if (idx.x == 0 || idx.x == (next_state.size().x-1) || idx.y == 0 || (idx.y == next_state.size().y-1)) {
-        ApplyBoundaryCondition(next_state, idx);
-    }
+    ApplyBoundaryCondition(next_state, idx);
 
     // Ensure non-negative (physically plausible) density.
     next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
@@ -664,9 +662,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
     AllscaleFromMatrix(next_state[idx], ctx.field);
 
     // Ensure boundary conditions on the outer border.
-	if(idx.x == 0 || idx.x == (next_state.size().x - 1) || idx.y == 0 || (idx.y == next_state.size().y - 1)) {
-        ApplyBoundaryCondition(next_state, idx);
-    }
+    ApplyBoundaryCondition(next_state, idx);
 
     // Ensure non-negative (physically plausible) density.
     next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
