@@ -244,11 +244,11 @@ void ApplyBoundaryCondition(domain_t & state, const point2d_t & idx)
 
     // Set the leftmost and rightmost.
     if (idx.x == 0)      subdom.setBoundary(Direction::Left,  double_array_t(Sy, 0.0));
-    if (idx.x == Nx - 1) subdom.setBoundary(Direction::Right, double_array_t(Sy, 0.0));
+    else if (idx.x == Nx - 1) subdom.setBoundary(Direction::Right, double_array_t(Sy, 0.0));
 
     // Set the bottommost and topmost.
     if (idx.y == 0)      subdom.setBoundary(Direction::Down, double_array_t(Sx, 0.0));
-    if (idx.y == Ny - 1) subdom.setBoundary(Direction::Up,   double_array_t(Sx, 0.0));
+    else if (idx.y == Ny - 1) subdom.setBoundary(Direction::Up,   double_array_t(Sx, 0.0));
 }
 
 /**
