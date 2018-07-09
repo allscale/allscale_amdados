@@ -8,12 +8,14 @@
 #include <chrono>
 #include <fstream>
 #include <map>
+
 #include "allscale/utils/assert.h"
 #include "allscale/api/user/data/adaptive_grid.h"
-#include "../include/debugging.h"
-#include "../include/geometry.h"
-#include "../include/amdados_utils.h"
-#include "../include/configuration.h"
+
+#include "amdados/app/debugging.h"
+#include "amdados/app/geometry.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/configuration.h"
 
 namespace amdados {
 

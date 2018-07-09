@@ -5,7 +5,8 @@
 //-----------------------------------------------------------------------------
 
 #include <iostream>
-#include "../include/debugging.h"
+
+#include "amdados/app/debugging.h"
 
 namespace amdados {
 

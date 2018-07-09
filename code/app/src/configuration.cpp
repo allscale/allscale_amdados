@@ -4,13 +4,15 @@
 //-----------------------------------------------------------------------------
 
 #include "allscale/utils/assert.h"
+
 #include <cmath>
 #include <fstream>
 #include <sstream>
 #include <limits>
 #include <map>
-#include "../include/debugging.h"
-#include "../include/configuration.h"
+
+#include "amdados/app/debugging.h"
+#include "amdados/app/configuration.h"
 
 namespace amdados {
 

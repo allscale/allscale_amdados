@@ -13,11 +13,11 @@
 #include "allscale/utils/assert.h"
 #include "allscale/utils/vector.h"
 
-#include "../include/geometry.h"
-#include "../include/amdados_utils.h"
-#include "../include/configuration.h"
-#include "../include/matrix.h"
-#include "../include/debugging.h"
+#include "amdados/app/geometry.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/configuration.h"
+#include "amdados/app/matrix.h"
+#include "amdados/app/debugging.h"
 
 namespace amdados {
 

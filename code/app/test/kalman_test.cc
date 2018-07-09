@@ -11,11 +11,11 @@
 #include <fstream>
 #include <string>
 #include <random>
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
-#include "../include/cholesky.h"
-#include "../include/lu.h"
-#include "../include/kalman_filter.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
+#include "amdados/app/cholesky.h"
+#include "amdados/app/lu.h"
+#include "amdados/app/kalman_filter.h"
 
 //-----------------------------------------------------------------------------
 // Function for testing a Kalman filter on a toy 2D problem.

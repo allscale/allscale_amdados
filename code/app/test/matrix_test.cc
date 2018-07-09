@@ -11,8 +11,8 @@
 #include <fstream>
 #include <string>
 #include <limits>
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
 #define ARMA_USE_CXX11
 #define ARMA_DONT_USE_WRAPPER
 #define ARMA_DONT_USE_LAPACK

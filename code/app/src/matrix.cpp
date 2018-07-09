@@ -4,10 +4,12 @@
 //-----------------------------------------------------------------------------
 
 #include "allscale/utils/assert.h"
+
 #include <algorithm>
 #include <random>
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
+
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
 
 namespace amdados {
 

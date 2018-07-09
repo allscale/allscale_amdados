@@ -11,9 +11,9 @@
 #include <fstream>
 #include <string>
 #include <limits>
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
-#include "../include/lu.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
+#include "amdados/app/lu.h"
 
 // Tolerance on relative error.
 const double TOL = std::sqrt(std::sqrt(std::numeric_limits<double>::epsilon()));

@@ -9,15 +9,16 @@
 #include "allscale/api/user/algorithm/stencil.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
-#include "../include/debugging.h"
-#include "../include/geometry.h"
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
-#include "../include/configuration.h"
-#include "../include/cholesky.h"
-#include "../include/lu.h"
-#include "../include/kalman_filter.h"
-#include "../include/demo_average_profile.h"
+
+#include "amdados/app/debugging.h"
+#include "amdados/app/geometry.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
+#include "amdados/app/configuration.h"
+#include "amdados/app/cholesky.h"
+#include "amdados/app/lu.h"
+#include "amdados/app/kalman_filter.h"
+#include "amdados/app/demo_average_profile.h"
 
 // There are two methods to implement multi-scaling.
 #define MY_MULTISCALE_METHOD 2
@@ -756,6 +757,7 @@ void RunDataAssimilation(const Configuration         & conf,
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
+			std::cerr << "t: " << t << ", idx: "<< idx << std::endl;
             if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], size_t(t),
