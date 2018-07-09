@@ -757,7 +757,6 @@ void RunDataAssimilation(const Configuration         & conf,
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
-			std::cerr << "t: " << t << ", idx: "<< idx << std::endl;
             if (contexts[idx].sensors.size() > 0) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], size_t(t),
