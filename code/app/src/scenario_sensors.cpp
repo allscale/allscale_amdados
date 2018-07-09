@@ -100,8 +100,8 @@ void InitialGuess(const Configuration & conf,
                   double_array_t      & y,
                   const point2d_t     & idx)
 {
-    std::mt19937 gen(RandomSeed() +
-                        idx.x * conf.asInt("num_subdomains_y") + idx.y);
+    std::mt19937 gen(static_cast<unsigned>(RandomSeed() +
+                        idx.x * conf.asInt("num_subdomains_y") + idx.y));
     std::uniform_real_distribution<double> distrib(0.0, 1.0);
     std::generate(x.begin(), x.end(), [&](){ return distrib(gen); });
     std::generate(y.begin(), y.end(), [&](){ return distrib(gen); });
@@ -156,9 +156,9 @@ void OptimizePointLocations(double_array_t & x, double_array_t & y)
 /**
 * Function scales a coordinate from [0..1] range to specified size.
 */
-int ScaleCoord(double v, int size) {
-    int i = static_cast<int>(std::floor(v * size));
-    i = std::min(std::max(i, 0), size - 1);
+index_t ScaleCoord(double v, index_t size) {
+    index_t i = static_cast<index_t>(std::floor(v * size));
+    i = std::min(std::max(i, index_t(0)), size - 1);
     return i;
 }
 
@@ -223,9 +223,9 @@ void ScenarioSensors(const std::string & config_file)
         });
     } else {
         // Global (whole domain) sizes.
-        const int Nx = conf.asInt("subdomain_x") * GridSize.x;
-        const int Ny = conf.asInt("subdomain_y") * GridSize.y;
-        const int problem_size = Nx * Ny;
+        const auto Nx = conf.asInt("subdomain_x") * GridSize.x;
+        const auto Ny = conf.asInt("subdomain_y") * GridSize.y;
+        const auto problem_size = Nx * Ny;
 
         // Generate pseudo-random sensor locations.
         const int Nobs = std::max(Round(fraction * problem_size), 1);
@@ -243,8 +243,8 @@ void ScenarioSensors(const std::string & config_file)
         
         // Save (scaled) sensor locations.
         for (int k = 0; k < Nobs; ++k) {
-            int xk = ScaleCoord(x[k], Nx);
-            int yk = ScaleCoord(y[k], Ny);
+            auto xk = ScaleCoord(x[k], Nx);
+            auto yk = ScaleCoord(y[k], Ny);
             out << xk << " " << yk << "\n";
         }
         manager.close(out);

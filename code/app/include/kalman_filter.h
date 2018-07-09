@@ -61,7 +61,7 @@ friend std::ostream& operator<<(std::ostream& out, const KalmanFilter& kf) {
 void PropagateStateInverse(VectorView & x, Matrix & P,
                            const Matrix & B, const Matrix & Q)
 {
-    const int N = x.Size();     // problem size
+    const index_t N = x.Size();     // problem size
 
     assert_true((P.NRows() == N) && (P.NCols() == N));
     assert_true(B.SameSize(P) && Q.SameSize(P));
@@ -93,8 +93,8 @@ void PropagateStateInverse(VectorView & x, Matrix & P,
 void SolveFilter(VectorView & x, Matrix & P,
                  const Matrix & H, const Matrix & R, const VectorView & z)
 {
-    const int N = x.Size();     // problem size
-    const int O = z.Size();     // number of observations
+    const index_t N = x.Size();     // problem size
+    const index_t O = z.Size();     // number of observations
 
     assert_true((P.NRows() == N) && (P.NCols() == N));
     assert_true((H.NRows() == O) && (H.NCols() == N));

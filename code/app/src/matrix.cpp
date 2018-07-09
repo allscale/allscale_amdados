@@ -19,15 +19,15 @@ namespace amdados {
 //-----------------------------------------------------------------------------
 void MatMult(Matrix & result, const Matrix & A, const Matrix & B)
 {
-    const int nrows = A.NRows();
-    const int msize = A.NCols();
-    const int ncols = B.NCols();
+	const index_t nrows = A.NRows();
+	const index_t msize = A.NCols();
+	const index_t ncols = B.NCols();
     assert_true((result.NRows() == nrows) &&
                 (result.NCols() == ncols) && (msize == B.NRows()));
-    for (int r = 0; r < nrows; ++r) {
-    for (int c = 0; c < ncols; ++c) {
+	for(index_t r = 0; r < nrows; ++r) {
+		for(index_t c = 0; c < ncols; ++c) {
         double sum = 0.0;
-        for (int k = 0; k < msize; ++k) { sum += A(r,k) * B(k,c); }
+        for (index_t k = 0; k < msize; ++k) { sum += A(r,k) * B(k,c); }
         result(r,c) = sum;
     }}
 }
@@ -41,15 +41,15 @@ void MatMult(Matrix & result, const Matrix & A, const Matrix & B)
 //-----------------------------------------------------------------------------
 void MatMultTr(Matrix & result, const Matrix & A, const Matrix & B)
 {
-    const int nrows = A.NRows();
-    const int ncols = B.NRows();
-    const int msize = B.NCols();
+    const index_t nrows = A.NRows();
+    const index_t ncols = B.NRows();
+    const index_t msize = B.NCols();
     assert_true((result.NRows() == nrows) &&
                 (result.NCols() == ncols) && (A.NCols() == msize));
-    for (int r = 0; r < nrows; ++r) {
-    for (int c = 0; c < ncols; ++c) {     // get B as transposed
+    for (index_t r = 0; r < nrows; ++r) {
+    for (index_t c = 0; c < ncols; ++c) {     // get B as transposed
         double sum = 0.0;
-        for (int k = 0; k < msize; ++k) { sum += A(r,k) * B(c,k); }
+        for (index_t k = 0; k < msize; ++k) { sum += A(r,k) * B(c,k); }
         result(r,c) = sum;
     }}
 }
@@ -59,12 +59,12 @@ void MatMultTr(Matrix & result, const Matrix & A, const Matrix & B)
 //-----------------------------------------------------------------------------
 void MatVecMult(VectorView & result, const Matrix & A, const VectorView & v)
 {
-    const int nrows = A.NRows();
-    const int ncols = A.NCols();
+    const index_t nrows = A.NRows();
+    const index_t ncols = A.NCols();
     assert_true((result.Size() == nrows) && (v.Size() == ncols));
-    for (int r = 0; r < nrows; ++r) {
+    for (index_t r = 0; r < nrows; ++r) {
         double sum = 0.0;
-        for (int c = 0; c < ncols; ++c) { sum += A(r,c) * v(c); }
+        for (index_t c = 0; c < ncols; ++c) { sum += A(r,c) * v(c); }
         result(r) = sum;
     }
 }
@@ -125,7 +125,7 @@ void Fill(VectorView & v, double vfill)
 void MakeIdentityMatrix(Matrix & A)
 {
     std::fill(A.begin(), A.end(), 0.0);
-    for (int i = 0; i < A.NRows(); ++i) { A(i,i) = 1.0; }
+    for (index_t i = 0; i < A.NRows(); ++i) { A(i,i) = 1.0; }
 }
 
 //-----------------------------------------------------------------------------
@@ -133,11 +133,11 @@ void MakeIdentityMatrix(Matrix & A)
 //-----------------------------------------------------------------------------
 void GetTransposed(Matrix & At, const Matrix & A)
 {
-    const int nrows = A.NRows();
-    const int ncols = A.NCols();
+    const index_t nrows = A.NRows();
+    const index_t ncols = A.NCols();
 	assert_true(A.SameSizeTr(At));
-    for (int r = 0; r < nrows; ++r) {
-    for (int c = 0; c < ncols; ++c) { At(c,r) = A(r,c); }}
+    for (index_t r = 0; r < nrows; ++r) {
+    for (index_t c = 0; c < ncols; ++c) { At(c,r) = A(r,c); }}
 }
 
 //-----------------------------------------------------------------------------
@@ -146,10 +146,10 @@ void GetTransposed(Matrix & At, const Matrix & A)
 //-----------------------------------------------------------------------------
 void Symmetrize(Matrix & A)
 {
-    const int nrows = A.NRows();
+    const index_t nrows = A.NRows();
     assert_true(A.IsSquare());
-    for (int i = 0;     i < nrows; ++i) {
-    for (int j = i + 1; j < nrows; ++j) {
+    for (index_t i = 0;     i < nrows; ++i) {
+    for (index_t j = i + 1; j < nrows; ++j) {
         A(j,i) = A(i,j) = 0.5 * (A(j,i) + A(i,j));
     }}
 }
@@ -191,10 +191,10 @@ double NormDiff(const VectorView & a, const VectorView & b)
 //-----------------------------------------------------------------------------
 double Trace(const Matrix & A)
 {
-    const int nrows = A.NRows();
+    const index_t nrows = A.NRows();
     assert_true(A.IsSquare());
     double sum = 0.0;
-    for (int i = 0; i < nrows; ++i) { sum += A(i,i); }
+    for (index_t i = 0; i < nrows; ++i) { sum += A(i,i); }
     return sum;
 }
 
@@ -203,8 +203,8 @@ double Trace(const Matrix & A)
 //-----------------------------------------------------------------------------
 void Negate(VectorView & v)
 {
-    const int size = v.Size();
-    for (int i = 0; i < size; ++i) { v(i) = - v(i); }
+    const index_t size = v.Size();
+    for (index_t i = 0; i < size; ++i) { v(i) = - v(i); }
 }
 
 //-----------------------------------------------------------------------------
@@ -213,14 +213,14 @@ void Negate(VectorView & v)
 //-----------------------------------------------------------------------------
 void MakeRandom(VectorView & v, const char type)
 {
-    const int size = v.Size();
+    const index_t size = v.Size();
     std::mt19937_64 gen(RandomSeed());
     if (type == 'n') {                              // normal, mu=0, sigma=1
         std::normal_distribution<double> distrib;
-        for (int i = 0; i < size; ++i) { v(i) = distrib(gen); }
+        for (index_t i = 0; i < size; ++i) { v(i) = distrib(gen); }
     } else if (type == 'u') {                       // uniform, [0..1]
         std::uniform_real_distribution<double> distrib;
-        for (int i = 0; i < size; ++i) { v(i) = distrib(gen); }
+        for (index_t i = 0; i < size; ++i) { v(i) = distrib(gen); }
     } else {
         assert_true(0) << "unknown distribution" << std::endl;
     }

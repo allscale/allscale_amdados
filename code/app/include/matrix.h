@@ -11,6 +11,8 @@
 
 namespace amdados {
 
+	using index_t = int64_t;
+
 // Macros check vector/matrix sizes and produce error message with
 // file/line information upon mismatch.
 #ifndef NDEBUG
@@ -43,7 +45,7 @@ public:
     VectorView() : data() {}
 
 	// constructor, ensures data can fit size elements.
-	VectorView(int size) : data(size) {}
+	VectorView(index_t size) : data(size) {}
 
 	VectorView(const VectorView &) = default;
 
@@ -56,7 +58,7 @@ public:
     // Indexing operator provides read only access to vector elements.
 	// Using a call operator here for unified element access with
 	// multi-dimensional indices (e.g. (i,y)) in subclasses.
-    const double & operator()(int i) const
+	const double& operator()(index_t i) const
     {
 #ifndef NDEBUG
         if (!(static_cast<unsigned>(i) < static_cast<unsigned>(data.size())))
@@ -68,7 +70,7 @@ public:
     // Indexing operator provides read/write access to vector elements.
 	// Using a call operator here for unified element access with
 	// multi-dimensional indices (e.g. (i,y)) in subclasses.
-    double & operator()(int i)
+	double& operator()(index_t i)
     {
 #ifndef NDEBUG
         if (!(static_cast<unsigned>(i) < static_cast<unsigned>(data.size())))
@@ -85,7 +87,7 @@ public:
     const double * end()   const { return &*data.cend(); }
 
     // Function returns the size of this vector (view).
-    int Size() const { return data.size(); }
+	index_t Size() const { return data.size(); }
 
     // Function returns "true" if both vectors have the same length.
 	// TODO: Quite expensive operation, maybe replace with something faster.
@@ -100,7 +102,7 @@ public:
 	}
 
 	// Resizes the content to fit the given size, optionally also clearing the content.
-	void Resize(int new_size, bool fillzero = true) {
+	void Resize(index_t new_size, bool fillzero = true) {
 		if(fillzero) {
 			data.clear();
 		}
@@ -138,15 +140,15 @@ using Vector = VectorView;
 class Matrix : public VectorView
 {
 private:
-    int nrows;                  ///< number of rows
-    int ncols;                  ///< number of columns
+	index_t nrows; ///< number of rows
+    index_t ncols; ///< number of columns
 
 public:
     // Default constructor.
     Matrix() : VectorView(), nrows(0), ncols(0) { }
 
     // Default constructor creates matrix filled by zeros.
-    Matrix(int numrows, int numcols) : VectorView(numrows*numcols), nrows(numrows), ncols(numcols) { }
+    Matrix(index_t numrows, index_t numcols) : VectorView(numrows*numcols), nrows(numrows), ncols(numcols) { }
 
     // Copy constructor. Note, user can copy a matrix but not a vector.
     Matrix(const Matrix & mat) : VectorView(mat), nrows(mat.nrows), ncols(mat.ncols) { }
@@ -167,7 +169,7 @@ public:
     }
 
     // Resizes this matrix and optionally clears the contents.
-    void Resize(int numrows, int numcols, bool fillzero = true)
+	void Resize(index_t numrows, index_t numcols, bool fillzero = true)
     {
 		VectorView::Resize(numrows*numcols, fillzero);
         nrows = numrows;
@@ -188,7 +190,7 @@ public:
     // Indexing operator provides read only access to matrix element.
 	// Using a call operator here for unified element access with
 	// single-dimensional indices (e.g. (i)) in parent class.
-    const double & operator()(int r, int c) const
+	const double& operator()(index_t r, index_t c) const
     {
 #ifndef NDEBUG
         if (!((static_cast<unsigned>(r) < static_cast<unsigned>(nrows)) &&
@@ -201,7 +203,7 @@ public:
     // Indexing operator provides read/write access to matrix element.
 	// Using a call operator here for unified element access with
 	// single-dimensional indices (e.g. (i)) in parent class.
-    double & operator()(int r, int c)
+	double& operator()(index_t r, index_t c)
     {
 #ifndef NDEBUG
         if (!((static_cast<unsigned>(r) < static_cast<unsigned>(nrows)) &&
@@ -212,13 +214,13 @@ public:
     }
 
     // Returns the number of rows of this matrix.
-    int NRows() const { return nrows; }
+	index_t NRows() const { return nrows; }
 
 	// Returns the number of columns of this matrix.
-    int NCols() const { return ncols; }
+	index_t NCols() const { return ncols; }
 
 	// Returns the total number of elements of this matrix.
-    int Size()  const { return nrows*ncols;  }
+	index_t Size() const { return nrows * ncols; }
 
     // Returns "true" if both matrices have the same number of rows and columns, respectively.
     bool SameSize(const Matrix & mat) const

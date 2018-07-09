@@ -55,8 +55,8 @@ inline point2d_t Sub2Glo(const point2d_t & query_point,
                          const point2d_t & subdomain_pos,
                          const size2d_t  & subdomain_size)
 {
-    const long x = query_point.x;
-    const long y = query_point.y;
+    const auto x = query_point.x;
+    const auto y = query_point.y;
 #ifndef NDEBUG
     if (!((static_cast<size_t>(x) < static_cast<size_t>(subdomain_size.x)) &&
           (static_cast<size_t>(y) < static_cast<size_t>(subdomain_size.y))))

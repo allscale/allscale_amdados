@@ -139,14 +139,14 @@ using context_domain_t = ::allscale::api::user::data::Grid<SubdomainContext,2>;
  * Function converts 2D point to a flat 1D index for extended (!!!) subdomain.
  * Index layout ('y' is faster than 'x') matches to row-major Matrix class.
  */
-inline int sub2ind(int x, int y, const size2d_t & layer_size)
+inline index_t sub2ind(index_t x, index_t y, const size2d_t & layer_size)
 {
 #ifndef NDEBUG
     if (!((static_cast<size_t>(x) < static_cast<size_t>(layer_size.x + 2)) &&
           (static_cast<size_t>(y) < static_cast<size_t>(layer_size.y + 2))))
         assert_true(0);
 #endif
-    return (x * static_cast<int>(layer_size.y + 2) + y);
+    return (x * (layer_size.y + 2) + y);
 }
 
 /**
@@ -210,9 +210,9 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
                      const Matrix & H, const point_array_t & sensors,
                      const size2d_t & layer_size)
 {
-    const int n = observations.NCols();
+    const index_t n = observations.NCols();
     assert_eq(z.Size(), n);
-    for (int i = 0; i < n; ++i) { z(i) = observations(timestep, i); }
+    for (index_t i = 0; i < n; ++i) { z(i) = observations(timestep, i); }
 
     (void) H; (void) sensors; (void) layer_size;
 #ifdef AMDADOS_DEBUGGING
@@ -220,7 +220,7 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
     // Mind the extended subdomain: one extra point layer on either side.
     assert_true(H.NCols() == (layer_size.x + 2) * (layer_size.y + 2));
     Matrix subfield(layer_size.x + 2, layer_size.y + 2);
-    for (int i = 0; i < static_cast<int>(sensors.size()); ++i) {
+    for (index_t i = 0; i < static_cast<index_t>(sensors.size()); ++i) {
         subfield(sensors[i].x + 1, sensors[i].y + 1) =
             observations(timestep, i);
     }
@@ -239,8 +239,8 @@ void ApplyBoundaryCondition(domain_t & state, const point2d_t & idx)
     subdomain_t &  subdom = state[idx];
     const size2d_t subdom_size = subdom.getActiveLayerSize();
 
-    const long Nx = state.size().x, Sx = subdom_size.x;
-    const long Ny = state.size().y, Sy = subdom_size.y;
+    const index_t Nx = state.size().x, Sx = subdom_size.x;
+    const index_t Ny = state.size().y, Sy = subdom_size.y;
 
     // Set the leftmost and rightmost.
     if (idx.x == 0)      subdom.setBoundary(Direction::Left,  double_array_t(Sy, 0.0));
@@ -263,10 +263,10 @@ void InitialCovar(const Configuration & conf, Matrix & P)
     const double covar_radius = conf.asDouble("model_ini_covar_radius");
     const double sigma_x = std::max(covar_radius, 1.0);
     const double sigma_y = std::max(covar_radius, 1.0);
-    const int Rx = Round(std::ceil(4.0 * sigma_x));
-    const int Ry = Round(std::ceil(4.0 * sigma_y));
-    const int Sx = conf.asInt("subdomain_x");
-    const int Sy = conf.asInt("subdomain_y");
+    const index_t Rx = Round(std::ceil(4.0 * sigma_x));
+    const index_t Ry = Round(std::ceil(4.0 * sigma_y));
+    const index_t Sx = conf.asInt("subdomain_x");
+    const index_t Sy = conf.asInt("subdomain_y");
     const size2d_t layer_size(Sx, Sy);      // size at the finest resolution
 
     assert_true(P.IsSquare());
@@ -274,13 +274,13 @@ void InitialCovar(const Configuration & conf, Matrix & P)
 
     // Mind the extended subdomain: one extra point layer on either side.
     Fill(P, 0.0);
-    for (int u = 0; u < Sx + 2; ++u) {
-    for (int v = 0; v < Sy + 2; ++v) {
-        int i = sub2ind(u, v, layer_size);
+    for (index_t u = 0; u < Sx + 2; ++u) {
+    for (index_t v = 0; v < Sy + 2; ++v) {
+        index_t i = sub2ind(u, v, layer_size);
         double dx = 0.0, dy = 0.0;
-        for (int x = u-Rx; x <= u+Rx; ++x) { if ((0 <= x) && (x < Sx + 2)) {
-        for (int y = v-Ry; y <= v+Ry; ++y) { if ((0 <= y) && (y < Sy + 2)) {
-            int j = sub2ind(x, y, layer_size);
+        for (index_t x = u-Rx; x <= u+Rx; ++x) { if ((0 <= x) && (x < Sx + 2)) {
+        for (index_t y = v-Ry; y <= v+Ry; ++y) { if ((0 <= y) && (y < Sy + 2)) {
+            index_t j = sub2ind(x, y, layer_size);
             if (i <= j) {
                 dx = (u - x) / sigma_x;
                 dy = (v - y) / sigma_y;
@@ -301,7 +301,7 @@ void ComputeQ(const Configuration & conf, Matrix & Q)
 
     assert_true(Q.IsSquare());
     Fill(Q, 0.0);
-    for (int k = 0; k < Q.NRows(); ++k) {
+    for (index_t k = 0; k < Q.NRows(); ++k) {
         Q(k,k) = 1.0 + model_noise_Q * distrib(gen);    // always >= 1
     }
 }
@@ -317,7 +317,7 @@ void ComputeR(const Configuration & conf, Matrix & R)
 
     assert_true(R.IsSquare());
     Fill(R, 0.0);
-    for (int k = 0; k < R.NRows(); ++k) {
+    for (index_t k = 0; k < R.NRows(); ++k) {
         R(k,k) = 1.0 + model_noise_R * distrib(gen);    // always >= 1
     }
 }
@@ -334,13 +334,11 @@ void ComputeH(const point_array_t & sensors, const size2d_t & layer_size,
         return;
     }
     // Mind the extended subdomain: one extra point layer on either side.
-    assert_true(H.NRows() == static_cast<int>(sensors.size()));
+    assert_true(H.NRows() == static_cast<index_t>(sensors.size()));
     assert_true(H.NCols() == (layer_size.x + 2) * (layer_size.y + 2));
     Fill(H, 0.0);
     for (size_t k = 0; k < sensors.size(); ++k) {
-        int x = sensors[k].x;
-        int y = sensors[k].y;
-        H(static_cast<int>(k), sub2ind(x + 1, y + 1, layer_size)) = 1.0;
+        H(k, sub2ind(sensors[k].x + 1, sensors[k].y + 1, layer_size)) = 1.0;
     }
 }
 
@@ -371,8 +369,8 @@ void InverseModelMatrix(Matrix & B, const Configuration & conf,
                         const flow_t & flow, const size2d_t & layer_size,
                         unsigned resolution, int dt_divisor = 0)
 {
-    const long Sx = layer_size.x;
-    const long Sy = layer_size.y;
+    const index_t Sx = layer_size.x;
+    const index_t Sy = layer_size.y;
 
     assert_true((B.NRows() == B.NCols()) && (B.NCols() == (Sx + 2)*(Sy + 2)));
 
@@ -398,9 +396,9 @@ void InverseModelMatrix(Matrix & B, const Configuration & conf,
     // differently. The border values are passed through as is (B(i,i) = 1).
     // Mind the extended subdomain: one extra point layer on either side.
     MakeIdentityMatrix(B);
-    for (int x = 1; x <= Sx; ++x) {
-    for (int y = 1; y <= Sy; ++y) {
-        int i = sub2ind(x, y, layer_size);
+    for (index_t x = 1; x <= Sx; ++x) {
+    for (index_t y = 1; y <= Sy; ++y) {
+        index_t i = sub2ind(x, y, layer_size);
         B(i,i) = 1.0 + 2*(rho_x + rho_y);
         B(i,sub2ind(x-1, y, layer_size)) = - vx - rho_x;
         B(i,sub2ind(x+1, y, layer_size)) = + vx - rho_x;
@@ -427,10 +425,10 @@ void MatrixFromAllscale(Matrix & field,
                         const domain_t & dom, const point2d_t & idx)
 {
     const unsigned layer_no = dom[idx].getActiveLayer();
-    const long Nx = dom.size().x;
-    const long Ny = dom.size().y;
-    const long Sx = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().x;
-    const long Sy = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().y;
+    const index_t Nx = dom.size().x;
+    const index_t Ny = dom.size().y;
+    const index_t Sx = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().x;
+    const index_t Sy = const_cast<subdomain_t&>(dom[idx]).getActiveLayerSize().y;
 
     // Copy the internal points of a subdomain to the (internal part of) output
     // field. Mind the extended subdomain: an extra point layer on either side.
@@ -450,9 +448,9 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x-1, idx.y}].data.getBoundary(layer_no, Direction::Right);
 #endif
         assert_true(boundary.size() == size_t(Sy));
-        for (int y = 0; y < Sy; ++y) field(0, y+1) = boundary[y];
+        for (index_t y = 0; y < Sy; ++y) field(0, y+1) = boundary[y];
     } else {
-        for (int y = 0; y < Sy; ++y) field(0, y+1) = field(2, y+1);
+        for (index_t y = 0; y < Sy; ++y) field(0, y+1) = field(2, y+1);
     }
 
     // Set up right-most points from the left boundary of the right peer.
@@ -463,9 +461,9 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x+1, idx.y}].data.getBoundary(layer_no, Direction::Left);
 #endif
         assert_true(boundary.size() == size_t(Sy));
-        for (int y = 0; y < Sy; ++y) field(Sx+1, y+1) = boundary[y];
+        for (index_t y = 0; y < Sy; ++y) field(Sx+1, y+1) = boundary[y];
     } else {
-        for (int y = 0; y < Sy; ++y) field(Sx+1, y+1) = field(Sx-1, y+1);
+        for (index_t y = 0; y < Sy; ++y) field(Sx+1, y+1) = field(Sx-1, y+1);
     }
 
     // Set up bottom-most points from the top boundary of the bottom peer.
@@ -476,9 +474,9 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x, idx.y-1}].data.getBoundary(layer_no, Direction::Up);
 #endif
         assert_true(boundary.size() == size_t(Sx));
-        for (int x = 0; x < Sx; ++x) field(x+1, 0) = boundary[x];
+        for (index_t x = 0; x < Sx; ++x) field(x+1, 0) = boundary[x];
     } else {
-        for (int x = 0; x < Sx; ++x) field(x+1, 0) = field(x+1, 2);
+        for (index_t x = 0; x < Sx; ++x) field(x+1, 0) = field(x+1, 2);
     }
 
     // Set up top-most points from the bottom boundary of the top peer.
@@ -489,9 +487,9 @@ void MatrixFromAllscale(Matrix & field,
         boundary = dom[{idx.x, idx.y+1}].data.getBoundary(layer_no, Direction::Down);
 #endif
         assert_true(boundary.size() == size_t(Sx));
-        for (int x = 0; x < Sx; ++x) field(x+1, Sy+1) = boundary[x];
+        for (index_t x = 0; x < Sx; ++x) field(x+1, Sy+1) = boundary[x];
     } else {
-        for (int x = 0; x < Sx; ++x) field(x+1, Sy+1) = field(x+1, Sy-1);
+        for (index_t x = 0; x < Sx; ++x) field(x+1, Sy+1) = field(x+1, Sy-1);
     }
 
     // The corner points are not used in finite-difference scheme applied to
@@ -572,7 +570,7 @@ const subdomain_t & SubdomainRoutineKalman(
     // covariance matrices; (3) compute the prior state estimation.
     if (sub_iter == 0) {
         // Get the current sensor measurements.
-        GetObservations(ctx.z, observations, t_discrete,
+        GetObservations(ctx.z, observations, static_cast<int>(t_discrete),
                         ctx.H, sensors, layer_size);
 
         // Covariance matrices can change over time.
@@ -653,7 +651,7 @@ const subdomain_t & SubdomainRoutineNoSensors(
 
     // Prior estimation.
     InverseModelMatrix(ctx.B, conf, ctx.flow, layer_size,
-                       resolution, Nsubiter);
+                       resolution, static_cast<int>(Nsubiter));
     ctx.tmp_field = ctx.field;              // copy state into a temporary one
     ctx.LU.Init(ctx.B);                     // decompose: B = L*U
     ctx.LU.Solve(ctx.field, ctx.tmp_field); // new_field = B^{-1}*old_field
@@ -719,7 +717,7 @@ void RunDataAssimilation(const Configuration         & conf,
 
         // If there is at least one sensor in a subdomain, then we operate at
         // the fine resolution, otherwise at the low resolution.
-        const int Nsensors = static_cast<int>(sensors[idx].size());
+        const index_t Nsensors = static_cast<index_t>(sensors[idx].size());
         if (Nsensors > 0) {
             state_field[idx].setActiveLayer(LayerFine);
              temp_field[idx].setActiveLayer(LayerFine);
@@ -729,9 +727,9 @@ void RunDataAssimilation(const Configuration         & conf,
         }
 
         const size2d_t layer_size = state_field[idx].getActiveLayerSize();
-        const int Sx = static_cast<int>(layer_size.x);
-        const int Sy = static_cast<int>(layer_size.y);
-        const int sub_prob_size = (Sx + 2) * (Sy + 2);
+        const index_t Sx = layer_size.x;
+        const index_t Sy = layer_size.y;
+        const index_t sub_prob_size = (Sx + 2) * (Sy + 2);
 
         // Note, we initialize the Kalman filter matrices only in the
         // presence of sensor(s), otherwise they are useless. Also,
@@ -807,10 +805,10 @@ void RunDataAssimilation(const Configuration         & conf,
 		Entry stream_entry = file_manager.createEntry(filename, Mode::Text);
 		auto out_stream = file_manager.openOutputStream(stream_entry);
 
-		for(int i = 0; i < GridSize.x; ++i) {
-			for(int j = 0; j < GridSize.y; ++j) {
+		for(index_t i = 0; i < GridSize.x; ++i) {
+			for(index_t j = 0; j < GridSize.y; ++j) {
 				const point2d_t idx{ i,j };
-				const int t = Nt - 1;
+				const size_t t = Nt - 1;
 				subdomain_t temp;
 				temp = state_field[idx];
 				while(temp.getActiveLayer() != LayerFine) {
@@ -842,8 +840,8 @@ void InitDependentParams(Configuration & conf)
     subdomain_t temp;
     temp.setActiveLayer(LayerFine);
     const size2d_t fine_size = temp.getActiveLayerSize();
-    const int Sx = static_cast<int>(fine_size.x);   // subdomain size x
-    const int Sy = static_cast<int>(fine_size.y);   // subdomain size y
+    const index_t Sx = fine_size.x;   // subdomain size x
+    const index_t Sy = fine_size.y;   // subdomain size y
 
     // Compute the size ratio between fine and low resolution layers.
     // Same ratio is expected in both dimensions.
@@ -874,13 +872,13 @@ void InitDependentParams(Configuration & conf)
                         << "subdomain_y mismatch" << std::endl;
 
     const point2d_t grid_size = GetGridSize(conf);
-    const int nx = grid_size.x * Sx;                // global X-size
-    const int ny = grid_size.y * Sy;                // global Y-size
+    const index_t nx = grid_size.x * Sx;                // global X-size
+    const index_t ny = grid_size.y * Sy;                // global Y-size
 
     const double D = conf.asDouble("diffusion_coef");
     assert_true(D > 0.0);
 
-    conf.SetInt("global_problem_size", nx * ny);
+    conf.SetInt("global_problem_size", static_cast<int>(nx * ny));
     const double dx = conf.asDouble("domain_size_x") / (nx - 1);
     const double dy = conf.asDouble("domain_size_y") / (ny - 1);
     assert_true((dx > 0) && (dy > 0));

@@ -57,16 +57,16 @@ namespace {
         // --- initialize sensor positions ---
 
         // Function scales a coordinate from [0..1] range to specified size.
-        auto ScaleCoord = [](double v, int size) -> int {
-            int i = static_cast<int>(std::floor(v * size));
-            i = std::min(std::max(i, 0), size - 1);
+        auto ScaleCoord = [](double v, index_t size) -> index_t {
+            index_t i = static_cast<index_t>(std::floor(v * size));
+            i = std::min(std::max(i, index_t(0)), size - 1);
             return i;
         };
 
         // Global (whole domain) sizes.
-        const int Nx = conf.asInt("subdomain_x") * GridSize.x;
-        const int Ny = conf.asInt("subdomain_y") * GridSize.y;
-        const int problem_size = Nx * Ny;
+        const auto Nx = conf.asInt("subdomain_x") * GridSize.x;
+        const auto Ny = conf.asInt("subdomain_y") * GridSize.y;
+        const auto problem_size = Nx * Ny;
 
         // Generate pseudo-random sensor locations.
         const int Nobs = std::max(Round(fraction * problem_size), 1);
@@ -81,8 +81,8 @@ namespace {
 
         // Save (scaled) sensor locations to temporary storage.
         for (int k = 0; k < Nobs; ++k) {
-            int xk = ScaleCoord(x[k], Nx);
-            int yk = ScaleCoord(y[k], Ny);
+            auto xk = ScaleCoord(x[k], Nx);
+            auto yk = ScaleCoord(y[k], Ny);
             // insert sensor position
             point2d_t pt{xk,yk};
             point2d_t idx = allscale::utils::elementwiseDivision(pt,finest_layer_size);
@@ -92,7 +92,7 @@ namespace {
 			locations[idx].push_back(pt % finest_layer_size);
         }
 
-		int Nt = conf.asUInt("Nt");
+		index_t Nt = static_cast<index_t>(conf.asUInt("Nt"));
 
 		assert_eq(sensors.size(), observations.size());
 		assert_eq(sensors.size(), GridSize);
@@ -118,7 +118,7 @@ namespace {
 
 			if(num_observations > 0) {
 				// fill in observation values
-				int t_step = Nt / num_observations;
+				index_t t_step = Nt / num_observations;
 				for(std::size_t cnt = 0; cnt < num_observations; cnt++) {
 					m(t_step * cnt, cnt) = 1.0f;
 				}
@@ -156,7 +156,7 @@ void ScenarioBenchmark(const std::string& config_file, int problem_size)
     conf.PrintParameters();
 
     // print some status info for the user
-    int steps = conf.asUInt("Nt");
+    int steps = static_cast<int>(conf.asUInt("Nt"));
 	std::cout << "Running benchmark based on configuration file \"" << config_file;
 	std::cout << "\" with domain size " << problem_size << "x" << problem_size;
 	std::cout << " for " << steps << " time steps ...\n";
