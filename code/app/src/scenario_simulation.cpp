@@ -698,7 +698,7 @@ void RunDataAssimilation(const Configuration         & conf,
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
     const size_t    Nt = conf.asUInt("Nt");
     const size_t    Nsubiter = conf.asUInt("num_sub_iter");
-	__attribute__((unused)) const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
+	//const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
     domain_t         temp_field(GridSize);  // grid of sub-domains
@@ -770,7 +770,7 @@ void RunDataAssimilation(const Configuration         & conf,
         // Monitoring.
         ::allscale::api::user::algorithm::observer(
             // Time filter: choose time-slices evenly distributed on time axis.
-            [=](__attribute__((unused)) time_t t) {
+            [=](time_t /*t*/) {
                 // Filter out the first sub-iteration, skip the others.
                 //if ((t % time_t(Nsubiter)) != 0) return false;
                 //t /= time_t(Nsubiter);
@@ -780,7 +780,7 @@ void RunDataAssimilation(const Configuration         & conf,
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
-            [&,Nsubiter](__attribute__((unused)) time_t t, __attribute__((unused)) const point2d_t & idx, __attribute__((unused)) const subdomain_t & cell) {
+            [&,Nsubiter](time_t /*t*/, const point2d_t & /*idx*/, const subdomain_t & /*cell*/) {
 //                t /= time_t(Nsubiter);
 //                // Important: we save field at the finest resolution.
 //                subdomain_t temp;
