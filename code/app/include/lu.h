@@ -41,7 +41,7 @@ void Init(const Matrix & M)
     const int N = M.NRows();     // problem size; M is square
 
 	m_LU = M;                    // copy input matrix, then do decomposition
-	m_Perm.resize(N);            // resize the permutation vector accordingly
+	m_Perm.resize((unsigned)N);  // resize the permutation vector accordingly
 
 	auto & A = m_LU;             // short-hand alias for LU
 	int  * P = m_Perm.data();    // short-hand alias for permutation
@@ -65,7 +65,7 @@ void Init(const Matrix & M)
         }
 
         // Check the matrix is not singular.
-        assert_gt(maxA, TINY) << "LU failed, max. element: " << maxA;
+        assert_true(maxA > TINY) << "LU failed, max. element: " << maxA;
 
         // Pivoting P: the diagonal element A[P[i]][i] takes
         // the maximum value in i-th column.

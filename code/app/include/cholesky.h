@@ -53,7 +53,7 @@ void Init(const Matrix & A)
         for (int k = i - 1; k >= 0; k--) { sum -= L(i,k) * L(j,k); }
 
         if (i == j) {
-            assert_gt(sum, TINY) << "Cholesky failed, sum: " << sum;
+            assert_true(sum > TINY) << "Cholesky failed, sum: " << sum;
             L(i,i) = std::sqrt(sum);
         } else {
             L(j,i) = sum / L(i,i);

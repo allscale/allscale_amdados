@@ -1335,17 +1335,7 @@ auxlib::eig_pair
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_ignore(vals);
-    arma_ignore(vecs);
-    arma_ignore(vecs_on);
-    arma_ignore(A_expr);
-    arma_ignore(B_expr);
-    arma_stop_logic_error("eig_pair() for complex matrices not available due to crippled LAPACK");
-    return false;
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef typename T1::pod_type     T;
     typedef typename std::complex<T> eT;
@@ -1831,6 +1821,8 @@ auxlib::chol_band(Mat< std::complex<T> >& X, const uword KD, const uword layout)
   
   #if defined(ARMA_CRIPPLED_LAPACK)
     {
+    arma_extra_debug_print("auxlib::chol_band(): redirecting to auxlib::chol() due to crippled LAPACK");
+    
     arma_ignore(KD);
     
     return auxlib::chol(X, layout);
@@ -1885,6 +1877,61 @@ auxlib::chol_band_common(Mat<eT>& X, const uword KD, const uword layout)
     arma_ignore(layout);
     
     arma_stop_logic_error("chol(): use of LAPACK must be enabled");
+    return false;
+    }
+  #endif
+  }
+
+
+//
+// hessenberg decomposition
+template<typename eT, typename T1>
+inline
+bool
+auxlib::hess(Mat<eT>& H, const Base<eT,T1>& X, Col<eT>& tao)
+  {
+  arma_extra_debug_sigprint();
+  
+  #if defined(ARMA_USE_LAPACK)
+    {
+    H = X.get_ref();
+    
+    arma_debug_check( (H.is_square() == false), "hess(): given matrix must be square sized" );
+    
+    if(H.is_empty())
+      {
+      return true;
+      }
+    
+    arma_debug_assert_blas_size(H);
+    
+    if(H.n_rows > 2)
+      {
+      tao.set_size(H.n_rows-1);
+      
+      blas_int  n      = blas_int(H.n_rows);
+      blas_int  ilo    = 1;
+      blas_int  ihi    = blas_int(H.n_rows);
+      blas_int  lda    = blas_int(H.n_rows);
+      blas_int  lwork  = blas_int(H.n_rows) * 64;
+      blas_int  info   = 0;
+      
+      podarray<eT> work(static_cast<uword>(lwork));
+      
+      arma_extra_debug_print("lapack::gehrd()");
+      lapack::gehrd(&n, &ilo, &ihi, H.memptr(), &lda, tao.memptr(), work.memptr(), &lwork, &info);
+      
+      return (info == 0);
+      }
+    
+    return true;
+    }
+  #else
+    {
+    arma_ignore(H);
+    arma_ignore(X);
+    arma_ignore(tao);
+    arma_stop_logic_error("hess(): use of LAPACK must be enabled");
     return false;
     }
   #endif
@@ -2734,13 +2781,7 @@ auxlib::svd_dc(Col<T>& S, const Base<std::complex<T>, T1>& X, uword& X_n_rows, u
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_extra_debug_print("auxlib::svd_dc(): redirecting to auxlib::svd() due to crippled LAPACK");
-    
-    return auxlib::svd(S, X, X_n_rows, X_n_cols);
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef std::complex<T> eT;
     
@@ -2895,13 +2936,7 @@ auxlib::svd_dc(Mat< std::complex<T> >& U, Col<T>& S, Mat< std::complex<T> >& V, 
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_extra_debug_print("auxlib::svd_dc(): redirecting to auxlib::svd() due to crippled LAPACK");
-    
-    return auxlib::svd(U, S, V, X);
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef std::complex<T> eT;
     
@@ -3038,13 +3073,7 @@ auxlib::svd_dc_econ(Mat< std::complex<T> >& U, Col<T>& S, Mat< std::complex<T> >
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_extra_debug_print("auxlib::svd_dc_econ(): redirecting to auxlib::svd_econ() due to crippled LAPACK");
-    
-    return auxlib::svd_econ(U, S, V, X, 'b');
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef std::complex<T> eT;
     
@@ -3313,16 +3342,7 @@ auxlib::solve_square_refine(Mat< std::complex<typename T1::pod_type> >& out, typ
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_ignore(out_rcond);
-    arma_ignore(equilibrate);
-    
-    arma_debug_warn("solve(): refinement and/or equilibration not done due to crippled LAPACK");
-    
-    return auxlib::solve_square_fast(out, A, B_expr);
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef typename T1::pod_type     T;
     typedef typename std::complex<T> eT;
@@ -3605,15 +3625,7 @@ auxlib::solve_approx_svd(Mat< std::complex<typename T1::pod_type> >& out, Mat< s
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_ignore(out);
-    arma_ignore(A);
-    arma_ignore(B_expr);
-    arma_debug_warn("solve() for rank-deficient matrices not available due to crippled LAPACK");
-    return false;
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef typename T1::pod_type     T;
     typedef typename std::complex<T> eT;
@@ -3797,6 +3809,8 @@ auxlib::solve_band_fast(Mat< std::complex<typename T1::pod_type> >& out, Mat< st
   
   #if defined(ARMA_CRIPPLED_LAPACK)
     {
+    arma_extra_debug_print("auxlib::solve_band_fast(): redirecting to auxlib::solve_square_fast() due to crippled LAPACK");
+    
     arma_ignore(KL);
     arma_ignore(KU);
     
@@ -3985,6 +3999,8 @@ auxlib::solve_band_refine(Mat< std::complex<typename T1::pod_type> >& out, typen
   
   #if defined(ARMA_CRIPPLED_LAPACK)
     {
+    arma_extra_debug_print("auxlib::solve_band_refine(): redirecting to auxlib::solve_square_refine() due to crippled LAPACK");
+    
     arma_ignore(KL);
     arma_ignore(KU);
     
@@ -4069,8 +4085,282 @@ auxlib::solve_band_refine(Mat< std::complex<typename T1::pod_type> >& out, typen
     arma_ignore(out);
     arma_ignore(out_rcond);
     arma_ignore(A);
+    arma_ignore(KL);
+    arma_ignore(KU);
     arma_ignore(B_expr);
     arma_ignore(equilibrate);
+    arma_stop_logic_error("solve(): use of LAPACK must be enabled");
+    return false;
+    }
+  #endif
+  }
+
+
+
+//! solve a system of linear equations via Gaussian elimination with partial pivoting (real tridiagonal band matrix)
+template<typename T1>
+inline
+bool
+auxlib::solve_tridiag_fast(Mat<typename T1::pod_type>& out, Mat<typename T1::pod_type>& A, const Base<typename T1::pod_type,T1>& B_expr)
+  {
+  arma_extra_debug_sigprint();
+  
+  return auxlib::solve_tridiag_fast_common(out, A, B_expr);
+  }
+
+
+
+//! solve a system of linear equations via Gaussian elimination with partial pivoting (complex tridiagonal band matrix)
+template<typename T1>
+inline
+bool
+auxlib::solve_tridiag_fast(Mat< std::complex<typename T1::pod_type> >& out, Mat< std::complex<typename T1::pod_type> >& A, const Base< std::complex<typename T1::pod_type>,T1>& B_expr)
+  {
+  arma_extra_debug_sigprint();
+  
+  #if defined(ARMA_CRIPPLED_LAPACK)
+    {
+    arma_extra_debug_print("auxlib::solve_band_fast(): redirecting to auxlib::solve_square_fast() due to crippled LAPACK");
+    
+    return auxlib::solve_square_fast(out, A, B_expr);
+    }
+  #else
+    {
+    return auxlib::solve_tridiag_fast_common(out, A, B_expr);
+    }
+  #endif
+  }
+
+
+
+//! solve a system of linear equations via Gaussian elimination with partial pivoting (tridiagonal band matrix)
+template<typename T1>
+inline
+bool
+auxlib::solve_tridiag_fast_common(Mat<typename T1::elem_type>& out, const Mat<typename T1::elem_type>& A, const Base<typename T1::elem_type,T1>& B_expr)
+  {
+  arma_extra_debug_sigprint();
+  
+  #if defined(ARMA_USE_LAPACK)
+    {
+    typedef typename T1::elem_type eT;
+    
+    out = B_expr.get_ref();
+    
+    const uword B_n_rows = out.n_rows;
+    const uword B_n_cols = out.n_cols;
+    
+    arma_debug_check( (A.n_rows != B_n_rows), "solve(): number of rows in the given matrices must be the same" );
+    
+    if(A.is_empty() || out.is_empty())
+      {
+      out.zeros(A.n_rows, B_n_cols);
+      return true;
+      }
+    
+    Mat<eT> tridiag;
+    band_helper::extract_tridiag(tridiag, A);
+    
+    arma_debug_assert_blas_size(tridiag, out);
+    
+    blas_int n    = blas_int(A.n_rows);
+    blas_int nrhs = blas_int(B_n_cols);
+    blas_int ldb  = blas_int(B_n_rows);
+    blas_int info = blas_int(0);
+    
+    arma_extra_debug_print("lapack::gtsv()");
+    lapack::gtsv<eT>(&n, &nrhs, tridiag.colptr(0), tridiag.colptr(1), tridiag.colptr(2), out.memptr(), &ldb, &info);
+    
+    return (info == 0);
+    }
+  #else
+    {
+    arma_ignore(out);
+    arma_ignore(A);
+    arma_ignore(B_expr);
+    arma_stop_logic_error("solve(): use of LAPACK must be enabled");
+    return false;
+    }
+  #endif
+  }
+
+
+
+//! solve a system of linear equations via LU decomposition with refinement (real tridiagonal band matrix)
+template<typename T1>
+inline
+bool
+auxlib::solve_tridiag_refine(Mat<typename T1::pod_type>& out, typename T1::pod_type& out_rcond, Mat<typename T1::pod_type>& A, const Base<typename T1::pod_type,T1>& B_expr)
+  {
+  arma_extra_debug_sigprint();
+  
+  #if defined(ARMA_USE_LAPACK)
+    {
+    typedef typename T1::pod_type eT;
+    
+    Mat<eT> B = B_expr.get_ref();  // B is overwritten
+    
+    arma_debug_check( (A.n_rows != B.n_rows), "solve(): number of rows in the given matrices must be the same" );
+      
+    if(A.is_empty() || B.is_empty())
+      {
+      out.zeros(A.n_rows, B.n_cols);
+      return true;
+      }
+    
+    Mat<eT> tridiag;
+    band_helper::extract_tridiag(tridiag, A);
+    
+    const uword N = A.n_rows;
+    
+    out.set_size(N, B.n_cols);
+    
+    arma_debug_assert_blas_size(out, B);
+    
+    char     fact  = 'N'; 
+    char     trans = 'N';
+    blas_int n     = blas_int(N);
+    blas_int nrhs  = blas_int(B.n_cols);
+    blas_int ldb   = blas_int(B.n_rows);
+    blas_int ldx   = blas_int(N);
+    blas_int info  = blas_int(0);
+    eT       rcond = eT(0);
+    
+    podarray<eT>         DLF(  N);
+    podarray<eT>          DF(  N);
+    podarray<eT>         DUF(  N);
+    podarray<eT>         DU2(  N);
+    podarray<blas_int>  IPIV(  N);
+    podarray<eT>        FERR(  B.n_cols);
+    podarray<eT>        BERR(  B.n_cols);
+    podarray<eT>        WORK(3*N);
+    podarray<blas_int> IWORK(  N);
+    
+    arma_extra_debug_print("lapack::gtsvx()");
+    lapack::gtsvx
+      (
+      &fact, &trans, &n, &nrhs,
+      tridiag.colptr(0), tridiag.colptr(1), tridiag.colptr(2),
+       DLF.memptr(),
+        DF.memptr(),
+       DUF.memptr(),
+       DU2.memptr(),
+      IPIV.memptr(),
+         B.memptr(), &ldb,
+       out.memptr(), &ldx,
+      &rcond,
+       FERR.memptr(),
+       BERR.memptr(),
+       WORK.memptr(),
+      IWORK.memptr(),
+      &info
+      );
+    
+    out_rcond = rcond;
+    
+    return (info == 0);
+    }
+  #else
+    {
+    arma_ignore(out);
+    arma_ignore(out_rcond);
+    arma_ignore(A);
+    arma_ignore(B_expr);
+    arma_stop_logic_error("solve(): use of LAPACK must be enabled");
+    return false;
+    }
+  #endif
+  }
+
+
+
+//! solve a system of linear equations via LU decomposition with refinement (complex tridiagonal band matrix)
+template<typename T1>
+inline
+bool
+auxlib::solve_tridiag_refine(Mat< std::complex<typename T1::pod_type> >& out, typename T1::pod_type& out_rcond, Mat< std::complex<typename T1::pod_type> >& A, const Base<std::complex<typename T1::pod_type>,T1>& B_expr)
+  {
+  arma_extra_debug_sigprint();
+  
+  #if defined(ARMA_CRIPPLED_LAPACK)
+    {
+    arma_extra_debug_print("auxlib::solve_tridiag_refine(): redirecting to auxlib::solve_square_refine() due to crippled LAPACK");
+    
+    return auxlib::solve_square_refine(out, out_rcond, A, B_expr, false);
+    }
+  #elif defined(ARMA_USE_LAPACK)
+    {
+    typedef typename T1::pod_type     T;
+    typedef typename std::complex<T> eT;
+    
+    Mat<eT> B = B_expr.get_ref();  // B is overwritten
+    
+    arma_debug_check( (A.n_rows != B.n_rows), "solve(): number of rows in the given matrices must be the same" );
+      
+    if(A.is_empty() || B.is_empty())
+      {
+      out.zeros(A.n_rows, B.n_cols);
+      return true;
+      }
+    
+    Mat<eT> tridiag;
+    band_helper::extract_tridiag(tridiag, A);
+    
+    const uword N = A.n_rows;
+    
+    out.set_size(N, B.n_cols);
+    
+    arma_debug_assert_blas_size(out, B);
+    
+    char     fact  = 'N'; 
+    char     trans = 'N';
+    blas_int n     = blas_int(N);
+    blas_int nrhs  = blas_int(B.n_cols);
+    blas_int ldb   = blas_int(B.n_rows);
+    blas_int ldx   = blas_int(N);
+    blas_int info  = blas_int(0);
+    T        rcond = T(0);
+    
+    podarray<eT>         DLF(  N);
+    podarray<eT>          DF(  N);
+    podarray<eT>         DUF(  N);
+    podarray<eT>         DU2(  N);
+    podarray<blas_int>  IPIV(  N);
+    podarray< T>        FERR(  B.n_cols);
+    podarray< T>        BERR(  B.n_cols);
+    podarray<eT>        WORK(2*N);
+    podarray< T>       RWORK(  N);
+    
+    arma_extra_debug_print("lapack::cx_gtsvx()");
+    lapack::cx_gtsvx
+      (
+      &fact, &trans, &n, &nrhs,
+      tridiag.colptr(0), tridiag.colptr(1), tridiag.colptr(2),
+        DLF.memptr(),
+         DF.memptr(),
+        DUF.memptr(),
+        DU2.memptr(),
+       IPIV.memptr(),
+          B.memptr(), &ldb,
+        out.memptr(), &ldx,
+      &rcond,
+       FERR.memptr(),
+       BERR.memptr(),
+       WORK.memptr(),
+      RWORK.memptr(),
+      &info
+      );
+    
+    out_rcond = rcond;
+    
+    return (info == 0);
+    }
+  #else
+    {
+    arma_ignore(out);
+    arma_ignore(out_rcond);
+    arma_ignore(A);
+    arma_ignore(B_expr);
     arma_stop_logic_error("solve(): use of LAPACK must be enabled");
     return false;
     }
@@ -4133,6 +4423,7 @@ auxlib::schur(Mat<eT>& U, Mat<eT>& S, const Base<eT,T1>& X, const bool calc_U)
     arma_ignore(U);
     arma_ignore(S);
     arma_ignore(X);
+    arma_ignore(calc_U);
     arma_stop_logic_error("schur(): use of LAPACK must be enabled");
     return false;
     }
@@ -4164,15 +4455,7 @@ auxlib::schur(Mat<std::complex<T> >& U, Mat<std::complex<T> >& S, const bool cal
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_ignore(U);
-    arma_ignore(S);
-    arma_ignore(calc_U);
-    arma_stop_logic_error("schur() for complex matrices not available due to crippled LAPACK");
-    return false;
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef std::complex<T> eT;
     
@@ -4389,18 +4672,7 @@ auxlib::qz(Mat< std::complex<T> >& A, Mat< std::complex<T> >& B, Mat< std::compl
   {
   arma_extra_debug_sigprint();
   
-  #if defined(ARMA_CRIPPLED_LAPACK)
-    {
-    arma_ignore(A);
-    arma_ignore(B);
-    arma_ignore(vsl);
-    arma_ignore(vsr);
-    arma_ignore(X_expr);
-    arma_ignore(Y_expr);
-    arma_stop_logic_error("qz() for complex matrices not available due to crippled LAPACK");
-    return false;
-    }
-  #elif defined(ARMA_USE_LAPACK)
+  #if defined(ARMA_USE_LAPACK)
     {
     typedef typename std::complex<T> eT;
     
@@ -4600,6 +4872,8 @@ auxlib::crippled_lapack(const Base<typename T1::elem_type, T1>&)
   {
   #if defined(ARMA_CRIPPLED_LAPACK)
     {
+    arma_extra_debug_print("auxlib::crippled_lapack(): true");
+    
     return (is_cx<typename T1::elem_type>::yes);
     }
   #else

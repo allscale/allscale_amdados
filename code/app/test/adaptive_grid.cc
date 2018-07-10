@@ -1,3 +1,6 @@
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
 #include <gtest/gtest.h>
 #include "allscale/utils/assert.h"
 #include "allscale/api/user/data/adaptive_grid.h"
@@ -350,3 +353,5 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
 } // end namespace user
 } // end namespace api
 } // end namespace allscale
+
+#endif  // AMDADOS_PLAIN_MPI

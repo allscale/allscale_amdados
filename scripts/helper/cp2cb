@@ -9,7 +9,7 @@ echo "Copying the project to the blade machine ..."
 DESTIN="${CUDABLADE}:/home/${USER}/work/"
 
 rsync -arv \
---exclude '*output*' --exclude 'build' --exclude '__pycache__' \
+--exclude 'output*' --exclude 'build' --exclude '__pycache__' \
 --exclude '*.jpg' --exclude '*.pdf' --exclude 'doc*' --exclude 'experimental' \
 --exclude '*.tgz' --exclude '*.zip' --exclude '.git*' \
 --exclude 'tags' --exclude 'Release' --exclude 'Debug' \

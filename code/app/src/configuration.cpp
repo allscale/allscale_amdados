@@ -3,14 +3,17 @@
 // Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
 #include "allscale/utils/assert.h"
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 #include <limits>
 #include <map>
 #include "../include/debugging.h"
 #include "../include/configuration.h"
+#endif  // AMDADOS_PLAIN_MPI
 
 namespace amdados {
 
@@ -27,8 +30,7 @@ Configuration::Configuration() : m_params()
 void Configuration::ReadConfigFile(const std::string & filename)
 {
     std::fstream f(filename, std::ios::in);
-    assert_true(f.good()) << "ERROR: failed to open configuration file"
-                          << std::endl;
+    assert_true(f.good()) << "ERROR: failed to open configuration file";
     int lineNo = 1;
     std::string line, token, name;
     // Read line by line.
@@ -39,20 +41,20 @@ void Configuration::ReadConfigFile(const std::string & filename)
         // Parse the line.
         for (int count = 1; ss >> token; ++count) {
             assert_true(count <= 3)
-                << "ERROR at line " << filename << ":" << lineNo << std::endl
+                << "ERROR at line " << filename << ":" << lineNo << "\n"
                 << "the valid line layout: "
-                << "'<comment>' or '<name> <value> <comment>'" << std::endl;
+                << "'<comment>' or '<name> <value> <comment>'";
 
             // Comment is the 1st or the 3rd token in a line.
             if (!token.empty() && (token[0] == '#')) {
                 assert_true((count == 1) || (count == 3))
-                    << "ERROR at line " << filename << ":" << lineNo
-                    << std::endl << "comment may present in the "
-                    << "1st or the 3rd token in a line" << std::endl;
+                    << "ERROR at line " << filename << ":" << lineNo << "\n"
+                    << "comment may present in the "
+                    << "1st or the 3rd token in a line";
                 break;
             }
             // If not comment, the 1st token is the name, the 2nd one is
-            // the value. The value is a "double" if sscanf() succeeded,
+            // the value. The value is a "double", if sscanf() succeeded,
             // otherwise a "string".
             if (count == 1) {
                 name = token;
@@ -66,8 +68,8 @@ void Configuration::ReadConfigFile(const std::string & filename)
             }
         }
         assert_true(!f.bad())
-            << "ERROR at line " << filename << ":" << lineNo << std::endl
-            << "failure while reading configuration file" << std::endl;
+            << "ERROR at line " << filename << ":" << lineNo
+            << "\nfailure while reading configuration file";
     }
 }
 
@@ -77,20 +79,29 @@ void Configuration::ReadConfigFile(const std::string & filename)
 //-----------------------------------------------------------------------------
 void Configuration::PrintParameters() const
 {
-#ifdef AMDADOS_DEBUGGING
-    std::cout << std::endl << "Parameters:" << std::endl;
-    for (const auto & p : m_params) {
-        std::cout << p.second.name << " : ";
-        switch (p.second.type) {
-            case NUMERIC_T : std::cout << p.second.dvalue << std::endl;
-                             break;
-            case STRING_T  : std::cout << p.second.svalue << std::endl;
-                             break;
-            default        : assert_fail() << "never get here" << std::endl;
-                             break;
+#if defined(AMDADOS_DEBUGGING) || defined(AMDADOS_PLAIN_MPI)
+    int rank = 0;
+#ifdef AMDADOS_PLAIN_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+    if (rank == 0) {
+        MY_LOG(INFO) << "#######################";
+        MY_LOG(INFO) << "##### Parameters: #####";
+        for (const auto & p : m_params) {
+            switch (p.second.type) {
+                case NUMERIC_T :
+                    MY_LOG(INFO) << p.second.name << " : " << p.second.dvalue;
+                    break;
+                case STRING_T:
+                    MY_LOG(INFO) << p.second.name << " : " << p.second.svalue;
+                    break;
+                default:
+                    assert_true(0) << "never get here";
+                    break;
+            }
         }
+        MY_LOG(INFO) << "#######################";
     }
-    std::cout << std::endl;
 #endif
 }
 
@@ -99,8 +110,7 @@ void Configuration::PrintParameters() const
 //-----------------------------------------------------------------------------
 void Configuration::CheckExist(bool do_exist, const char * param_name) const
 {
-    assert_true(do_exist) << "Parameter " << param_name
-                          << " was not found" << std::endl;
+    assert_true(do_exist) << "Parameter " << param_name << " was not found";
 }
 
 //-----------------------------------------------------------------------------
@@ -110,10 +120,10 @@ void Configuration::CheckType(const Configuration::Parameter & p,
                               ParamType expected) const
 {
     assert_true(p.type != UNKNOWN_T)
-        << "Parameter " << p.name << " has no type defined" << std::endl;
+        << "Parameter " << p.name << " has no type defined";
     assert_true(p.type == expected)
         << "Parameter " << p.name << " is expected to be a "
-        << ((expected == NUMERIC_T) ? "numeric" : "string") << std::endl;
+        << ((expected == NUMERIC_T) ? "numeric" : "string");
 }
 
 //-----------------------------------------------------------------------------
@@ -123,8 +133,8 @@ void Configuration::CheckIntRange(double value) const
 {
     assert_true((std::numeric_limits<int>::lowest() <= value) &&
                 (value <= std::numeric_limits<int>::max()))
-        << "the value '" << value << "' causes numerical overflow" << std::endl
-        << "when converted to an integer parameter" << std::endl;
+        << "the value '" << value << "' causes numerical overflow\n"
+        << "when converted to an integer parameter";
 }
 
 //-----------------------------------------------------------------------------
@@ -181,6 +191,14 @@ const char * Configuration::asCString(const char * param_name) const
     CheckExist(it != m_params.end(), param_name);
     CheckType(it->second, STRING_T);
     return it->second.svalue.c_str();
+}
+
+//-----------------------------------------------------------------------------
+// Function returns "true" if parameter does exist.
+//-----------------------------------------------------------------------------
+bool Configuration::IsExist(const char * param_name) const
+{
+    return (m_params.find(param_name) != m_params.end());
 }
 
 //-----------------------------------------------------------------------------

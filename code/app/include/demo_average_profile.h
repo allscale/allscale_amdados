@@ -11,8 +11,6 @@ using ::allscale::api::user::data::Grid;
 
 #ifdef AMDADOS_DEBUGGING
 
-point2d_t GetGridSize(const Configuration & conf);
-
 /**
  * This is debugging/testing/visualization facility. Class accumulates some
  * entity over time in per-subdomain fashion. At the end of time progression,

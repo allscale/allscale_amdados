@@ -117,7 +117,7 @@
   #undef  ARMA_USE_HDF5
   #define ARMA_USE_HDF5
   
-  #define ARMA_HDF5_INCLUDE_DIR /usr/local/Cellar/hdf5/1.10.1_2/include/
+  #define ARMA_HDF5_INCLUDE_DIR /usr/local/Cellar/hdf5/1.10.2_1/include/
 #endif
 
 #if !defined(ARMA_MAT_PREALLOC)
@@ -129,7 +129,7 @@
 //// change the number to the size of your vectors.
 
 #if !defined(ARMA_OPENMP_THRESHOLD)
-  #define ARMA_OPENMP_THRESHOLD 384
+  #define ARMA_OPENMP_THRESHOLD 320
 #endif
 //// The minimum number of elements in a matrix to allow OpenMP based parallelisation;
 //// it must be an integer that is at least 1.
@@ -267,5 +267,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.1_2/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib;/usr/local/lib/libsuperlu.a
-#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.1_2/include;/usr/local/opt/szip/include;/usr/local/include/superlu
+#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.2_1/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib;/usr/local/lib/libsuperlu.a
+#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.2_1/include;/usr/local/opt/szip/include;/usr/local/include/superlu

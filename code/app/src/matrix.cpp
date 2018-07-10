@@ -3,11 +3,13 @@
 // Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
 #include "allscale/utils/assert.h"
 #include <algorithm>
 #include <random>
 #include "../include/amdados_utils.h"
 #include "../include/matrix.h"
+#endif  // AMDADOS_PLAIN_MPI
 
 namespace amdados {
 
@@ -225,7 +227,7 @@ void MakeRandom(VectorView & v, const char type)
         std::uniform_real_distribution<double> distrib;
         for (int i = 0; i < size; ++i) { v(i) = distrib(gen); }
     } else {
-        assert_true(0) << "unknown distribution" << std::endl;
+        assert_true(0) << "unknown distribution";
     }
 }
 

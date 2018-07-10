@@ -64,4 +64,13 @@ inline point2d_t Sub2Glo(const point2d_t & query_point,
                      y + subdomain_pos.y * subdomain_size.y);
 }
 
+//-----------------------------------------------------------------------------
+// Function returns the grid size as a number of subdomains in both dimensions.
+//-----------------------------------------------------------------------------
+inline point2d_t GetGridSize(const Configuration & conf)
+{
+    return point2d_t(conf.asInt("num_subdomains_x"),
+                     conf.asInt("num_subdomains_y"));
+}
+
 } // namespace amdados

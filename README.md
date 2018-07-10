@@ -168,3 +168,18 @@ simulation might be very long (~ 1 day) on the machine with few CPU cores.
     b) Another useful tool is "mplayer" - a command-line player that
     shows the solution rolling out in time.
 
+### MPI implementation
+
+(1) TODO: not integrated into building system yet.
+(2) Temporary solution - run the script from the project root folder:
+        ./mympi -r
+    This will compile both, Allscale and MPI, versions of Amdados application.
+(3) Generate observations as usually:
+        python3 python/ObservationsGenerator.py --config <config_file_name>
+(4) Run MPI implementation (MPICH):
+        mpirun -n XX -f host_file ./build/mpi_amdados --config <config_file_name>
+    In case of OpenMPI you specify host file differently: --hostfile host_file.
+    The file "host_file" can be placed in the project root folder as in example
+    above. The current one is very simple. It contains a single record
+    "localhost".
+(5)

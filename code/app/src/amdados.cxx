@@ -5,6 +5,8 @@
 //-----------------------------------------------------------------------------
 
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include "../include/debugging.h"
 
 namespace amdados {
@@ -43,15 +45,20 @@ void PrintHelp()
         << std::endl << std::endl;
 }
 
-void ScenarioSimulation(const std::string &);
-void ScenarioSensors(const std::string &);
+void ScenarioSimulation(const std::string & config);
+void ScenarioSensors(const std::string & config);
 
 } // namespace amdados
 
 int main(int argc, char ** argv)
 {
-    MY_TRY
-    {
+#ifdef AMDADOS_DEBUGGING
+    try {
+        // Open the log-file.
+        extern std::fstream gLogFile;   // in "amdados_utils.cpp"
+        gLogFile.open("my.log", std::ios::out | std::ios::trunc);
+#endif
+
         std::string scenario = "simulation";
         std::string config_file = "amdados.conf";
 
@@ -73,15 +80,25 @@ int main(int argc, char ** argv)
         }
 
         if (scenario == "sensors") {
-            MY_INFO("%s", "SCENARIO: 'sensors'")
+            MY_LOG(INFO) << "SCENARIO: generating random sensors";
             amdados::ScenarioSensors(config_file);
         } else {
-            MY_INFO("%s", "SCENARIO: 'simulation'")
+            MY_LOG(INFO) << "SCENARIO: simulation with Allscale API";
             amdados::ScenarioSimulation(config_file);
         }
         return EXIT_SUCCESS;
+
+#ifdef AMDADOS_DEBUGGING
+    } catch (const std::domain_error & e) {
+        std::cout << std::endl << "domain error: " << e.what() << std::endl;
+    } catch (const std::runtime_error & e) {
+        std::cout << std::endl << "runtime error: " << e.what() << std::endl;
+    } catch (const std::exception & e) {
+        std::cout << std::endl << "exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cout << std::endl << "Unsupported exception" << std::endl;
     }
-    MY_CATCH
+#endif
     return EXIT_FAILURE;
 }
 

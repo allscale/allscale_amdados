@@ -3,21 +3,25 @@
 // Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
+#include <fstream>
+#include <sstream>
+#include <chrono>
+
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
 
-#include "../include/geometry.h"
 #include "../include/amdados_utils.h"
 #include "../include/configuration.h"
+#include "../include/geometry.h"
 #include "../include/matrix.h"
 #include "../include/debugging.h"
 
 namespace amdados {
-
-// amdados_utils.cpp:
-point2d_t GetGridSize(const Configuration & conf);
 
 namespace {
 
@@ -187,7 +191,8 @@ void ScenarioSensors(const std::string & config_file)
         return i;
     };
 
-    if (conf.asInt("sensor_per_subdomain")) {
+    if (conf.IsExist("sensor_per_subdomain") &&
+            (conf.asInt("sensor_per_subdomain") > 0)) {
         // Local (subdomain) sizes at the finest resolution.
         const int      Sx = conf.asInt("subdomain_x");
         const int      Sy = conf.asInt("subdomain_y");
@@ -219,8 +224,8 @@ void ScenarioSensors(const std::string & config_file)
 
         // Generate pseudo-random sensor locations.
         const int Nobs = std::max(Round(fraction * problem_size), 1);
-        std::cout << "fraction of sensor points = " << fraction
-                  << ", #observations = " << Nobs << std::endl;
+        MY_LOG(INFO) << "fraction of sensor points = " << fraction
+                     << ", #observations = " << Nobs;
         double_array_t x(Nobs), y(Nobs);
         InitialGuess(conf, x, y, point2d_t(0,0));
         OptimizePointLocations(x, y);
@@ -282,26 +287,26 @@ void LoadSensorLocations(const Configuration   & conf,
 #ifdef AMDADOS_DEBUGGING
     size_t num_sensors = 0;
     sensors.forEach([&](point_array_t & arr) { num_sensors += arr.size(); });
-    MY_INFO("Average number of sensors per subdomain: %f",
-            (double(num_sensors) / double(GridSize[0] * GridSize[1])));
+    MY_LOG(INFO) << "Average number of sensors per subdomain: " <<
+            (double(num_sensors) / double(GridSize[0] * GridSize[1]));
 #endif
 }
 
 /**
- * Function sequentially (!) reads the file of sensor locations.
+ * Function sequentially (!) reads the file of sensor measurements.
  */
 void LoadSensorMeasurements(const Configuration         & conf,
                             const Grid<point_array_t,2> & sensors,
                             Grid<Matrix,2>              & observations)
 {
     MY_TIME_IT("Loading sensor measurements ...")
-    MY_INFO("%s", "---------------------------------------------------------")
-    MY_INFO("%s", "B E W A R E: if you had run: amdados --scenario sensors")
-    MY_INFO("%s", "then you have to rerun:")
-    MY_INFO("%s", "        python3 python/ObservationsGenerator.py")
-    MY_INFO("%s", "otherwise there will be a mismatch error between")
-    MY_INFO("%s", "the new sensors and the old observation locations.")
-    MY_INFO("%s", "---------------------------------------------------------")
+    MY_LOG(INFO) << "-------------------------------------------------------\n"
+                 << "B E W A R E: if you had run: amdados --scenario sensors\n"
+                 << "then you have to rerun:\n"
+                 << "        python3 python/ObservationsGenerator.py\n"
+                 << "otherwise there will be a mismatch error between\n"
+                 << "the new sensors and the old observation locations.\n"
+                 << "------------------------------------------------------\n";
 
     using ::allscale::api::core::FileIOManager;
     using ::allscale::api::core::Entry;
@@ -386,4 +391,6 @@ void LoadSensorMeasurements(const Configuration         & conf,
 }
 
 } // namespace amdados
+
+#endif  // AMDADOS_PLAIN_MPI
 

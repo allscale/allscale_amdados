@@ -50,6 +50,7 @@ public:
     const std::string & asString(const char * param_name) const;
     const char *        asCString(const char * param_name) const;
 
+    bool IsExist(const char * param_name) const;
     bool IsInteger(const char * param_name) const;
 
     void SetInt(const char * param_name, int value = 0);

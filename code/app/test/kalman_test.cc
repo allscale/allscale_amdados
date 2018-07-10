@@ -3,6 +3,9 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
 #include <gtest/gtest.h>
 #include "allscale/utils/assert.h"
 #include <cstdlib>
@@ -119,3 +122,5 @@ TEST(KalmanFilter, Basic)
     log_file << "mean estimated deviation: " << total_mean_dev << std::endl;
     log_file << std::endl << std::flush;
 }
+
+#endif  // AMDADOS_PLAIN_MPI

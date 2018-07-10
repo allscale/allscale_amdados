@@ -3,6 +3,9 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
 #include <gtest/gtest.h>
 #include "allscale/api/user/data/adaptive_grid.h"
 
@@ -396,3 +399,4 @@ TEST(GridTest, Basic)
     TestInterSubdomain();
 }
 
+#endif  // AMDADOS_PLAIN_MPI

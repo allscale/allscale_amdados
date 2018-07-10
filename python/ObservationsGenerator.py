@@ -117,6 +117,9 @@ def LoadSensorLocations(conf):
     Np = round(math.ceil(Nx * Ny * conf.sensor_fraction))
     data = np.loadtxt(MakeFileName(conf, "sensors"), dtype=int)
     assert (data is not None) and (data.size > 0), "empty file of sensors"
+    if data.ndim == 1:
+        assert data.size == 2                   # single sensor point (x,y)
+        data = np.reshape(data, (-1,data.size))
     assert len(data.shape) == 2 and data.shape[1] == 2, "wrong layout"
     assert data.shape[0] <= Nx * Ny, "too many records"
     assert data.dtype == int, "type mismatch"
@@ -251,7 +254,7 @@ def ForwardSolver(conf, glo_idx, sensor_idx, solution_fid, demo):
         # Write the field entries at sensors into the file of observations.
         writer.WriteField(field, sensor_idx, k)
         # Write a number of full fields for comparison against C++ simulation.
-        if ((Nw-1)*(k-1))//(Nt-1) != ((Nw-1)*k)//(Nt-1):
+        if k == 0 or ((Nw-1)*(k-1))//(Nt-1) != ((Nw-1)*k)//(Nt-1):
             WriteEntireField(solution_fid, field, k)
 
         # Visualization, if needed.

@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Blank lines.
+for i in {1..5}; do echo ""; done
+
+# Make build directory.
+mkdir -p build
+# Remove the old executable.
+/bin/rm -f build/mpi_amdados
+# Build Allscale version of Amdados application, if does not exist.
+if [ ! -f build/app/amdados ]; then
+    bash ./standard.build.sh
+fi
+
+# Generate main() function.
+CWD=$(pwd)
+cat > build/mpi_amdados.cpp << EOF
+#include "${CWD}/code/app/mpi_src/mpi_simulation.h"
+int main(int argc, char ** argv) {
+    return mpi_main(&argc, &argv);
+}
+EOF
+
+# By default we choose debugging mode and do not run the application.
+LAUNCH=false
+DEBUG=true;
+
+# Parse the input arguments.
+while getopts ":drl" opt; do
+    case $opt in
+        d) DEBUG=true  ;;
+        r) DEBUG=false ;;
+        l) LAUNCH=true ;;
+        \?) echo "Invalid option: -$OPTARG" >&2 ;;
+    esac
+done
+
+# Set up the mode-dependent settings.
+if ${DEBUG} ; then
+    echo "Compiling (and running) the application in 'debug' mode"
+    CONF="-g3 -O0 -DDEBUG -D_DEBUG"
+else
+    echo "Compiling (and running) the application in 'release' mode"
+    CONF="-O2 -DNDEBUG"
+fi
+
+# Compile.
+mpicxx -DAMDADOS_PLAIN_MPI -std=c++14 -Wall -pedantic -Wextra -Wconversion \
+        ${CONF} -o build/mpi_amdados build/mpi_amdados.cpp
+
+# Run.
+if ${LAUNCH} ; then
+    if [[ $(uname) == "Linux" ]]; then
+        # I have "mpich" on Linux blade, and mpich tolerates overcommit.
+        NUMPROC=$(getconf _NPROCESSORS_ONLN)
+    elif [[ $(uname) == "Darwin" ]]; then
+        # I have "open-mpi" on Mac OS, and open-mpi wants to know the exact
+        # number of cores (not processors!), so overcommit is not tolerated.
+        NUMPROC=$(system_profiler SPHardwareDataType | \
+                    grep 'Total Number of Cores' | awk '{print $5}')
+    fi
+    if ${DEBUG} ; then
+        if [[ $(uname) == "Linux" ]]; then
+            # I have "mpich" on Linux blade.
+            mpirun -np ${NUMPROC} -f host_file xterm -e gdb build/mpi_amdados
+        elif [[ $(uname) == "Darwin" ]]; then
+            # I have "open-mpi" on Mac OS.
+            mpirun -np ${NUMPROC} --hostfile host_file \
+                xterm -e /usr/bin/lldb build/mpi_amdados
+        fi
+    else
+        if [[ $(uname) == "Linux" ]]; then
+            # I have "mpich" on Linux blade.
+            mpirun -np ${NUMPROC} -f host_file build/mpi_amdados
+        elif [[ $(uname) == "Darwin" ]]; then
+            # I have "open-mpi" on Mac OS.
+            mpirun -np ${NUMPROC} --hostfile host_file build/mpi_amdados
+        fi
+    fi
+fi
+
+# Blank lines.
+for i in {1..3}; do echo ""; done
+

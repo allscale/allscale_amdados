@@ -4,16 +4,22 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
+#include <fstream>
+#include <sstream>
+#include <chrono>
 #include "allscale/api/user/data/adaptive_grid.h"
 #include "allscale/api/user/algorithm/pfor.h"
 #include "allscale/api/user/algorithm/stencil.h"
 #include "allscale/api/core/io.h"
 #include "allscale/utils/assert.h"
 #include "../include/debugging.h"
-#include "../include/geometry.h"
 #include "../include/amdados_utils.h"
-#include "../include/matrix.h"
 #include "../include/configuration.h"
+#include "../include/matrix.h"
+#include "../include/geometry.h"
 #include "../include/cholesky.h"
 #include "../include/lu.h"
 #include "../include/kalman_filter.h"
@@ -35,9 +41,6 @@ using ::allscale::api::user::data::Direction::Up;
 using ::allscale::api::user::data::Direction::Down;
 using ::allscale::api::user::data::Direction::Left;
 using ::allscale::api::user::data::Direction::Right;
-
-// amdados_utils.cpp:
-point2d_t GetGridSize(const Configuration & conf);
 
 // scenario_sensors.cpp:
 void LoadSensorLocations(const Configuration   & conf,
@@ -762,6 +765,14 @@ void RunDataAssimilation(const Configuration         & conf,
     domain_t         temp_field(GridSize);  // grid if sub-domains
     domain_t         state_field(GridSize); // grid if sub-domains
 
+    // Is the special testing mode intended?
+    const int kalman_time_gap = std::max(conf.asInt("kalman_time_gap"), 1);
+    if (kalman_time_gap != 1) {
+        std::cout << std::endl
+                  << "WARNING !!! : parameter 'kalman_time_gap' != 1"
+                  << std::endl << std::endl;
+    }
+
     // Initialize the observation and model covariance matrices.
     pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
         // Zero field at the beginning for all the resolutions.
@@ -828,7 +839,7 @@ void RunDataAssimilation(const Configuration         & conf,
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
             assert_true(t >= 0);
-            if (contexts[idx].Nsensors > 0) {
+            if ((contexts[idx].Nsensors > 0) && (t % kalman_time_gap == 0)) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], false, size_t(t),
                             state, temp_field, contexts[idx], diff_profile);
@@ -841,7 +852,7 @@ void RunDataAssimilation(const Configuration         & conf,
         [&](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t &  // cell is not copy-constructible, so '&'
         {
-            if (contexts[idx].Nsensors > 0) {
+            if ((contexts[idx].Nsensors > 0) && (t % kalman_time_gap == 0)) {
                 return SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], true, size_t(t),
                             state, temp_field, contexts[idx], diff_profile);
@@ -857,7 +868,8 @@ void RunDataAssimilation(const Configuration         & conf,
                 // Filter out the first sub-iteration, skip the others.
                 if ((t % time_t(Nsubiter)) != 0) return false;
                 t /= time_t(Nsubiter);
-                return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
+                return ((t == 0) || ( ((Nwrite - 1) * (t - 1)) / (Nt - 1) !=
+                                      ((Nwrite - 1) * (t + 0)) / (Nt - 1) ) );
             },
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
@@ -886,19 +898,19 @@ void RunDataAssimilation(const Configuration         & conf,
     );
     file_manager.close(out_stream);
     diff_profile.PrintProfile(conf, "subiter_diff");
-    MY_INFO("%s", "\n\n")
+    MY_LOG(INFO) << "\n\n";
 }
 
 } // anonymous namespace
 
 /**
  * The main function of this application runs simulation with data
- * assimilation using method to handle domain subdivision.
+ * assimilation.
  */
 void ScenarioSimulation(const std::string & config_file)
 {
-    MY_INFO("%s", "***** Amdados2D application *****")
-    MY_INFO("%s", "AMDADOS_DEBUGGING is enabled")
+    MY_LOG(INFO) << "\n\n***** Amdados2D application *****\n"
+                 << "AMDADOS_DEBUGGING is enabled\n\n";
 
     // Read application parameters from configuration file,
     // prepare the output directory.
@@ -921,3 +933,5 @@ void ScenarioSimulation(const std::string & config_file)
 }
 
 } // namespace amdados
+
+#endif  // AMDADOS_PLAIN_MPI

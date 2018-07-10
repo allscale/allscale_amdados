@@ -3,6 +3,9 @@
 // Copyright : IBM Research Ireland, 2017
 //-----------------------------------------------------------------------------
 
+#ifndef AMDADOS_PLAIN_MPI
+// This implementation is based on Allscale API, no MPI at all.
+
 #include <gtest/gtest.h>
 #include "allscale/utils/assert.h"
 #include <cstdlib>
@@ -105,3 +108,4 @@ TEST(Cholesky, Basic)
              << max_rel_err << std::endl << std::endl << std::flush;
 }
 
+#endif  // AMDADOS_PLAIN_MPI

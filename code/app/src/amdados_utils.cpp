@@ -3,17 +3,22 @@
 // Copyright : IBM Research Ireland, 2017-2018
 //-----------------------------------------------------------------------------
 
-#include <string>
-#include <random>
-#include <chrono>
+#ifndef AMDADOS_PLAIN_MPI
+#include <cmath>
 #include <fstream>
+#include <sstream>
+#include <chrono>
+#include <string>
 #include <map>
+#include <vector>
 #include "allscale/utils/assert.h"
-#include "allscale/api/user/data/adaptive_grid.h"
 #include "../include/debugging.h"
-#include "../include/geometry.h"
 #include "../include/amdados_utils.h"
 #include "../include/configuration.h"
+// TODO: for some strange reason I cannot place these global variables in
+// "amdados.cxx" - linker error. So, the temporary solution.
+std::fstream gLogFile;      // global instance of log-file
+#endif  // AMDADOS_PLAIN_MPI
 
 namespace amdados {
 
@@ -21,10 +26,10 @@ namespace amdados {
  * Function checks if the file exists and prints error message if it does not.
  */
 #ifdef AMDADOS_DEBUGGING
-void CheckFileExists(const Configuration & conf, const std::string & filename)
+void CheckFileExists(const Configuration &, const std::string & filename)
 {
     if (!std::fstream(filename, std::ios::in).good()) {
-        MY_ERR("failed to open file (not existing?): %s", filename.c_str());
+        MY_LOG(ERROR) << "failed to open file (not existing?): " << filename;
         std::exit(1);
     }
 }
@@ -39,10 +44,10 @@ void CheckFileExists(const Configuration &, const std::string &) {}
 uint64_t RandomSeed()
 {
     using hrclock_t = std::chrono::high_resolution_clock;
-    uint64_t prev = hrclock_t::now().time_since_epoch().count();
-    uint64_t seed = 0;
+    long prev = hrclock_t::now().time_since_epoch().count();
+    long seed = 0;
     while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
-    return seed;
+    return (uint64_t)seed;
 }
 
 /**
@@ -71,20 +76,19 @@ std::string MakeFileName(const Configuration & conf, const std::string & what)
         assert_true(0) << "unknown entity to make a file name from";
     }
 
-    MY_INFO(((what == "field") ? "\n%s%s" : "%s%s"),
-            "File name: ", filename.str().c_str());
-
+    MY_LOG(INFO) << ((what == "field") ? "\n" : "")
+                 << "File name: " << filename.str();
     return filename.str();
 }
 
-/**
- * Function returns the grid size as a number of subdomains
- * in both dimensions.
- */
-point2d_t GetGridSize(const Configuration & conf)
-{
-    return point2d_t(conf.asInt("num_subdomains_x"),
-                     conf.asInt("num_subdomains_y"));
-}
+///**
+// * Function returns the grid size as a number of subdomains
+// * in both dimensions.
+// */
+//point2d_t GetGridSize(const Configuration & conf)
+//{
+//    return point2d_t(conf.asInt("num_subdomains_x"),
+//                     conf.asInt("num_subdomains_y"));
+//}
 
 } // namespace amdados

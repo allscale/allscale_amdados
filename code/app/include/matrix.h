@@ -137,7 +137,7 @@ public:
         if (size != new_size) {
             Clear();
             if (new_size > 0) {
-                data = new double[new_size];
+                data = new double[(unsigned)new_size];
                 size = new_size;
             }
         }
@@ -219,7 +219,7 @@ public:
                 nrows = numrows;
                 ncols = numcols;
                 assert_true(size > 0);
-                data = new double[size];
+                data = new double[(unsigned)size];
             }
         }
         if (fillzero) std::fill(begin(), end(), 0.0);
@@ -288,6 +288,15 @@ public:
 
     // Returns "true" if matrix is square.
     bool IsSquare() const { return (nrows == ncols); }
+
+    // Swaps contents with external matrix.
+    void swap(Matrix & m)
+    {
+        std::swap(data,  m.data);
+        std::swap(size,  m.size);
+        std::swap(nrows, m.nrows);
+        std::swap(ncols, m.ncols);
+    }
 };
 
 void MatMult(Matrix & result, const Matrix & A, const Matrix & B);

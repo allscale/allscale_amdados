@@ -52,8 +52,8 @@ template<typename eT> class spdiagview;
 
 template<typename eT> class MapMat;
 template<typename eT> class MapMat_val;
-template<typename eT> class MapMat_elem;
-template<typename eT> class MapMat_svel;
+template<typename eT> class SpMat_MapMat_val;
+template<typename eT> class SpSubview_MapMat_val;
 
 template<typename eT, typename T1>              class subview_elem1;
 template<typename eT, typename T1, typename T2> class subview_elem2;
@@ -63,6 +63,7 @@ template<typename parent, unsigned int mode, typename TB> class subview_each2;
 
 template<typename eT>              class subview_cube_each1;
 template<typename eT, typename TB> class subview_cube_each2;
+template<typename eT, typename T1> class subview_cube_slices;
 
 
 class SizeMat;
@@ -101,6 +102,8 @@ class op_find_simple;
 class op_find_unique;
 class op_flipud;
 class op_fliplr;
+class op_reverse_vec;
+class op_reverse_mat;
 class op_real;
 class op_imag;
 class op_nonzeros;
@@ -111,6 +114,7 @@ class op_unique_index;
 class op_diff_default;
 class op_hist;
 class op_chi2rnd;
+class op_roots;
 
 class eop_conj;
 

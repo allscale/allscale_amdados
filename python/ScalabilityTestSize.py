@@ -49,27 +49,36 @@ from Utility import *
 # This is a reasonable set of problems, be patient for days to come ...
 #GridSizes = [(11,11), (19,17), (23,25), (37,31), (43,41), (83,89)]
 # Small problems for a relatively brief testing.
-#GridSizes = [(13,11), (17,13), (19,15), (23,21), (25,23), (27,25)]
+GridSizes = [(13,11), (17,13), (19,15), (23,21), (25,23), (27,25)]
 #GridSizes = [(13,11), (18,16), (23,21), (29,27), (34,32), (39,37)]
-GridSizes = [(2,2),(4,4),(8,8),(12,12),(16,16),(20,20),(24,24),(28,28),(32,32)]
+#GridSizes = [(2,2),(4,4),(8,8),(12,12),(16,16),(20,20),(24,24),(28,28),(32,32)]
 
 # Integration period in seconds.
 IntegrationPeriod = 9000
 
-# Path to the C++ executable.
+# Path to the C++ executable(s).
 AMDADOS_EXE = "build/app/amdados"
-
+MPI_AMDADOS_EXE = "build/mpi_amdados"
 
 if __name__ == "__main__":
     try:
         CheckPythonVersion()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--mpi", type=bool, default=False,
+                    help="use MPI implementation instead of Allscale one")
+        param = parser.parse_args()
         # Read configuration file.
         conf = Configuration("amdados.conf")
         # Create the output directory, if it does not exist.
         if not os.path.isdir(conf.output_dir):
             os.mkdir(conf.output_dir)
-        # Check existence of "amdados" application executable.
-        assert os.path.isfile(AMDADOS_EXE), "amdados executable was not found"
+        # Check existence of "amdados" application executable(s).
+        assert os.path.isfile(AMDADOS_EXE), (
+                    "Allscale amdados executable was not found")
+        if param.mpi:
+            assert os.path.isfile(MPI_AMDADOS_EXE), (
+                    "MPI amdados executable was not found")
+            print("Running MPI implementation")
 
         # For all the grid sizes in the list ...
         exe_time_profile = np.zeros((len(GridSizes),2))
@@ -91,11 +100,21 @@ if __name__ == "__main__":
             start_time = timer()
 
             # Run C++ data assimilation application.
-            print("##################################################")
-            print("Simulation by 'amdados' application ...")
-            print("silent if debugging & messaging were disabled")
-            print("##################################################")
-            subprocess.run([AMDADOS_EXE, "--scenario", "simulation",
+            if param.mpi:
+                print("##################################################")
+                print("Simulation with pure MPI Amdados application ...")
+                print("silent if debugging & messaging were disabled")
+                print("##################################################")
+                subprocess.run(["mpirun", "-np", str(os.cpu_count()),
+                                "-f", "host_file", MPI_AMDADOS_EXE,
+                                "--scenario", "simulation",
+                                "--config", config_file], check=True)
+            else:
+                print("##################################################")
+                print("Simulation with Allscale Amdados application ...")
+                print("silent if debugging & messaging were disabled")
+                print("##################################################")
+                subprocess.run([AMDADOS_EXE, "--scenario", "simulation",
                                 "--config", config_file], check=True)
 
             # Get the execution time and corresponding (global) problem size
