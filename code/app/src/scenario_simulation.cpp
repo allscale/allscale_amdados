@@ -235,13 +235,12 @@ void GetObservations(Vector & z, const Matrix & observations, int timestep,
  * Function applies Dirichlet zero boundary condition at the outer border
  * of the domain.
  */
-void ApplyBoundaryCondition(domain_t & state, const point2d_t & idx)
+void ApplyBoundaryCondition(subdomain_t & subdom, const point2d_t & idx, const point2d_t& Gridsize)
 {
-    subdomain_t &  subdom = state[idx];
     const size2d_t subdom_size = subdom.getActiveLayerSize();
 
-    const index_t Nx = state.size().x, Sx = subdom_size.x;
-    const index_t Ny = state.size().y, Sy = subdom_size.y;
+    const index_t Nx = Gridsize.x, Sx = subdom_size.x;
+    const index_t Ny = Gridsize.y, Sy = subdom_size.y;
 
     // Set the leftmost and rightmost.
     if (idx.x == 0)      subdom.setBoundary(Direction::Left,  double_array_t(Sy, 0.0));
@@ -523,26 +522,24 @@ void AllscaleFromMatrix(subdomain_t & cell, const Matrix & field)
  * during the time integration. For such a subdomain the Kalman filter governs
  * the simulation by pulling it towards the observed ground-truth.
  */
-const subdomain_t & SubdomainRoutineKalman(
+void SubdomainRoutineKalman(
                             const Configuration & conf,
                             const point_array_t & sensors,
                             const Matrix        & observations,
                             const size_t          timestamp,
                             const domain_t      & curr_state,
-                            domain_t            & next_state,
+                            subdomain_t         & next_state,
                             SubdomainContext    & ctx, 
                             const point2d_t     & idx,
                             const size_t          Nsubiter,
                             const size_t          Nt)
 {
     const unsigned resolution = static_cast<unsigned>(LayerFine);
-    assert_true(&curr_state != &next_state);
-    assert_true(curr_state.size() == next_state.size());
 
     // Important: synchronize active layers, otherwise when we exchange data
     // at the borders of neighbour subdomains the size mismatch can happen.
     assert_true(curr_state[idx].getActiveLayer() == resolution);
-    next_state[idx].setActiveLayer(resolution);
+    next_state.setActiveLayer(resolution);
     const size2d_t layer_size =
         const_cast<subdomain_t&>(curr_state[idx]).getActiveLayerSize();
 
@@ -587,46 +584,42 @@ const subdomain_t & SubdomainRoutineKalman(
     ctx.Kalman.SolveFilter(ctx.field, ctx.P, ctx.H, ctx.R, ctx.z);
 
     // Put new estimation back to the Allscale state field.
-    AllscaleFromMatrix(next_state[idx], ctx.field);
+    AllscaleFromMatrix(next_state, ctx.field);
 
     // Ensure boundary conditions on the outer border.
-    ApplyBoundaryCondition(next_state, idx);
+    ApplyBoundaryCondition(next_state, idx, curr_state.size());
 
     // Ensure non-negative (physically plausible) density.
-    next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
+    next_state.forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
 
 #if MY_MULTISCALE_METHOD == 2
     // Make up the coarse layer (so the peer subdomains can use either
     // fine or low resolution one), then go back to the default resolution.
-    next_state[idx].coarsen([](const double & elem) { return elem; });
-    next_state[idx].setActiveLayer(resolution);
+    next_state.coarsen([](const double & elem) { return elem; });
+    next_state.setActiveLayer(resolution);
 #endif
-
-    return next_state[idx];
 }
 
 /**
  * Function is invoked for each sub-domain without sensors therein
  * during the time integration.
  */
-const subdomain_t & SubdomainRoutineNoSensors(
+void SubdomainRoutineNoSensors(
                             const Configuration & conf,
                             const size_t          timestamp,
                             const domain_t      & curr_state,
-                            domain_t            & next_state,
+                            subdomain_t         & next_state,
                             SubdomainContext    & ctx,
                             const point2d_t     & idx,
                             const size_t          Nsubiter,
                             const size_t          Nt)
 {
     const unsigned resolution = static_cast<unsigned>(LayerLow);
-    assert_true(&curr_state != &next_state);
-    assert_true(curr_state.size() == next_state.size());
 
     // Important: synchronize active layers, otherwise when we exchange data
     // at the borders of neighbour subdomains the size mismatch can happen.
     assert_true(curr_state[idx].getActiveLayer() == resolution);
-    next_state[idx].setActiveLayer(resolution);
+    next_state.setActiveLayer(resolution);
     const size2d_t layer_size =
         const_cast<subdomain_t&>(curr_state[idx]).getActiveLayerSize();
 
@@ -658,22 +651,20 @@ const subdomain_t & SubdomainRoutineNoSensors(
     ctx.LU.Solve(ctx.field, ctx.tmp_field); // new_field = B^{-1}*old_field
 
     // Put the estimation back to the Allscale state field.
-    AllscaleFromMatrix(next_state[idx], ctx.field);
+    AllscaleFromMatrix(next_state, ctx.field);
 
     // Ensure boundary conditions on the outer border.
-    ApplyBoundaryCondition(next_state, idx);
+    ApplyBoundaryCondition(next_state, idx, curr_state.size());
 
     // Ensure non-negative (physically plausible) density.
-    next_state[idx].forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
+    next_state.forAllActiveNodes([](double & v){ if (v < 0.0) v = 0.0; });
 
 #if MY_MULTISCALE_METHOD == 2
     // Make up the fine layer (so the peer subdomains can use either
     // fine or low resolution one), then go back to the default resolution.
-    next_state[idx].refine([](const double & elem) { return elem; });
-    next_state[idx].setActiveLayer(resolution);
+    next_state.refine([](const double & elem) { return elem; });
+    next_state.setActiveLayer(resolution);
 #endif
-
-    return next_state[idx];
 }
 
 } // anonymous namespace
@@ -700,7 +691,6 @@ void RunDataAssimilation(const Configuration         & conf,
 	//const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
-    domain_t         temp_field(GridSize);  // grid of sub-domains
     domain_t         state_field(GridSize); // grid of sub-domains
 
     // Initialize the observation and model covariance matrices.
@@ -721,10 +711,8 @@ void RunDataAssimilation(const Configuration         & conf,
         const index_t Nsensors = static_cast<index_t>(sensors[idx].size());
         if (Nsensors > 0) {
             state_field[idx].setActiveLayer(LayerFine);
-             temp_field[idx].setActiveLayer(LayerFine);
         } else {
             state_field[idx].setActiveLayer(LayerLow);
-             temp_field[idx].setActiveLayer(LayerLow);
         }
 
         const size2d_t layer_size = state_field[idx].getActiveLayerSize();
@@ -755,16 +743,18 @@ void RunDataAssimilation(const Configuration         & conf,
     ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
-        -> const subdomain_t &  // cell is not copy-constructible, so '&'
+        -> const subdomain_t
         {
+            subdomain_t temp_field;
             if (contexts[idx].sensors.size() > 0) {
-                return SubdomainRoutineKalman(conf, sensors[idx],
+                SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], size_t(t),
                             state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             } else {
-                return SubdomainRoutineNoSensors(conf, size_t(t),
-                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
+               SubdomainRoutineNoSensors(conf, size_t(t),
+                           state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             }
+            return temp_field;
         },
         // Monitoring.
         ::allscale::api::user::algorithm::observer(
