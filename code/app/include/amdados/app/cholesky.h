@@ -41,8 +41,8 @@ friend std::ostream& operator<<(std::ostream& out, const Cholesky& c) {
 //-----------------------------------------------------------------------------
 void Init(const Matrix & A)
 {
-    const double TINY = std::numeric_limits<double>::min() /
-		       std::pow(std::numeric_limits<double>::epsilon(),3);
+    assert_decl(const double TINY = std::numeric_limits<double>::min() /
+		       std::pow(std::numeric_limits<double>::epsilon(),3));
 
     assert_true(A.IsSquare());
     const index_t N = A.NRows();    // problem size, A is square
@@ -81,8 +81,7 @@ void Solve(Vector & x, const Vector & b) const
     const Matrix & L = m_L;         // short-hand alias
     const index_t      N = L.NRows();   // problem size, L is symmetric
 
-    bool ok = ((x.Size() == N) && (b.Size() == N));
-    assert_true(ok);
+    assert_true(((x.Size() == N) && (b.Size() == N)));
 
     for (index_t i = 0; i < N; i++) {
         double sum = b(i);

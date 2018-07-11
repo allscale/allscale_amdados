@@ -60,8 +60,8 @@ const int _Y_ = 1;  // index of ordinate
 // Unique ID from subdomain location.
 int GetId(point2d_t idx)
 {
-    bool ok1 = ((0 <= idx[_X_]) && (idx[_X_] < NUM_DOMAINS_X));
-    bool ok2 = ((0 <= idx[_Y_]) && (idx[_Y_] < NUM_DOMAINS_Y));
+    assert_decl(bool ok1 = ((0 <= idx[_X_]) && (idx[_X_] < NUM_DOMAINS_X)));
+    assert_decl(bool ok2 = ((0 <= idx[_Y_]) && (idx[_Y_] < NUM_DOMAINS_Y)));
     assert_true(ok1 && ok2);
     return static_cast<int>(idx[_X_] * NUM_DOMAINS_Y + idx[_Y_]);
 }

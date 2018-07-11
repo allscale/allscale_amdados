@@ -546,6 +546,7 @@ void SubdomainRoutineKalman(
     // Get the discrete time (index of iteration) in the range [0..Nt) and
     // the index of sub-iteration in the range [0..Nsubiter).
     assert_true(timestamp < Nt * Nsubiter);
+	(void)Nt; // silence unused parameter warning
     const size_t t_discrete = timestamp / Nsubiter;
     const size_t sub_iter   = timestamp % Nsubiter;
 
@@ -626,6 +627,7 @@ void SubdomainRoutineNoSensors(
     // Get the discrete time (index of iteration) in the range [0..Nt) and
     // the index of sub-iteration in the range [0..Nsubiter).
     assert_true(timestamp < Nt * Nsubiter);
+	(void)Nt; // silence unused parameter warning
     const size_t t_discrete = timestamp / Nsubiter;
     const size_t sub_iter   = timestamp % Nsubiter;  (void) sub_iter;
 
@@ -738,13 +740,15 @@ void RunDataAssimilation(const Configuration         & conf,
         }
     });
 
+	
+
     // Time integration forward in time. We want to make Nt (normal) iterations
     // and Nsubiter sub-iterations within each (normal) iteration.
     ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
         [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t
-        {
+        {			
             subdomain_t temp_field;
             if (contexts[idx].sensors.size() > 0) {
                 SubdomainRoutineKalman(conf, sensors[idx],

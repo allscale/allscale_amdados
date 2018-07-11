@@ -333,7 +333,7 @@ void LoadSensorMeasurements(const Configuration         & conf,
     const int       Nt = conf.asInt("Nt");
 
     Grid<int,2> counters(GridSize);
-    int         last_timestamp = -1;
+    assert_decl(int last_timestamp = -1);
 
     assert_true(sensors.size() == GridSize);
     assert_true(observations.size() == GridSize);
@@ -395,12 +395,12 @@ void LoadSensorMeasurements(const Configuration         & conf,
             ++cnt;
         }
         assert_true(in);
-        last_timestamp = t;
+        assert_decl(last_timestamp = t);
 
         // Check that all the entries of data matrix were set given a timestamp.
-        pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
+        assert_decl(pfor(point2d_t(0,0), GridSize, [&](const point2d_t & idx) {
             assert_true(counters[idx] == static_cast<int>(sensors[idx].size()));
-        });
+        }));
     }
     manager.close(in);
     assert_true(last_timestamp + 1 == Nt);

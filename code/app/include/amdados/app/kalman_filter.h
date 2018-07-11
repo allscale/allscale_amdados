@@ -61,7 +61,7 @@ friend std::ostream& operator<<(std::ostream& out, const KalmanFilter& kf) {
 void PropagateStateInverse(VectorView & x, Matrix & P,
                            const Matrix & B, const Matrix & Q)
 {
-    const index_t N = x.Size();     // problem size
+    assert_decl(const index_t N = x.Size());     // problem size
 
     assert_true((P.NRows() == N) && (P.NCols() == N));
     assert_true(B.SameSize(P) && Q.SameSize(P));

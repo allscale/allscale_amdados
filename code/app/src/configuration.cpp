@@ -103,6 +103,7 @@ void Configuration::CheckExist(bool do_exist, const char * param_name) const
 {
     assert_true(do_exist) << "Parameter " << param_name
                           << " was not found" << std::endl;
+	(void)do_exist; //silence compiler warnings
 }
 
 //-----------------------------------------------------------------------------

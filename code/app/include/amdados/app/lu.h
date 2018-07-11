@@ -42,8 +42,8 @@ friend std::ostream& operator<<(std::ostream& out, const LUdecomposition& lud) {
 //-----------------------------------------------------------------------------
 void Init(const Matrix & M)
 {
-    const double TINY = std::numeric_limits<double>::min() /
-		       std::pow(std::numeric_limits<double>::epsilon(),3);
+    assert_decl(const double TINY = std::numeric_limits<double>::min() /
+		       std::pow(std::numeric_limits<double>::epsilon(),3));
 
     assert_true(M.IsSquare());
     const index_t N = M.NRows();     // problem size; M is square
@@ -103,8 +103,7 @@ void Solve(VectorView & x, const VectorView & b) const
 	const index_t  * P = m_Perm.data();     // permutation
 	const index_t    N = A.NRows();         // problem size; A is square
 
-	bool ok = ((x.Size() == N) && (b.Size() == N));
-    assert_true(ok);
+    assert_true(((x.Size() == N) && (b.Size() == N)));
 
     for (index_t i = 0; i < N; ++i) {
         const index_t Pi = P[i];
