@@ -31,19 +31,19 @@
 #ifndef AMDADOS_PLAIN_MPI
 #define AMDADOS_PLAIN_MPI
 #endif
-#include "../include/debugging.h"
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
-#include "../include/configuration.h"
-#include "../include/cholesky.h"
-#include "../include/lu.h"
-#include "../include/kalman_filter.h"
+#include "../include/amdados/app/debugging.h"
+#include "../include/amdados/app/amdados_utils.h"
+#include "../include/amdados/app/matrix.h"
+#include "../include/amdados/app/configuration.h"
+#include "../include/amdados/app/cholesky.h"
+#include "../include/amdados/app/lu.h"
+#include "../include/amdados/app/kalman_filter.h"
 #include "mpi_basic.h"
 #include "mpi_grid.h"
 #include "mpi_subdomain.h"
 #include "mpi_input_data.h"
 #include "mpi_output.h"
-#include "../include/sensors_generator.h"
+#include "../include/amdados/app/sensors_generator.h"
 // Include source files directly for simpler maintenance of the MPI project.
 #include "../src/amdados_utils.cpp"
 #include "../src/configuration.cpp"
@@ -380,10 +380,10 @@ void ComputeR(const Configuration & conf, Matrix & R)
 //-----------------------------------------------------------------------------
 void GetObservations(SubDomain * sd, long timestamp)
 {
-    const int n = sd->m_observations.NCols();
+    const index_t n = sd->m_observations.NCols();
     assert_true(sd->m_z.Size() == n);
-    for (int i = 0; i < n; ++i) {
-        sd->m_z(i) = sd->m_observations((int)timestamp, i);
+    for (index_t i = 0; i < n; ++i) {
+        sd->m_z(i) = sd->m_observations((index_t)timestamp, i);
     }
 
 #ifdef AMDADOS_DEBUGGING
@@ -392,10 +392,10 @@ void GetObservations(SubDomain * sd, long timestamp)
     assert_true(sd->m_H.NCols() == (sd->m_size.x + 2) * (sd->m_size.y + 2));
     Matrix subfield(static_cast<int>(sd->m_size.x + 2),
                     static_cast<int>(sd->m_size.y + 2));
-    for (int i = 0; i < static_cast<int>(sd->m_sensors.size()); ++i) {
+    for (index_t i = 0; i < static_cast<index_t>(sd->m_sensors.size()); ++i) {
         subfield(static_cast<int>(sd->m_sensors[(size_t)i].x + 1),
                  static_cast<int>(sd->m_sensors[(size_t)i].y + 1)) =
-            sd->m_observations((int)timestamp, i);
+            sd->m_observations((index_t)timestamp, i);
     }
     Vector _z(n);
     MatVecMult(_z, sd->m_H, subfield);    // _z = H * observations(t)

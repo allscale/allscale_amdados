@@ -1,0 +1,69 @@
+#/bin/bash
+
+# check whether correct results are computed by amdados
+# return 0 if results match reference data, return 1 if results are incorrect
+
+# stop on any error
+set -e
+
+# set the number of threads to use to 4 if not set to something else already
+export NPROC="${NPROC:-4}"
+
+# set a cpu time limit (in seconds)
+ulimit -t 3600
+
+# default to "2" problem size if no other size was specified, print usage if requested
+CASE="2"
+if [ "$#" -eq 1 ]; then
+	case "$1" in 
+		"-h"|"-help"|"--help")
+			echo "Usage: $0 <problem size>"
+			exit 1
+			;;
+	esac
+	CASE="$1"
+fi
+
+# prepare additional arguments
+if [ ! -z "$RUNNING_IN_ALLSCALE_RUNTIME" ]; then
+	export ADDITIONAL_ARGUMENTS="--hpx:threads=$NPROC --hpx:bind=none --"
+fi
+
+# run application, capture output to get output file name
+cd @PROJECT_BINARY_DIR@/app
+OUTPUT=$(NUM_WORKERS="$NPROC" /usr/bin/time -v @PROJECT_BINARY_DIR@/app/amdados $ADDITIONAL_ARGUMENTS --scenario benchmark:${CASE} --config @PROJECT_BINARY_DIR@/app/amdados.conf)
+# grep for filename in output
+FILENAME=`echo $OUTPUT | grep -o '\(field_Nx[0-9][0-9]*_Ny[0-9][0-9]*_Nt[0-9][0-9]*\.bin\)'`
+
+REFERENCE_PATH="@PROJECT_SOURCE_DIR@/../output/$FILENAME"
+GENERATED_PATH="@PROJECT_BINARY_DIR@/app/output/$FILENAME"
+
+echo "RESULT CHECK: Checking for problem size \"${CASE}\""
+
+# check if reference file present and not empty
+if [ ! -s "$REFERENCE_PATH" ] ; then
+	echo "RESULT CHECK: [FAILED] File $REFERENCE_PATH is missing or empty!"
+	exit 1
+fi
+
+# check if generated file present and not empty
+if [ ! -s "$GENERATED_PATH" ] ; then
+	echo "RESULT CHECK: [FAILED] File $GENERATED_PATH is missing or empty!"
+	exit 1
+fi
+
+# compare output
+set +e
+bash -c "diff <(sort $GENERATED_PATH) <(sort $REFERENCE_PATH)"
+RETVAL=$?
+set -e
+
+echo -n "RESULT CHECK: "
+if [ ${RETVAL} -eq 0 ] ; then
+	echo "[  OK  ] Computed solution matches reference for problem size \"${CASE}\""
+else
+	echo "[FAILED] Computed solution does not match reference for problem size \"${CASE}\"!"
+fi
+
+# exit with corresponding exit code
+exit ${RETVAL}

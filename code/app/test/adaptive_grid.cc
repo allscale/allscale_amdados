@@ -1,5 +1,9 @@
+//-----------------------------------------------------------------------------
+// Author    : Albert Akhriev, albert_akhriev@ie.ibm.com
+// Copyright : IBM Research Ireland, 2017
+//-----------------------------------------------------------------------------
+
 #ifndef AMDADOS_PLAIN_MPI
-// This implementation is based on Allscale API, no MPI at all.
 
 #include <gtest/gtest.h>
 #include "allscale/utils/assert.h"
@@ -199,7 +203,7 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
                 AdaptiveGridCell<int, FourLayerCellConfig> & cell)
         {
             unsigned int old = cell.getActiveLayer();
-            for (unsigned int i = 0; i < NUM_LAYERS; ++i) {
+            for (int i = 0; i < NUM_LAYERS; ++i) {
                 cell.setActiveLayer(i);
                 const auto sz = cell.getActiveLayerSize();
                 std::cout << "layer: " << i << ", size: " << sz << std::endl;
@@ -217,7 +221,7 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
         };
 
         // Initialize. Important!
-        for (unsigned int i = 0; i < NUM_LAYERS; ++i) {
+        for (int i = 0; i < NUM_LAYERS; ++i) {
             cell.setActiveLayer(i);
             //cell.forAllActiveNodes([=](int& element) { element = i; });
             const auto sz = cell.getActiveLayerSize();
@@ -242,14 +246,15 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
         for (unsigned int i = 0; i < NUM_LAYERS; ++i) {
             cell.setActiveLayer(0);
             unsigned long count = 0;
-            const auto sz = cell.getActiveLayerSize();
+            assert_decl(const auto sz = cell.getActiveLayerSize(););
             cell.forAllActiveNodes(
-                [&](const allscale::utils::Vector<long,2> & pos, int & cur) {
-                    const long x = pos.x;
-                    const long y = pos.y;
+                [&](const GridPoint<2> & pos, int & cur) {
+                    const auto x = pos.x;
+                    const auto y = pos.y;
                     assert_true(count == x*sz.y + y);   // y is faster!
                     cell[{x,y}] = ++count;
                     assert_true((cell[{x,y}] == cur));
+					(void)cur; // silence compiler warning for non-assert builds
             });
             assert_true(count == sz.x * sz.y);
         }
@@ -288,7 +293,7 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
 //        cell.refine([](const int & element) { return element; });
 //        PrintAllLayers(cell);
 
-        std::srand(std::time(nullptr));
+        std::srand(static_cast<unsigned>(std::time(nullptr)));
         for (int test = 0; test < 10; ++test) {
             for (int l = 0; l < 4; ++l) {
                 cell.setActiveLayer(l);
@@ -298,7 +303,6 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
                 if (!((W > 1) && (H > 1)))
                     continue;
 
-                bool ok = false;
                 std::vector<int> boundary;
                 std::vector<int> left( static_cast<size_t>(H)),
                                  right(static_cast<size_t>(H));
@@ -310,22 +314,18 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
                     right[static_cast<size_t>(y)] = cell[{W-1,y}] = std::rand();
                 }
                 boundary = cell.getBoundary(Left);
-                ok = std::equal(left.begin(), left.end(), boundary.begin());
-                assert_true(ok);
+                assert_true(std::equal(left.begin(), left.end(), boundary.begin()));
                 boundary = cell.getBoundary(Right);
-                ok = std::equal(right.begin(), right.end(), boundary.begin());
-                assert_true(ok);
+                assert_true(std::equal(right.begin(), right.end(), boundary.begin()));
 
                 for (int x = 0; x < W; ++x) {
                     bottom[static_cast<size_t>(x)] = cell[{x,  0}] = std::rand();
                     top   [static_cast<size_t>(x)] = cell[{x,H-1}] = std::rand();
                 }
                 boundary = cell.getBoundary(Down);
-                ok = std::equal(bottom.begin(), bottom.end(), boundary.begin());
-                assert_true(ok);
+                assert_true(std::equal(bottom.begin(), bottom.end(), boundary.begin()));
                 boundary = cell.getBoundary(Up);
-                ok = std::equal(top.begin(), top.end(), boundary.begin());
-                assert_true(ok);
+                assert_true(std::equal(top.begin(), top.end(), boundary.begin()));
 
                 std::generate(  left.begin(),   left.end(), std::rand);
                 std::generate( right.begin(),  right.end(), std::rand);
@@ -334,16 +334,12 @@ void insert(Fragment& fragment, const utils::Archive& archive) {
                 cell.setBoundary(Left, left);
                 cell.setBoundary(Right, right);
                 for (int y = 0; y < H; ++y) {
-                    ok = (left [static_cast<size_t>(y)] == cell[{0  ,y}]);
-                    assert_true(ok);
-                    ok = (right[static_cast<size_t>(y)] == cell[{W-1,y}]);
-                    assert_true(ok);
+                    assert_true((left [static_cast<size_t>(y)] == cell[{0  ,y}]));
+                    assert_true((right[static_cast<size_t>(y)] == cell[{W-1,y}]));
                 }
                 for (int x = 0; x < W; ++x) {
-                    ok = (bottom[static_cast<size_t>(x)] = cell[{x,  0}]);
-                    assert_true(ok);
-                    ok = (top   [static_cast<size_t>(x)] = cell[{x,H-1}]);
-                    assert_true(ok);
+                    assert_true((bottom[static_cast<size_t>(x)] = cell[{x,  0}]));
+                    assert_true((top   [static_cast<size_t>(x)] = cell[{x,H-1}]));
                 }
             }
         }

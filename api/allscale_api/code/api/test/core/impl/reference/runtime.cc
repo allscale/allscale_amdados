@@ -10,6 +10,12 @@ namespace core {
 namespace impl {
 namespace reference {
 
+	TEST(Runtime, Clock) {
+		auto a = RuntimePredictor::clock::now();
+		auto b = RuntimePredictor::clock::now();
+		EXPECT_LT(a, b);
+	}
+
 	TEST(Runtime, SimpleTask) {
 		treeture<int> future = spawn<false>([]{ return 12; });
 		EXPECT_EQ(12,future.get());
@@ -317,17 +323,17 @@ namespace reference {
 	}
 
 
-	constexpr unsigned const_fib(unsigned n) {
-		return (n <= 1) ? n : (const_fib(n-1) + const_fib(n-2));
-	}
+	//constexpr unsigned const_fib(unsigned n) {
+	//	return (n <= 1) ? n : (const_fib(n-1) + const_fib(n-2));
+	//}
 
 	unsigned fib(unsigned n) {
 		if (n <= 1) return n;
 		return fib(n-1) + fib(n-2);
 	}
 
-	const unsigned STRESS_N = 43;
-	const unsigned STRESS_RES = const_fib(STRESS_N);
+	//const unsigned STRESS_N = 43;
+	//const unsigned STRESS_RES = const_fib(STRESS_N);
 
 	TEST(Runtime, FibSeq) {
 

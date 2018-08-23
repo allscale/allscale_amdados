@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# This scripts creates mpi_amdados.cpp file on the fly and compiles
+# pure MPI version of Amdados application. Recall, we cannot create
+# permanent *.cpp files for MPI version to avoid any interference
+# with CMake building framework. Options:
+# -d : debugging mode; -r : release mode; -l : launch applications
+# after building.
+
 # Blank lines.
 for i in {1..5}; do echo ""; done
 
@@ -12,7 +19,7 @@ if [ ! -f build/app/amdados ]; then
     bash ./standard.build.sh
 fi
 
-# Generate main() function.
+# Generate cpp file containing main() function.
 CWD=$(pwd)
 cat > build/mpi_amdados.cpp << EOF
 #include "${CWD}/code/app/mpi_src/mpi_simulation.h"
@@ -23,7 +30,7 @@ EOF
 
 # By default we choose debugging mode and do not run the application.
 LAUNCH=false
-DEBUG=true;
+DEBUG=false;
 
 # Parse the input arguments.
 while getopts ":drl" opt; do
@@ -55,7 +62,7 @@ if ${LAUNCH} ; then
         NUMPROC=$(getconf _NPROCESSORS_ONLN)
     elif [[ $(uname) == "Darwin" ]]; then
         # I have "open-mpi" on Mac OS, and open-mpi wants to know the exact
-        # number of cores (not processors!), so overcommit is not tolerated.
+        # number of cores (not processors!) - overcommit is not tolerated.
         NUMPROC=$(system_profiler SPHardwareDataType | \
                     grep 'Total Number of Cores' | awk '{print $5}')
     fi

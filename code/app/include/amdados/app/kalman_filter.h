@@ -34,6 +34,25 @@ KalmanFilter()
 }
 
 //-----------------------------------------------------------------------------
+// Prints this object.
+//-----------------------------------------------------------------------------
+friend std::ostream& operator<<(std::ostream & out, const KalmanFilter & kf) {
+	out << "KalmanFilter: [ ";
+	out << kf.m_chol << ", ";
+	out << kf.m_lu << ", ";
+	out << kf.m_x_tmp << ", ";
+	out << kf.m_y << ", ";
+	out << kf.m_invSy << ", ";
+	out << kf.m_S << ", ";
+	out << kf.m_P_tmp << ", ";
+	out << kf.m_PHt << ", ";
+	out << kf.m_HP << ", ";
+	out << kf.m_invSHP << ", ";
+	out << " ]" << std::endl;
+	return out;
+}
+
+//-----------------------------------------------------------------------------
 // Function propagates state and covariance one timestep ahead and obtains
 // prior estimations: x_prior = A*x, P_prior = A*P*A^t + Q, where A is
 // the process model matrix, which is available by its inversion B = A^{-1}.
@@ -42,10 +61,10 @@ KalmanFilter()
 // @param  B  inverse model matrix: B = A^{-1}.
 // @param  Q  process noise covariance.
 //-----------------------------------------------------------------------------
-void PropagateStateInverse(VectorView & x, Matrix & P,
+void PropagateStateInverse(Vector & x, Matrix & P,
                            const Matrix & B, const Matrix & Q)
 {
-    const int N = x.Size();     // problem size
+    assert_decl(const index_t N = x.Size());     // problem size
 
     assert_true((P.NRows() == N) && (P.NCols() == N));
     assert_true(B.SameSize(P) && Q.SameSize(P));
@@ -74,11 +93,11 @@ void PropagateStateInverse(VectorView & x, Matrix & P,
 // @param  R  measurement noise (v) covariance.
 // @param  z  vector of observations.
 //-----------------------------------------------------------------------------
-void SolveFilter(VectorView & x, Matrix & P,
-                 const Matrix & H, const Matrix & R, const VectorView & z)
+void SolveFilter(Vector & x, Matrix & P,
+                 const Matrix & H, const Matrix & R, const Vector & z)
 {
-    const int N = x.Size();     // problem size
-    const int O = z.Size();     // number of observations
+    const index_t N = x.Size();     // problem size
+    const index_t O = z.Size();     // number of observations
 
     assert_true((P.NRows() == N) && (P.NCols() == N));
     assert_true((H.NRows() == O) && (H.NCols() == N));

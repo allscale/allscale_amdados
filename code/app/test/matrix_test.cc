@@ -4,7 +4,6 @@
 //-----------------------------------------------------------------------------
 
 #ifndef AMDADOS_PLAIN_MPI
-// This implementation is based on Allscale API, no MPI at all.
 
 #include <gtest/gtest.h>
 #include "allscale/utils/assert.h"
@@ -14,8 +13,8 @@
 #include <fstream>
 #include <string>
 #include <limits>
-#include "../include/amdados_utils.h"
-#include "../include/matrix.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/matrix.h"
 #define ARMA_USE_CXX11
 #define ARMA_DONT_USE_WRAPPER
 #define ARMA_DONT_USE_LAPACK
@@ -25,7 +24,12 @@
 #define ARMA_DONT_USE_SUPERLU
 #define ARMA_DONT_USE_HDF5
 #define ARMA_DONT_USE_OPENMP
-#include "../../../api/armadillo/include/armadillo"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+	#include "../../../api/armadillo/include/armadillo"
+#pragma GCC diagnostic pop
 
 using namespace ::amdados;
 

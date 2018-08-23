@@ -1,0 +1,22 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Albert Akhriev, albert_akhriev@ie.ibm.com
+# IBM Research Dublin (c), 2017-2018
+#------------------------------------------------------------------------------
+
+echo "Copying the project to the blade machine ..."
+
+DESTIN="${PPC9}:/home/${USER}/work/"
+
+rsync -arv \
+--exclude 'output*' --exclude 'build' --exclude '__pycache__' \
+--exclude '*.jpg' --exclude '*.pdf' --exclude 'doc*' --exclude 'experimental' \
+--exclude '*.tgz' --exclude '*.zip' --exclude '.git*' \
+--exclude 'tags' --exclude 'Release' --exclude 'Debug' \
+--exclude '*.*.swp' --exclude '*~' --exclude '*.swo' --exclude '*.log' \
+../allscale_amdados ${DESTIN}
+
+echo ""
+echo ""
+echo ""
+

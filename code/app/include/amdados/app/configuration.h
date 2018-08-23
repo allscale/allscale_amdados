@@ -56,6 +56,22 @@ public:
     void SetInt(const char * param_name, int value = 0);
     void SetDouble(const char * param_name, double value = 0.0);
     void SetString(const char * param_name, const char * value = "");
+
+	friend std::ostream& operator<<(std::ostream & out,
+                                    const Configuration & c) {
+		out << "Configuration: [ ";
+		for (const auto & e : c.m_params) {
+			out << e.first;
+			out << ", ";
+			out << e.second.name << ", ";
+			out << e.second.svalue << ", ";
+			out << e.second.dvalue << ", ";
+			out << e.second.type << "; ";
+		}
+		out << "]";
+		out << std::endl;
+		return out;
+	}
 };
 
 } // namespace amdados

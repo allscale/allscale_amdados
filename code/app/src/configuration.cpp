@@ -4,15 +4,19 @@
 //-----------------------------------------------------------------------------
 
 #ifndef AMDADOS_PLAIN_MPI
-#include "allscale/utils/assert.h"
 #include <cmath>
+#include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <chrono>
 #include <limits>
 #include <map>
-#include "../include/debugging.h"
-#include "../include/configuration.h"
+
+#include "allscale/utils/assert.h"
+
+#include "amdados/app/debugging.h"
+#include "amdados/app/configuration.h"
 #endif  // AMDADOS_PLAIN_MPI
 
 namespace amdados {
@@ -30,7 +34,8 @@ Configuration::Configuration() : m_params()
 void Configuration::ReadConfigFile(const std::string & filename)
 {
     std::fstream f(filename, std::ios::in);
-    assert_true(f.good()) << "ERROR: failed to open configuration file";
+    assert_true(f.good()) << "ERROR: failed to open configuration file "
+                          << filename;
     int lineNo = 1;
     std::string line, token, name;
     // Read line by line.
@@ -48,13 +53,13 @@ void Configuration::ReadConfigFile(const std::string & filename)
             // Comment is the 1st or the 3rd token in a line.
             if (!token.empty() && (token[0] == '#')) {
                 assert_true((count == 1) || (count == 3))
-                    << "ERROR at line " << filename << ":" << lineNo << "\n"
-                    << "comment may present in the "
+                    << "ERROR at line " << filename << ":" << lineNo
+                    << "\n" << "comment may present in the "
                     << "1st or the 3rd token in a line";
                 break;
             }
             // If not comment, the 1st token is the name, the 2nd one is
-            // the value. The value is a "double", if sscanf() succeeded,
+            // the value. The value is a "double" if sscanf() succeeded,
             // otherwise a "string".
             if (count == 1) {
                 name = token;
@@ -68,8 +73,8 @@ void Configuration::ReadConfigFile(const std::string & filename)
             }
         }
         assert_true(!f.bad())
-            << "ERROR at line " << filename << ":" << lineNo
-            << "\nfailure while reading configuration file";
+            << "ERROR at line " << filename << ":" << lineNo << "\n"
+            << "failure while reading configuration file";
     }
 }
 
@@ -110,7 +115,9 @@ void Configuration::PrintParameters() const
 //-----------------------------------------------------------------------------
 void Configuration::CheckExist(bool do_exist, const char * param_name) const
 {
-    assert_true(do_exist) << "Parameter " << param_name << " was not found";
+    assert_true(do_exist) << "Parameter " << param_name
+                          << " was not found" << "\n";
+	(void)do_exist;     // silence compiler warnings
 }
 
 //-----------------------------------------------------------------------------
@@ -120,10 +127,10 @@ void Configuration::CheckType(const Configuration::Parameter & p,
                               ParamType expected) const
 {
     assert_true(p.type != UNKNOWN_T)
-        << "Parameter " << p.name << " has no type defined";
+        << "Parameter " << p.name << " has no type defined" << "\n";
     assert_true(p.type == expected)
         << "Parameter " << p.name << " is expected to be a "
-        << ((expected == NUMERIC_T) ? "numeric" : "string");
+        << ((expected == NUMERIC_T) ? "numeric" : "string") << "\n";
 }
 
 //-----------------------------------------------------------------------------
@@ -133,8 +140,8 @@ void Configuration::CheckIntRange(double value) const
 {
     assert_true((std::numeric_limits<int>::lowest() <= value) &&
                 (value <= std::numeric_limits<int>::max()))
-        << "the value '" << value << "' causes numerical overflow\n"
-        << "when converted to an integer parameter";
+        << "the value '" << value << "' causes numerical overflow" << "\n"
+        << "when converted to an integer parameter" << "\n";
 }
 
 //-----------------------------------------------------------------------------

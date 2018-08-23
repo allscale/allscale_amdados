@@ -5,19 +5,22 @@
 
 #ifndef AMDADOS_PLAIN_MPI
 #include <cmath>
+#include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <chrono>
 #include <string>
 #include <map>
 #include <vector>
+
 #include "allscale/utils/assert.h"
-#include "../include/debugging.h"
-#include "../include/amdados_utils.h"
-#include "../include/configuration.h"
-// TODO: for some strange reason I cannot place these global variables in
-// "amdados.cxx" - linker error. So, the temporary solution.
-std::fstream gLogFile;      // global instance of log-file
+
+#include "amdados/app/debugging.h"
+#include "amdados/app/amdados_utils.h"
+#include "amdados/app/configuration.h"
+// Linker error if place this global variable in "amdados.cxx".
+std::fstream gLogFile;      		// global instance of log-file
 #endif  // AMDADOS_PLAIN_MPI
 
 namespace amdados {
@@ -28,6 +31,7 @@ namespace amdados {
 #ifdef AMDADOS_DEBUGGING
 void CheckFileExists(const Configuration &, const std::string & filename)
 {
+    // XXX
     if (!std::fstream(filename, std::ios::in).good()) {
         MY_LOG(ERROR) << "failed to open file (not existing?): " << filename;
         std::exit(1);
@@ -43,11 +47,15 @@ void CheckFileExists(const Configuration &, const std::string &) {}
  */
 uint64_t RandomSeed()
 {
+#ifdef AMDADOS_DEBUGGING
+    return 2063;
+#else
     using hrclock_t = std::chrono::high_resolution_clock;
     long prev = hrclock_t::now().time_since_epoch().count();
     long seed = 0;
     while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
     return (uint64_t)seed;
+#endif
 }
 
 /**
@@ -72,6 +80,8 @@ std::string MakeFileName(const Configuration & conf, const std::string & what)
         filename << "_Nt" << conf.asInt("Nt") << ".txt";
     } else if (what == "field") {
         filename << "_Nt" << conf.asInt("Nt") << ".bin";
+    } else if (what == "final_field") {
+        filename << "_Nt" << conf.asInt("Nt") << ".txt";
     } else {
         assert_true(0) << "unknown entity to make a file name from";
     }

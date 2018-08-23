@@ -5,13 +5,18 @@
 
 #pragma once
 
+/////////////////////////////////////////////////////////////////////
+// Error handling, messaging and logging facilities for debugging. //
+/////////////////////////////////////////////////////////////////////
+
 #if defined(AMDADOS_DEBUGGING)
 #error AMDADOS_DEBUGGING macro redefinition
 #endif
-// A T T E N T I O N: Comment out the line below in the final release.
-#define AMDADOS_DEBUGGING
 
-#if defined(MY_LOG) || defined(MY_TIME_IT)
+// A T T E N T I O N: Comment out the line below in the final release.
+//#define AMDADOS_DEBUGGING
+
+#if defined(MY_LOG) || defined(MY_TIME_IT) || defined(MY_HERE)
 #error macro redefinition
 #endif
 
@@ -21,7 +26,14 @@
 
 #if defined(AMDADOS_DEBUGGING) || defined(AMDADOS_PLAIN_MPI)
 
-#include <iomanip>
+#ifdef AMDADOS_PLAIN_MPI
+#define MY_HERE { int rank = 0; MPI_Comm_rank(MPI_COMM_WORLD, &rank); \
+    if (rank == 0) std::cout << "Here at: " << __FILE__ << ":" << __LINE__ \
+                             << std::endl; }
+#else
+#define MY_HERE { std::cout << "Here at: " << __FILE__ << ":" << __LINE__ \
+                            << std::endl; }
+#endif
 
 //=============================================================================
 // Simple logging implementation. It is NOT thread safe, but could easily be.
@@ -42,14 +54,14 @@ public:
             ((m_type == MY_LOGGING_WARNING) ? " [WARNING] " : " [ERROR] "));
         gLogFile << std::put_time(tm_info, "%d-%m-%Y %H-%M-%S")
                  << type << m_ss.str() << std::endl;
+        int rank = 0;
 #ifdef AMDADOS_PLAIN_MPI
-        int rank = -1;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
         if (rank == 0) {
             std::cout << std::put_time(tm_info, "%d-%m-%Y %H-%M-%S")
                       << type << m_ss.str() << std::endl;
         }
-#endif
     }
 
     MyLogger & operator<<(const char * s) {
@@ -135,6 +147,7 @@ private:
     bool              m_cond;   // status of condition
 };
 #define assert_true(cond) MyAssertTrue(cond, __FILE__, __LINE__)
+#define assert_decl(_DECL) _DECL
 
 #endif  // AMDADOS_PLAIN_MPI
 
@@ -145,7 +158,7 @@ private:
 #if defined(AMDADOS_PLAIN_MPI)
 
 //=============================================================================
-// Simple timer.
+// Simple timer for MPI version.
 //=============================================================================
 class MyTimer
 {
@@ -165,21 +178,10 @@ public:
 
 #elif defined(AMDADOS_DEBUGGING)
 
-//#include <cstdlib>
-//#include <cstdio>
-//#include <unistd.h>            // for access(), mkstemp()
-//#include <iostream>
-//#include <fstream>
-//#include <sstream>
-//#include <iomanip>
-//#include <stdexcept>
-#include <chrono>
-//#include <mutex>
-
 #warning !!! AMDADOS_DEBUGGING is enabled !!!
 
 //=============================================================================
-// Simple timer.
+// Simple timer for Allscale API version.
 //=============================================================================
 class MyTimer
 {

@@ -1,9 +1,9 @@
-libdir=/Users/albert/work/allscale_amdados/api/armadillo/lib
-includedir=/Users/albert/work/allscale_amdados/api/armadillo/include
+libdir=/Users/albert/work/tmp/allscale_amdados/api/armadillo/lib
+includedir=/Users/albert/work/tmp/allscale_amdados/api/armadillo/include
 
 Name: armadillo
 Description: Fast C++ matrix library with syntax similar to MATLAB and Octave
 URL: http://arma.sourceforge.net
-Version: 8.600.0
+Version: 9.100.5
 Cflags: -I${includedir}
 Libs: -L${libdir} -larmadillo

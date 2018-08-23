@@ -90,7 +90,8 @@ virtual void Write(long timestamp, const MpiGrid & grid)
 //        PrintErrorAndExit(nullptr);
 //    }
 
-    MPI_Offset len = m_buffer.size() * sizeof(float), offset = 0;
+    MPI_Offset len = static_cast<MPI_Offset>(m_buffer.size() * sizeof(float));
+    MPI_Offset offset = 0;
     MPI_CHECK(MPI_Exscan(&len, &offset, 1,
                          MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD));
 

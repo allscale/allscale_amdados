@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# This script is executed by the CI server to test the SDK by creating a
+# demo application, building it, and testing it.
+
+set -ex
+
+# -------------------------------------------------- Defaults
+# CMake Build Type (Debug / Release).
+export BUILD_TYPE="${BUILD_TYPE:-Release}"
+
+# Number of cores used for compilation and testing.
+export NPROC="${NPROC:-$(nproc)}"
+
+# Set default nice level.
+export NICE_LEVEL="${NICE_LEVEL:-10}"
+
+# Location of Third Party Libraries.
+export THIRD_PARTY_LIBS="${THIRD_PARTY_LIBS:-$HOME/third_party_libs}"
+
+# Assume Workspace if not set.
+CI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export WORKSPACE="${WORKSPACE:-"$(realpath "$CI_DIR/../..")"}"
+
+# Assume Build Directory if not set.
+export BUILD_DIR="${BUILD_DIR:-$WORKSPACE/build}"
+
+# Should we use the AllScale compiler?
+export ALLSCALECC="${ALLSCALECC:-OFF}"
+
+# -------------------------------------------------- Configuration
+# Setup build directory.
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+# Setup third_party directory.
+if [[ "$ALLSCALECC" == "ON" ]]; then
+	PREFIX="$THIRD_PARTY_LIBS" "$WORKSPACE/scripts/dependencies/third_party_linker"
+fi
+
+# -------------------------------------------------- Clean CMake
+rm -rf CMake* *.cmake
+
+# -------------------------------------------------- Build
+if [[ -n ${NIGHTLY_ALLSCALECC+x} && "$ALLSCALECC" == "ON" ]]; then
+	ALLSCALE_CMAKE="-DOVERRIDE_ALLSCALECC=$NIGHTLY_ALLSCALECC"
+else
+	ALLSCALE_CMAKE="-DUSE_ALLSCALECC=$ALLSCALECC"
+fi
+
+cmake "$WORKSPACE/code" \
+	-DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+	-DCMAKE_CXX_FLAGS="-Werror" \
+	"$ALLSCALE_CMAKE"
+
+/usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h make -j "$NPROC" app_amdados
+
+# -------------------------------------------- Run Application Tests
+/usr/bin/time -v nice -n "$NICE_LEVEL" /usr/bin/timeout 1h ./verify_output.sh 2

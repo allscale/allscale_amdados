@@ -4,8 +4,8 @@ Description goes here...
 
 ## Quickstart
 
-Ensure you have GCC 5 installed and set as your default C/C++ compiler.
-Furthermore CMake 3.5 (or later) is required for the build and testing process.
+Ensure you have GCC 6 (or 7) installed and set as your default C/C++ compiler.
+Furthermore CMake 3.6 (or later) is required for the build and testing process.
 Simply execute the following commands to build the project and run all tests.
 
     $ mkdir build
@@ -20,17 +20,19 @@ Simply execute the following commands to build the project and run all tests.
 
 Following options can be supplied to CMake
 
-| Option              | Values          |
-| ------------------- | --------------- |
-| -DCMAKE_BUILD_TYPE  | Release / Debug |
-| -DBUILD_SHARED_LIBS | ON / OFF        |
-| -DBUILD_TESTS       | ON / OFF        |
-| -DBUILD_DOCS        | ON / OFF        |
-| -DUSE_ASSERT        | ON / OFF        |
-| -DUSE_VALGRIND      | ON / OFF        |
-| -DUSE_ALLSCALECC    | ON / OFF        |
-| -DENABLE_PROFILING  | ON / OFF        |
-| -DTHIRD_PARTY_DIR   | \<path\>        |
+| Option                  | Values          |
+| ----------------------- | --------------- |
+| -DCMAKE_BUILD_TYPE      | Release / Debug |
+| -DBUILD_SHARED_LIBS     | ON / OFF        |
+| -DBUILD_TESTS           | ON / OFF        |
+| -DBUILD_DOCS            | ON / OFF        |
+| -DBUILD_COVERAGE        | ON / OFF        |
+| -DUSE_ASSERT            | ON / OFF        |
+| -DALLSCALE_CHECK_BOUNDS | ON / OFF        |
+| -DUSE_VALGRIND          | ON / OFF        |
+| -DUSE_ALLSCALECC        | ON / OFF        |
+| -DENABLE_PROFILING      | ON / OFF        |
+| -DTHIRD_PARTY_DIR       | \<path\>        |
 
 The files `cmake/build_settings.cmake` and `code/CMakeLists.txt` state their
 default value.
@@ -38,12 +40,17 @@ default value.
 ## Using the AllScale Compiler
 
 To use the AllScale compiler, you first have to setup the required dependencies
-in order to build it. A dependency installer is provided, running the following
-commands should be sufficient on most systems. See
-`scripts/dependencies/README.md` for more details.
+in order to build it. Some packages should be installed with your system's
+package manager, others must be installed via the provided dependency
+installer.  See `scripts/dependencies/README.md` for more details. The
+following commands assume you are using Ubuntu 16.04 LTS -- adjust the lines if
+you are using a different distribution.
 
-    $ scripts/dependencies/installer
-    $ scripts/dependencies/third_party_linker
+    $ sudo apt update
+    $ sudo apt install bison build-essential cmake flex git groff-base \
+      libcpufreq-dev libgmp10 libhwloc-dev libjemalloc-dev libluajit-5.1-dev \
+      libpapi-dev m4 pkg-config python ruby time wget zlib1g
+    $ scripts/dependencies/installer llvm boost cudd gmp zlib ghc cabal
 
 To build this project using the AllScale compiler, simply set the corresponding
 CMake option. You may want to use a separate build directory to easily switch
@@ -51,7 +58,8 @@ between GCC and AllScaleCC.
 
     $ mkdir build_with_allscalecc
     $ cd build_with_allscalecc
-    $ cmake -DUSE_ALLSCALECC=ON ..
+    $ ../scripts/dependencies/third_party_linker
+    $ cmake -DUSE_ALLSCALECC=ON ../code
     $ make -j8
     $ ctest -j8
 
@@ -77,6 +85,17 @@ This will add the files `sema.h`, `sema.cpp` and `sema_test.cc` to the
 containing `malloc_extension.h`, `malloc_extension.cpp` and
 `malloc_extension_test.cc` in their respective subdirectories.
 
+### Using a present AllScale Compiler / API project
+
+The following two CMake options allow you to manually set the AllScale Compiler
+and AllScale API to use. Note that `USE_ALLSCALECC` must *not* be enabled for
+this to work.
+
+| Option                  | Values                         |
+| ----------------------- | ------------------------------ |
+| -DOVERRIDE_ALLSCALECC   | *path to `allscalecc` binary*  |
+| -DOVERRIDE_ALLSCALE_API | *path to AllScale API project* |
+
 ### Executable Bit
 
 When working on Windows via SMB share, consider setting following Git setting.
@@ -94,7 +113,7 @@ header to each source file upon commit. See `scripts/license`.
 
 ### Visual Studio Solution
 
-    $ cmake -G "Visual Studio 14 Win64" -DBUILD_SHARED_LIBS=OFF Z:\path\to\project
+    $ cmake -G "Visual Studio 15 2017 Win64" -DBUILD_SHARED_LIBS=OFF Z:\path\to\project
 
 Add path for third-party libraries when needed.
 
@@ -112,6 +131,16 @@ It is preferred to use the operating system's package manager, if applicable.
 Make sure your build folder is located outside the source folder. Eclipse is
 not capable of dealing with such a setup correctly.
 
+### Coverage
+
+Building the coverage us currently only supported on Linux, as Perl and Bash
+are required. To build and view the coverage set the corresponding CMake flag
+to `ON` and run:
+
+    $ make
+    $ make coverage
+    $ xdg-open coverage/index.html
+    
 ### Armadillo Library
 
 The Armadillo matrix library is used only (!) for testing of matrix operations.

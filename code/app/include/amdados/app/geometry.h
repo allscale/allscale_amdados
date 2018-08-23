@@ -43,18 +43,18 @@ typedef ::allscale::api::user::data::AdaptiveGridCell<double,
 // Grid of sub-domains constitutes the whole domain.
 typedef ::allscale::api::user::data::Grid<subdomain_t, 2> domain_t;
 
-/**
- * Function maps a subdomain local coordinates to global ones.
- * \param  query_point     point in question local to subdomain.
- * \param  subdomain_pos   position of the subdomain inside a grid structure.
- * \param  subdomain_size  size of the subdomain.
- */
+//-----------------------------------------------------------------------------
+// Function maps a subdomain local coordinates to global ones.
+// \param  query_point     point in question local to subdomain.
+// \param  subdomain_pos   position of the subdomain inside a grid structure.
+// \param  subdomain_size  size of the subdomain.
+//-----------------------------------------------------------------------------
 inline point2d_t Sub2Glo(const point2d_t & query_point,
                          const point2d_t & subdomain_pos,
                          const size2d_t  & subdomain_size)
 {
-    const long x = query_point.x;
-    const long y = query_point.y;
+    const auto x = query_point.x;
+    const auto y = query_point.y;
 #ifndef NDEBUG
     if (!((static_cast<size_t>(x) < static_cast<size_t>(subdomain_size.x)) &&
           (static_cast<size_t>(y) < static_cast<size_t>(subdomain_size.y))))
@@ -63,6 +63,8 @@ inline point2d_t Sub2Glo(const point2d_t & query_point,
     return point2d_t(x + subdomain_pos.x * subdomain_size.x,
                      y + subdomain_pos.y * subdomain_size.y);
 }
+
+class Configuration;
 
 //-----------------------------------------------------------------------------
 // Function returns the grid size as a number of subdomains in both dimensions.
