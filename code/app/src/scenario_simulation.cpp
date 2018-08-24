@@ -703,7 +703,7 @@ void RunDataAssimilation(const Configuration         & conf,
     const point2d_t GridSize = GetGridSize(conf);   // size in subdomains
     const size_t    Nt = conf.asUInt("Nt");
     const size_t    Nsubiter = conf.asUInt("num_sub_iter");
-    const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
+	//const size_t    Nwrite = std::min(Nt, conf.asUInt("write_num_fields"));
 
     context_domain_t contexts(GridSize);    // variables of each sub-domain
     domain_t         state_field(GridSize); // grid of sub-domains
@@ -756,71 +756,59 @@ void RunDataAssimilation(const Configuration         & conf,
         }
     });
 
-    // Open file manager and the output file for writing.
-    std::string filename = MakeFileName(conf, "field");
-    FileIOManager & file_manager = FileIOManager::getInstance();
-    Entry stream_entry = file_manager.createEntry(filename, Mode::Binary);
-    auto out_stream = file_manager.openOutputStream(stream_entry);
+	
 
     // Time integration forward in time. We want to make Nt (normal) iterations
     // and Nsubiter sub-iterations within each (normal) iteration.
-    ::allscale::api::user::algorithm::stencil<
-        allscale::api::user::algorithm::implementation::coarse_grained_iterative
-    >(
+    ::allscale::api::user::algorithm::stencil<allscale::api::user::algorithm::implementation::coarse_grained_iterative>(
         state_field, Nt * Nsubiter,
-        // Process the internal and external subdomains.
-        [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx,
-                                       const domain_t & state)
+        [&,conf,Nsubiter,Nt](time_t t, const point2d_t & idx, const domain_t & state)
         -> const subdomain_t
-        {
-            assert_true(t >= 0);
+        {			
             subdomain_t temp_field;
-            if ((contexts[idx].sensors.size() > 0) && (t % kalman_time_gap == 0)) {
+            if (contexts[idx].sensors.size() > 0) {
                 SubdomainRoutineKalman(conf, sensors[idx],
                             observations[idx], size_t(t),
                             state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             } else {
-                SubdomainRoutineNoSensors(conf, size_t(t),
-                            state, temp_field, contexts[idx], idx, Nsubiter, Nt);
+               SubdomainRoutineNoSensors(conf, size_t(t),
+                           state, temp_field, contexts[idx], idx, Nsubiter, Nt);
             }
             return temp_field;
         },
         // Monitoring.
         ::allscale::api::user::algorithm::observer(
             // Time filter: choose time-slices evenly distributed on time axis.
-            [=](time_t t) {
+            [=](time_t /*t*/) {
                 // Filter out the first sub-iteration, skip the others.
-                if ((t % time_t(Nsubiter)) != 0) return false;
-                t /= time_t(Nsubiter);
-                return ((t == 0) || ( ((Nwrite - 1) * (t - 1)) / (Nt - 1) !=
-                                      ((Nwrite - 1) * (t + 0)) / (Nt - 1) ) );
+                //if ((t % time_t(Nsubiter)) != 0) return false;
+                //t /= time_t(Nsubiter);
+                //return ((((Nwrite-1)*(t-1))/(Nt-1) != ((Nwrite-1)*t)/(Nt-1)));
+				return false;
             },
             // Space filter: no specific points.
             [](const point2d_t &) { return true; },
             // Append a full field to the file of simulation results.
-            [&](time_t t, const point2d_t & idx, const subdomain_t & subdom) {
-                t /= time_t(Nsubiter);
-                // Important: we save field at the finest resolution.
-                subdomain_t temp;
-                temp = subdom;
-                while (temp.getActiveLayer() != LayerFine) {
-                    temp.refine([](const double & elem) { return elem; });
-                }
-                const size2d_t finest_layer_size = temp.getActiveLayerSize();
-                // Write the subdomain into file.
-                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
-                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
-                    out_stream.atomic([=](auto & file) {
-                        file.write(static_cast<float>(t));
-                        file.write(static_cast<float>(glo.x));
-                        file.write(static_cast<float>(glo.y));
-                        file.write(static_cast<float>(val));
-                    });
-                });
+            [&,Nsubiter](time_t /*t*/, const point2d_t & /*idx*/, const subdomain_t & /*cell*/) {
+//                t /= time_t(Nsubiter);
+//                // Important: we save field at the finest resolution.
+//                subdomain_t temp;
+//                temp = cell;
+//                while (temp.getActiveLayer() != LayerFine) {
+//                    temp.refine([](const double & elem) { return elem; });
+//                }
+//                const size2d_t finest_layer_size = temp.getActiveLayerSize();
+//                // Write the subdomain into file.
+//                temp.forAllActiveNodes([&](const point2d_t & loc, double val) {
+//                    point2d_t glo = Sub2Glo(loc, idx, finest_layer_size);
+//                    out_stream.atomic([=](auto & file) {
+//                        file << t << " " << glo.x << " " << glo.y << " " << val << "\n";
+//                    });
+//                });
             }
         )
     );
-    file_manager.close(out_stream);
+
 
     // Print the final field in textual format.
 	filename = MakeFileName(conf, "final_field");
@@ -851,7 +839,7 @@ void RunDataAssimilation(const Configuration         & conf,
     		file_manager.close(out_stream);
 		// need to output result file name for the CI system to pick it up
 	}).wait();
-	MY_LOG(INFO) << "Wrote result data to " << filename << "\n\n\n";
+
 }
 
 /**
@@ -930,8 +918,6 @@ void InitDependentParams(Configuration & conf)
  */
 void ScenarioSimulation(const std::string & config_file)
 {
-    MY_LOG(INFO) << "\n\n***** Amdados2D application *****\n"
-                 << "AMDADOS_DEBUGGING is enabled\n\n";
 
     // Read application parameters from configuration file,
     // prepare the output directory.
