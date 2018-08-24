@@ -108,8 +108,7 @@ if __name__ == "__main__":
 
             # Get the execution time and corresponding (global) problem size
             # and save the current scalability profile into the file.
-            problem_size = ( conf.num_subdomains_x * conf.subdomain_x *
-                             conf.num_subdomains_y * conf.subdomain_y )
+            problem_size = ( conf.num_subdomains_x * conf.num_subdomains_y )
             execute_time[i, :] = [problem_size, Nproc, simtime_secs, throughput_secs]
             np.savetxt(os.path.join(conf.output_dir, "scalability_performance.txt"),
                        execute_time)
