@@ -29,7 +29,7 @@ print(__doc__)
 
 from timeit import default_timer as timer
 import os, cmd
-from RandObservationsGenerator import InitDependentParams, Amdados2D
+from RandObservationsGenerator import InitDependentParams, Amdados2D_quick
 from Utility import *
 
 # Get subdomain sizes as multiplier factors
@@ -79,7 +79,7 @@ if __name__ == "__main__":
             config_file = conf.WriteParameterFile("scalability_test.conf")
             os.sync()
             # Python simulator generates the ground-truth and observations.
-            Amdados2D(config_file, False)
+            Amdados2D_quick(config_file, False)
 
             # Get the starting time.
             start_time = timer()
@@ -92,7 +92,7 @@ if __name__ == "__main__":
             print(AMDADOS_EXE, config_file)
             output = subprocess.Popen([AMDADOS_EXE, "--scenario", "simulation",
                                        "--config", config_file, "--hpx:threads=" + str(Nproc)], stdout=subprocess.PIPE)
-            os.sync()
+            output.wait()
 
             # Strip the execution time from stdout, both total simulation time
             # and throughput (subdomain/s)
