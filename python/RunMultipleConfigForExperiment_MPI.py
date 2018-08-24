@@ -27,42 +27,32 @@
 """
 print(__doc__)
 
-#import pdb; pdb.set_trace()           # enables debugging
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import sys, traceback, os, glob, getopt, math, argparse, subprocess
-import numpy as np
-import numpy.linalg
-import scipy
-import scipy.misc
-import scipy.sparse
-import scipy.sparse.linalg
 from timeit import default_timer as timer
-from Configuration import Configuration
-from ObservationsGenerator import InitDependentParams, Amdados2D
+import os, cmd
+from RandObservationsGenerator import InitDependentParams, Amdados2D
 from Utility import *
 
-# Grid sizes (number of subdomains in each direction) for scalability tests.
-# This is a set of big problems, can take forever: time -> infinity ...
-#GridSizes = [(11,11), (23,25), (43,41), (83,89), (167,163), (367,373)]
-# This is a reasonable set of problems, be patient for days to come ...
-#GridSizes = [(11,11), (19,17), (23,25), (37,31), (43,41), (83,89)]
-# Small problems for a relatively brief testing.
-#GridSizes = [(13,11), (17,13), (19,15), (23,21), (25,23), (27,25)]
-#GridSizes = [(13,11), (18,16), (23,21), (29,27), (34,32), (39,37)]
-GridSizes = [(2,2),(4,4),(8,8),(12,12),(16,16),(20,20),(24,24),(28,28),(32,32)]
 
+nthreads = np.arange(0,46,2)
+GridSizes = np.zeros([len(nthreads), 2])
+nthreads[0] = 1
+nthreads[1] = 3
+GridSizes[0:13, :] = ([4,2], [6,4], [8,4], [8,6],[8,8], [10,8],[12, 8],[16,7],
+                       [16,8], [12,12], [20,8], [16,11], [16,12])
+for i in range(13, len(GridSizes)):
+        GridSizes[i, :] = [(i)*2, 8]
+        problem_size= GridSizes[:,0]*GridSizes[:,1]
+
+execute_time =  np.zeros([len(nthreads), 4])
 # Integration period in seconds.
-IntegrationPeriod = 100 
-
+IntegrationPeriod = 25 
+IntegrationNsteps = 50
 # Path to the C++ executable.
-AMDADOS_EXE = "build/app/amdados"
+AMDADOS_EXE = "build/mpi_amdados"
 
 
 if __name__ == "__main__":
     try:
-        CheckPythonVersion()
         # Read configuration file.
         conf = Configuration("amdados.conf")
         # Create the output directory, if it does not exist.
@@ -73,17 +63,18 @@ if __name__ == "__main__":
 
         # For all the grid sizes in the list ...
         exe_time_profile = np.zeros((len(GridSizes),2))
-        for grid_no, grid in enumerate(GridSizes):
-            assert grid[0] >= 2 and grid[1] >= 2, "the minimum grid size is 2x2"
+        for i in range(0, len(nthreads)):
+            grid = GridSizes[i]
+            Nproc = nthreads[i]
             # Modify parameters given the current grid size.
             setattr(conf, "num_subdomains_x", int(grid[0]))
             setattr(conf, "num_subdomains_y", int(grid[1]))
             setattr(conf, "integration_period", int(IntegrationPeriod))
+            setattr(conf, "integration_nsteps", int(IntegrationNsteps))
             InitDependentParams(conf)
             conf.PrintParameters()
             config_file = conf.WriteParameterFile("scalability_test.conf")
-            subprocess.run("sync", check=True)
-
+            os.sync()
             # Python simulator generates the ground-truth and observations.
             Amdados2D(config_file, False)
 
@@ -92,20 +83,38 @@ if __name__ == "__main__":
 
             # Run C++ data assimilation application.
             print("##################################################")
-            print("Simulation by 'amdados' application ...")
-            print("silent if debugging & messaging were disabled")
+            print("Simulation by 'amdados' application for series of hpx threads")
+            print("Initial simulations for Oceans paper")
             print("##################################################")
-            subprocess.run([AMDADOS_EXE, "--scenario", "simulation",
-                                "--config", config_file], check=True)
+            print(AMDADOS_EXE, config_file)
+            print("NPROC =", str(Nproc))
+            output = subprocess.Popen(["mpirun", "--allow-run-as-root", "-np", str(Nproc),
+                "./build/mpi_amdados", "--scenario", "simulation", "--config", config_file], stdout=subprocess.PIPE)
+            output.wait()
+            assert output.returncode == 0, "amdados returned non-zero status"
+
+            # Strip the execution time from stdout, both total simulation time
+            # and throughput (subdomain/s)
+            strip_output = str(output.communicate()[0]).split('\\n')
+            for line in strip_output:
+                if re.search("Simulation took", line):
+                    simtime_string = line
+                if re.search("Throughput", line):
+                    throughput_string = line
+            print('simtime read =', simtime_string)
+            print('simtime string =', simtime_string.split(' ')[2][:-1])
+            print('throughput string =', throughput_string.split(' ')[1])
+
+            simtime_secs = float(simtime_string.split(' ')[2][:-1])
+            throughput_secs = float(throughput_string.split(' ')[1])
+
 
             # Get the execution time and corresponding (global) problem size
             # and save the current scalability profile into the file.
-            problem_size = ( conf.num_subdomains_x * conf.subdomain_x *
-                             conf.num_subdomains_y * conf.subdomain_y )
-            exe_time_profile[grid_no,0] = problem_size
-            exe_time_profile[grid_no,1] = timer() - start_time
-            np.savetxt(os.path.join(conf.output_dir, "scalability_size.txt"),
-                       exe_time_profile)
+            problem_size = ( conf.num_subdomains_x * conf.num_subdomains_y  )
+            execute_time[i, :] = [problem_size, Nproc, simtime_secs, throughput_secs]
+            np.savetxt(os.path.join(conf.output_dir, "scalability_performance_MPI.txt"),
+                       execute_time)
 
     except subprocess.CalledProcessError as error:
         traceback.print_exc()

@@ -124,18 +124,8 @@ def ProblemParametersFromFilename(filename, extract_Nt = True,
 def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
     """ Function reads the binary file where a number of solutions (full state
         fields) are stacked one after another. The file format has 4-column
-        layout, namely, each row is represented as a record of 4 values:
-        (time, abscissa, ordinate, value). Each record corresponds to a domain
-        point identified by time and location. All the values have float-32
+        layout (time, abscissa, ordinate, value), all values have float-32
         precision and records are not necessary sorted (in case of C++ output).
-        Collection of all point values with the same time-stamps represent
-        a solution field at that time.
-        Args:
-            filename (string): name of the input file of all solution fields.
-        Returns:
-            ndarray: sorted solution fields: field[t,x,y]; note, since x
-            preceding y, we have to transpose the last two dimensions when
-            plotting the field[t,:,:] at time t.
     """
     Nx, Ny, Nt = ProblemParametersFromFilename(filename, True, None)
     # Read the solution fields file and sort the records because the parallel
@@ -146,7 +136,7 @@ def ReadResultFile(filename) -> [np.ndarray, np.ndarray]:
     data = np.reshape(data, (-1,4))
     Nw = data.shape[0] // (Nx * Ny)     # number of written records per field
     assert data.shape[0] == Nx * Ny * Nw, "wrong file size"
-    idx = np.lexsort(np.rot90(data[:,0:3]))     # sort rows by (t,x,y) triples
+    idx = np.lexsort(np.rot90(data[:,0:3]))     # sort by {t,x,y} triples
     # Create the output fields and corresponding timestamps.
     timestamps = np.zeros((Nw,), dtype=int)
     fields = np.zeros((Nw, Nx, Ny), dtype=np.float32)

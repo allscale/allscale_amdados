@@ -13,7 +13,7 @@ from Utility import *
 AMDADOS_EXE = "build/app/amdados"
 
 
-def Amdados2D(config_file, demo):
+def Amdados2D_quick(config_file, demo):
     """ Advection-diffusion PDE forward solver.
     """
     # Initialize parameters, global indices and output directory.
@@ -34,9 +34,9 @@ def Amdados2D(config_file, demo):
         print("generating a new one ...")
         assert os.path.exists(AMDADOS_EXE), (
             "Application 'amdados' must be built before running this script")
-        subprocess.Popen([AMDADOS_EXE, "--scenario", "sensors",
+        amdados = subprocess.Popen([AMDADOS_EXE, "--scenario", "sensors",
                         "--config", config_file])
-        os.sync()
+        amdados.wait()
         print("")
         print("")
     sensor_idx = LoadSensorLocations(conf)

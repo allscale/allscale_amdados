@@ -57,9 +57,7 @@ if __name__ == "__main__":
         # Read configuration file.
         conf = Configuration("amdados.conf")
         # Create the output directory, if it does not exist.
-        if not os.path.isdir(conf.output_dir):
-            if not os.path.islink(conf.output_dir):
-                os.mkdir(conf.output_dir)
+        if not os.path.isdir(conf.output_dir): os.mkdir(conf.output_dir)
         # Check existence of "amdados" application executable.
         assert os.path.isfile(AMDADOS_EXE), "amdados executable was not found"
 
@@ -90,7 +88,6 @@ if __name__ == "__main__":
             print("##################################################")
             print("Simulation by 'amdados' application ...")
             print("silent if debugging & messaging were disabled")
-            print("Number of workers: " + str(n))
             print("##################################################")
             proc = subprocess.Popen([AMDADOS_EXE,
                                     "--scenario", "simulation",

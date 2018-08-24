@@ -32,9 +32,24 @@ import os, cmd
 from RandObservationsGenerator import InitDependentParams, Amdados2D
 from Utility import *
 
-GridSizes = [(2,2),(4,4), (8,8), (12,12), (16,16), (20,20), (24,24), (28,28), (32,32)]
+# Get subdomain sizes as multiplier factors
+
+
+nthreads = np.arange(0,46,2)
+GridSizes = np.zeros([len(nthreads), 2])
+nthreads[0] = 1
+nthreads[1] = 3
+GridSizes[0:13, :] = ([4,2], [6,4], [8,4], [8,6],[8,8], [10,8],[12, 8],[16,7],
+                       [16,8], [12,12], [20,8], [16,11], [16,12])
+for i in range(13, len(GridSizes)):
+        GridSizes[i, :] = [(i)*2, 8]
+        problem_size= GridSizes[:,0]*GridSizes[:,1]
+
+execute_time =  np.zeros([len(nthreads), 4])
 # Integration period in seconds.
-IntegrationPeriod = 100
+IntegrationPeriod = 25
+IntegrationNsteps = 50
+# Path to the C++ executable.
 
 # Path to the C++ executable.
 AMDADOS_EXE = "build/app/amdados"
@@ -52,8 +67,9 @@ if __name__ == "__main__":
 
         # For all the grid sizes in the list ...
         exe_time_profile = np.zeros((len(GridSizes),2))
-        for grid_no, grid in enumerate(GridSizes):
-            assert grid[0] >= 2 and grid[1] >= 2, "the minimum grid size is 2x2"
+        for i in range(0, len(nthreads)):
+            grid = GridSizes[i, :]
+            Nproc = nthreads[i]
             # Modify parameters given the current grid size.
             setattr(conf, "num_subdomains_x", int(grid[0]))
             setattr(conf, "num_subdomains_y", int(grid[1]))
@@ -70,22 +86,33 @@ if __name__ == "__main__":
 
             # Run C++ data assimilation application.
             print("##################################################")
-            print("Simulation by 'amdados' application ...")
-            print("silent if debugging & messaging were disabled")
+            print("Simulation by 'amdados' application for series of hpx threads")
+            print("Initial simulations for Oceans paper")
             print("##################################################")
             print(AMDADOS_EXE, config_file)
-            subprocess.call([AMDADOS_EXE, "--scenario", "simulation",
-                              "--config", config_file])
+            output = subprocess.Popen([AMDADOS_EXE, "--scenario", "simulation",
+                                       "--config", config_file, "--hpx:threads=" + str(Nproc)], stdout=subprocess.PIPE)
             os.sync()
+
+            # Strip the execution time from stdout, both total simulation time
+            # and throughput (subdomain/s)
+            strip_output = str(output.communicate()[0]).split('\\n')
+            for line in strip_output:
+                if re.search("Simulation", line):
+                    simtime_string = line
+                if re.search("Throughput", line):
+                    throughput_string = line
+            simtime_secs = float(simtime_string.split(' ')[2][:-1])
+            throughput_secs = float(throughput_string.split(' ')[1])
+
 
             # Get the execution time and corresponding (global) problem size
             # and save the current scalability profile into the file.
             problem_size = ( conf.num_subdomains_x * conf.subdomain_x *
                              conf.num_subdomains_y * conf.subdomain_y )
-            exe_time_profile[grid_no,0] = problem_size
-            exe_time_profile[grid_no,1] = timer() - start_time
+            execute_time[i, :] = [problem_size, Nproc, simtime_secs, throughput_secs]
             np.savetxt(os.path.join(conf.output_dir, "scalability_performance.txt"),
-                       exe_time_profile)
+                       execute_time)
 
     except subprocess.CalledProcessError as error:
         traceback.print_exc()
