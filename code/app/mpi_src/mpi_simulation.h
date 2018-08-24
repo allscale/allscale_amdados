@@ -761,9 +761,31 @@ int mpi_main(int * argc, char *** argv)
         }
         MY_LOG(INFO) << "SCENARIO: simulation with MPI framework.";
 
+        const auto Nx = conf.asInt("num_subdomains_x") ;
+        const auto Ny = conf.asInt("num_subdomains_y") ;
+        int steps = static_cast<int>(conf.asUInt("Nt"));
+        // print some status info for the user
+    	std::cout << "Running MPI simulation on configuration file \"" << config_file;
+    	std::cout << "\" with domain size " << Nx << "x" << Ny;
+    	std::cout << " for " << steps << " time steps ...\n";
+        std::cout << "Running full scenario simulation ...\n";
+        auto start = std::chrono::high_resolution_clock::now();
+
         // Now the main simulation.
         amdados::RunSimulation(conf);
         ret_val = EXIT_SUCCESS;
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = end - start;
+
+        // --- summarize performance data ---
+        double time = (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f);
+        std::cout << "Simulation took " << time << "s\n";
+
+        double throughput = (Nx * Ny * steps) / time;
+        std::cout << "Throughput: " << throughput << " sub-domains/s\n";
+
+
         if (gTestBoundExchange) {
             MY_LOG(INFO) << "Test for boundary values exchange has passed";
         } else {

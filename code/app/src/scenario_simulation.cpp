@@ -946,11 +946,34 @@ void ScenarioSimulation(const std::string & config_file)
     LoadSensorLocations(conf, sensors);
     LoadSensorMeasurements(conf, sensors, observations);
 
+    const auto Nx = conf.asInt("num_subdomains_x") ;
+    const auto Ny = conf.asInt("num_subdomains_y") ;
+    int steps = static_cast<int>(conf.asUInt("Nt"));
+
+    // print some status info for the user
+	std::cout << "Running AMDADOS full simulation   \" " ;
+	std::cout << "\" based on configuration file \"" << config_file;
+	std::cout << "\" with domain size " << Nx << "x" << Ny;
+	std::cout << " for " << steps << " time steps ...\n";
+
     // Run the simulation with data assimilation. Important: by this time
     // some parameters had been initialized in InitDependentParams(..), so
     // we can safely proceed to the main part of the simulation algorithm.
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     MY_TIME_IT("Running the simulation with data assimilation ...")
     RunDataAssimilation(conf, sensors, observations);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = end - start;
+
+    // --- summarize performance data ---
+    double time = (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f);
+    std::cout << "Simulation took " << time << "s\n";
+
+    double throughput = (Nx * Ny * steps) / time;
+    std::cout << "Throughput: " << throughput << " sub-domains/s\n";
 }
 
 } // namespace amdados
