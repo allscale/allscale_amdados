@@ -57,4 +57,13 @@ if(NOT TARGET allscale)
 
 		set(ALLSCALE_API_INCLUDE_PATH ${source_dir}/code/api/include ${source_dir}/code/utils/include)
 	endif()
+
+	if(DEFINED OVERRIDE_ALLSCALECC)
+		set(USE_ALLSCALECC ON)
+		set(ALLSCALECC ${OVERRIDE_ALLSCALECC})
+	endif()
+	
+	if(DEFINED OVERRIDE_ALLSCALE_API)
+		set(ALLSCALE_API_INCLUDE_PATH ${OVERRIDE_ALLSCALE_API}/code/api/include ${OVERRIDE_ALLSCALE_API}/code/utils/include)
+	endif()
 endif()

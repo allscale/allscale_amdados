@@ -811,7 +811,7 @@ void RunDataAssimilation(const Configuration         & conf,
 
 
     // Print the final field in textual format.
-	filename = MakeFileName(conf, "final_field");
+	std::string filename = MakeFileName(conf, "final_field");
 	::allscale::api::user::algorithm::async([=,&state_field]() {
 		// Open file manager and the output file for writing.
 		FileIOManager & file_manager = FileIOManager::getInstance();

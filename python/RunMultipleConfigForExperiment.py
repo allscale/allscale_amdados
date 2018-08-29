@@ -29,7 +29,7 @@ print(__doc__)
 
 from timeit import default_timer as timer
 import os, cmd
-from RandObservationsGenerator import InitDependentParams, Amdados2D_quick
+from RandObservationsGenerator import InitDependentParams, Amdados2D_quick  
 from Utility import *
 
 # Get subdomain sizes as multiplier factors
