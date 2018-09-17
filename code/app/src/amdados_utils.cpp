@@ -50,11 +50,13 @@ uint64_t RandomSeed()
 #ifdef AMDADOS_DEBUGGING
     return 2063;
 #else
-    using hrclock_t = std::chrono::high_resolution_clock;
-    long prev = hrclock_t::now().time_since_epoch().count();
-    long seed = 0;
-    while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
-    return (uint64_t)seed;
+//    using hrclock_t = std::chrono::high_resolution_clock;
+//    long prev = hrclock_t::now().time_since_epoch().count();
+//    long seed = 0;
+//    while ((seed = hrclock_t::now().time_since_epoch().count()) == prev) {}
+//    return (uint64_t)seed;
+    // We want fixed seeding of sensor data to ensure reproducibility of results
+    return 2063; //
 #endif
 }
 
