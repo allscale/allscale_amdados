@@ -52,7 +52,7 @@ IntegrationNsteps = 50
 # Path to the C++ executable.
 
 # Path to the C++ executable.
-AMDADOS_EXE = "build/app/amdados"
+AMDADOS_EXE = "targetcode/amdados_cc"
 
 
 if __name__ == "__main__":
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             print("##################################################")
             print(AMDADOS_EXE, config_file)
             output = subprocess.Popen([AMDADOS_EXE, "--scenario", "simulation",
-                                       "--config", config_file, "--hpx:threads=" + str(Nproc)], stdout=subprocess.PIPE)
+                                       "--config", config_file, "--hpx:threads=" + str(Nproc), "--hpx:bind=none"], stdout=subprocess.PIPE)
             output.wait()
 
             # Strip the execution time from stdout, both total simulation time

@@ -65,18 +65,18 @@ ExperimentConfigs = [ [1, [4,2] ],                                          # Ti
                       [Nt, [Nt, 8]]]                                        # Real-world
 
 
-execute_time =  np.zeros([len(ExperimentConfigs) * 4, 6])
+execute_time =  np.zeros([1, 6])
 # Integration period in seconds.
-IntegrationPeriod = 25 
-IntegrationNsteps = 50
+IntegrationPeriod = 5 
+IntegrationNsteps = 10
 # Path to the C++ executable.
-AMDADOS_EXE = "build/app/amdados"
+AMDADOS_EXE = "targetcode/amdados_cc"
 ResultsFileName = "AMDADOS_weakScaling.txt"
 
 def VerifyCorrectSolution(Grid):
     nx = 16*Grid[0]
     ny = 16*Grid[1]
-    filename = "field_Nx" + str(nx) + "_Ny" + str(ny) + "_Nt" + str(IntegrationNsteps) + ".bin"
+    filename = "final_field_Nx" + str(nx) + "_Ny" + str(ny) + "_Nt" + str(IntegrationNsteps) + ".txt"
     simulation = np.loadtxt("./output/" + filename)
     reference = np.loadtxt("./correctsolution/" + filename)
     assert len(simulation) == len(reference)
@@ -99,8 +99,10 @@ if __name__ == "__main__":
         # Check existence of "amdados" application executable.
         assert os.path.isfile(AMDADOS_EXE), "amdados executable was not found"
         HeaderTxt = ["ProblemSize, NThreads, ALLSCALE_MONITOR, ALLSCALE_RESILIENCE, TotalRuntime, Throughput(Sdom/s)"]
-        print('filename = ',os.path.join(conf.output_dir, ResultsFileName))
-        np.savetxt(os.path.join(conf.output_dir, ResultsFileName), HeaderTxt, fmt = '%s')
+        time_file = os.path.join(conf.output_dir, ResultsFileName)
+        print('filename = ', time_file)
+        np.savetxt(time_file, HeaderTxt, fmt = '%s')
+        f = open(time_file, 'ab')
         i = 0
         # For all the grid sizes in the list ...
         for domain in range(0, len(ExperimentConfigs)):
@@ -128,8 +130,8 @@ if __name__ == "__main__":
             # For each test size, we need to run different configurations investigating
             # AllScale Resilience and Monitoring (i.e. =0/1)
             #  Run C++ data assimilation application.
-            for MonitorFlag in [0,1]:
-                for ResilienceFlag in [0,1]:
+            for MonitorFlag in [0]:
+                for ResilienceFlag in [0]:
                     print("##################################################")
                     print("Testing Framework for AllScale project")
                     print("Simulation by 'amdados' to check scalability and correctness")
@@ -161,11 +163,10 @@ if __name__ == "__main__":
                     # Get the execution time and corresponding (global) problem size
                     # and save the current scalability profile into the file.
                     problem_size = ( conf.num_subdomains_x * conf.num_subdomains_y )
-                    execute_time[i, :] = [problem_size, Nproc, MonitorFlag, ResilienceFlag, simtime_secs, throughput_secs]
+                    execute_time[0, :] = [problem_size, Nproc, MonitorFlag, ResilienceFlag, simtime_secs, throughput_secs]
                     i += 1
-                    np.savetxt(os.path.join(conf.output_dir, ResultsFileName),
-                            execute_time)
-
+                    np.savetxt(f, execute_time)
+        f.close()
     except subprocess.CalledProcessError as error:
         traceback.print_exc()
         if error.output is not None:

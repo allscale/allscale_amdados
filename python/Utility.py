@@ -7,10 +7,10 @@
 
 import glob, os, sys, errno, math, re, subprocess, traceback
 import numpy as np
-import scipy
-import scipy.misc
-import matplotlib
-matplotlib.use("Agg")
+#import scipy
+#import scipy.misc
+#import matplotlib
+#matplotlib.use("Agg")
 from Configuration import Configuration
 
 

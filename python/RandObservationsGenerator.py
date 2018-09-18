@@ -10,7 +10,7 @@ from Configuration import Configuration
 from Utility import *
 
 # Full-path name of C++ executable.
-AMDADOS_EXE = "build/app/amdados"
+AMDADOS_EXE = "targetcode/amdados_cc"
 
 
 def Amdados2D_quick(config_file, demo):

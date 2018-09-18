@@ -4,8 +4,8 @@
 # -----------------------------------------------------------------------------
 
 #import pdb; pdb.set_trace()           # enables debugging
-import matplotlib
-matplotlib.use("Agg")
+#import matplotlib
+#matplotlib.use("Agg")
 import sys, traceback, os, re, getopt, math, argparse, subprocess
 import numpy as np
 import scipy
@@ -17,7 +17,7 @@ from Configuration import Configuration
 from Utility import *
 
 # Full-path name of C++ executable.
-AMDADOS_EXE = "build/app/amdados"
+AMDADOS_EXE = "targetcode/amdados_cc"
 
 
 def Amdados2D(config_file, demo):
@@ -56,7 +56,7 @@ def Amdados2D(config_file, demo):
     sensor_idx = LoadSensorLocations(conf)
     sensor_idx[0,0] = x1
     sensor_idx[0,1] = y1
-    np.savetxt(MakeFileName(conf, "sensors"), dtype=int, sensor_idx)
+    np.savetxt(MakeFileName(conf, "sensors"), sensor_idx, fmt="%i")
 
     # Run forward simulation and record the "true" solutions into a file.
     with open(MakeFileName(conf, "true_field"), "wb") as fid:
