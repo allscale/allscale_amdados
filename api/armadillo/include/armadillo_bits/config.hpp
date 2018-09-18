@@ -127,7 +127,7 @@
   #undef  ARMA_USE_HDF5
   #define ARMA_USE_HDF5
   
-  #define ARMA_HDF5_INCLUDE_DIR /usr/local/Cellar/hdf5/1.10.2_1/include/
+  #define ARMA_HDF5_INCLUDE_DIR /usr/local/Cellar/hdf5/1.10.3/include/
 #endif
 
 #if !defined(ARMA_MAT_PREALLOC)
@@ -278,5 +278,5 @@
 // ARMA_AUX_LIBS lists the libraries required by Armadillo on this system, and
 // ARMA_AUX_INCDIRS lists the include directories required by Armadillo on this system.
 // Do not use these unless you know what you are doing.
-#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.2_1/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib;/usr/local/lib/libsuperlu.a
-#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.2_1/include;/usr/local/opt/szip/include;/usr/local/include/superlu
+#define ARMA_AUX_LIBS -framework Accelerate;/usr/local/Cellar/hdf5/1.10.3/lib/libhdf5.dylib;/usr/local/opt/szip/lib/libsz.dylib;/usr/lib/libz.dylib;/usr/lib/libdl.dylib;/usr/lib/libm.dylib;/usr/local/lib/libarpack.dylib;/usr/local/lib/libsuperlu.a
+#define ARMA_AUX_INCDIRS /usr/local/Cellar/hdf5/1.10.3/include;/usr/local/opt/szip/include;/usr/local/include/superlu

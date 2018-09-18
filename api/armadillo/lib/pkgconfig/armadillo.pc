@@ -1,5 +1,5 @@
-libdir=/Users/albert/work/tmp/allscale_amdados/api/armadillo/lib
-includedir=/Users/albert/work/tmp/allscale_amdados/api/armadillo/include
+libdir=/Users/albert/work/allscale_master/api/armadillo/lib
+includedir=/Users/albert/work/allscale_master/api/armadillo/include
 
 Name: armadillo
 Description: Fast C++ matrix library with syntax similar to MATLAB and Octave

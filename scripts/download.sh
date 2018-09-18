@@ -6,10 +6,11 @@
 
 # Check we are in the root directory.
 rootDir="allscale_amdados"
+rootDir2="allscale_master"
 currDir=$(basename "$PWD")
-if [ "${rootDir}" != "${currDir}" ]
+if [ "${rootDir}" != "${currDir}" ] && [ "${rootDir2}" != "${currDir}" ]
 then
-    echo "ERROR: the script must be executed from the project root directory: ${rootDir}"
+    echo "ERROR: the script must be executed from the project root directory: ${rootDir} or ${rootDir2}"
     exit 1
 fi
 
