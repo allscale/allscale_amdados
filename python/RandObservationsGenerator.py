@@ -10,7 +10,8 @@ from Configuration import Configuration
 from Utility import *
 
 # Full-path name of C++ executable.
-AMDADOS_EXE = "targetcode/amdados_cc"
+AMDADOS_EXE =  os.path.join(os.getcwd(),"targetcode/amdados_cc")
+
 
 
 def Amdados2D_quick(config_file, demo):
@@ -34,7 +35,7 @@ def Amdados2D_quick(config_file, demo):
         print("generating a new one ...")
         assert os.path.exists(AMDADOS_EXE), (
             "Application 'amdados' must be built before running this script")
-        amdados = subprocess.Popen([AMDADOS_EXE, "--scenario", "sensors",
+        amdados = subprocess.Popen(["aprun", "-n", "1", AMDADOS_EXE, "--scenario", "sensors",
                         "--config", config_file])
         amdados.wait()
         print("")

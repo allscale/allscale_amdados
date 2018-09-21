@@ -17,8 +17,7 @@ from Configuration import Configuration
 from Utility import *
 
 # Full-path name of C++ executable.
-AMDADOS_EXE = "targetcode/amdados_cc"
-
+AMDADOS_EXE =  os.path.join(os.getcwd(),"targetcode/amdados_cc")
 
 def Amdados2D(config_file, demo):
     """ Advection-diffusion PDE forward solver.
@@ -41,7 +40,7 @@ def Amdados2D(config_file, demo):
         print("generating a new one ...")
         assert os.path.exists(AMDADOS_EXE), (
             "Application 'amdados' must be built before running this script")
-        subprocess.run([AMDADOS_EXE, "--scenario", "sensors",
+        subprocess.run(["aprun", "-n", "1", AMDADOS_EXE, "--scenario", "sensors",
                         "--config", config_file], check=True)
         subprocess.run("sync", check=True)
         print("")
