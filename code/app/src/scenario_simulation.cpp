@@ -902,10 +902,11 @@ void InitDependentParams(Configuration & conf)
                            conf.asDouble("integration_nsteps");
     const double max_vx = conf.asDouble("flow_model_max_vx");
     const double max_vy = conf.asDouble("flow_model_max_vy");
-    const double dt = std::min(dt_base,
-                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
-                                  1.0/(std::fabs(max_vx)/dx +
-                                       std::fabs(max_vy)/dy + TINY) ));
+//    const double dt = std::min(dt_base,
+//                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
+//                                 1.0/(std::fabs(max_vx)/dx +
+//                                       std::fabs(max_vy)/dy + TINY) ));
+    const double dt = dt_base
     assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(

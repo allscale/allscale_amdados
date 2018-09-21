@@ -171,10 +171,12 @@ void InitDependentParams(Configuration & conf)
                            conf.asDouble("integration_nsteps");
     const double max_vx = conf.asDouble("flow_model_max_vx");
     const double max_vy = conf.asDouble("flow_model_max_vy");
-    const double dt = std::min(dt_base,
-                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
-                                  1.0/(std::fabs(max_vx)/dx +
-                                       std::fabs(max_vy)/dy + TINY) ));
+    // why does the time step depend on the number of subdomains??
+//    const double dt = std::min(dt_base,
+//                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
+//                                  1.0/(std::fabs(max_vx)/dx +
+//                                       std::fabs(max_vy)/dy + TINY) ));
+    const double dt = dt_base;
     assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(
@@ -723,10 +725,10 @@ int mpi_main(int * argc, char *** argv)
     }
 
     // Open log-file for this process rank.
-    if (!amdados::OpenLogFile()) {
-        MPI_Finalize();
-        return EXIT_FAILURE;
-    }
+//    if (!amdados::OpenLogFile()) {
+//        MPI_Finalize();
+//        return EXIT_FAILURE;
+//    }
 
     try {
         MY_LOG(INFO) << "***** MPI Amdados2D application *****";
@@ -764,28 +766,31 @@ int mpi_main(int * argc, char *** argv)
         const auto Nx = conf.asInt("num_subdomains_x") ;
         const auto Ny = conf.asInt("num_subdomains_y") ;
         int steps = static_cast<int>(conf.asUInt("Nt"));
-        // print some status info for the user
-    	std::cout << "Running MPI simulation on configuration file \"" << config_file;
-    	std::cout << "\" with domain size " << Nx << "x" << Ny;
-    	std::cout << " for " << steps << " time steps ...\n";
-        std::cout << "Running full scenario simulation ...\n";
-        auto start = std::chrono::high_resolution_clock::now();
 
+        if (amdados::GetRank() == 0) {
+        	// print some status info for the user
+        	std::cout << "Running MPI simulation on configuration file \"" << config_file;
+        	std::cout << "\" with domain size " << Nx << "x" << Ny;
+        	std::cout << " for " << steps << " time steps ...\n";
+        	std::cout << "Running full scenario simulation ...\n";
+        }
+    	auto start = std::chrono::high_resolution_clock::now();
         // Now the main simulation.
         amdados::RunSimulation(conf);
         ret_val = EXIT_SUCCESS;
+    	auto end = std::chrono::high_resolution_clock::now();
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = end - start;
+        if (amdados::GetRank() == 0) {
+        	auto duration = end - start;
 
-        // --- summarize performance data ---
-        double time = (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f);
-        std::cout << "Simulation took " << time << "s\n";
+        	// --- summarize performance data ---
+        	double time = (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() / 1000.0f);
+        	std::cout << "Simulation took " << time << "s\n";
 
-        double throughput = (Nx * Ny * steps) / time;
-        std::cout << "Throughput: " << throughput << " sub-domains/s\n";
+        	double throughput = (Nx * Ny * steps) / time;
+        	std::cout << "Throughput: " << throughput << " sub-domains/s\n";
 
-
+        }
         if (gTestBoundExchange) {
             MY_LOG(INFO) << "Test for boundary values exchange has passed";
         } else {
