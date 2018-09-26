@@ -906,7 +906,7 @@ void InitDependentParams(Configuration & conf)
 //                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
 //                                 1.0/(std::fabs(max_vx)/dx +
 //                                       std::fabs(max_vy)/dy + TINY) ));
-    const double dt = dt_base
+    const double dt = dt_base;
     assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(
