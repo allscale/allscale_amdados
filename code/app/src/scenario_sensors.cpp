@@ -21,6 +21,7 @@
 #include "amdados/app/geometry.h"
 #include "amdados/app/matrix.h"
 #include "amdados/app/debugging.h"
+#include "amdados/app/sensors_generator.h"
 
 namespace amdados {
 
@@ -46,63 +47,63 @@ inline point2d_t Glo2Sub(const point2d_t & p, const size2d_t & cell_size)
                      p.y % cell_size.y);
 }
 
-/**
- * Function evaluates objective function and its gradient.
- */
-void EvaluateObjective(double & J, double_array_t & gradJ,
-                             const double_array_t & x,
-                             const double_array_t & y)
-{
-    const int N = static_cast<int>(x.size());   // short-hand alias
-    const int NN = N * N;
-    assert_true(x.size() == y.size());
+///**
+// * Function evaluates objective function and its gradient.
+// */
+//void EvaluateObjective(double & J, double_array_t & gradJ,
+//                             const double_array_t & x,
+//                             const double_array_t & y)
+//{
+//    const int N = static_cast<int>(x.size());   // short-hand alias
+//    const int NN = N * N;
+//    assert_true(x.size() == y.size());
+//
+//    const double EPS = std::sqrt(std::numeric_limits<double>::epsilon());
+//
+//    J = 0.0;
+//    gradJ.resize(2*N);
+//    std::fill(gradJ.begin(), gradJ.end(), 0.0);
+//
+//    for (int i = 0; i < N; ++i) {
+//        // Reciprocal distances to subdomain borders.
+//        const double r_x1 = 1.0 / (std::pow(      x[i],2) + EPS);
+//        const double r_x2 = 1.0 / (std::pow(1.0 - x[i],2) + EPS);
+//        const double r_y1 = 1.0 / (std::pow(      y[i],2) + EPS);
+//        const double r_y2 = 1.0 / (std::pow(1.0 - y[i],2) + EPS);
+//
+//        J += (r_x1 + r_x2 +
+//              r_y1 + r_y2);
+//
+//        double gx = 0.0, gy = 0.0;
+//        for (int j = 0; j < N; ++j) {
+//            double dx = x[i] - x[j];
+//            double dy = y[i] - y[j];
+//            double sqdist = dx*dx + dy*dy + EPS;
+//            J  += 1.0 / sqdist;
+//            gx -= dx / std::pow(sqdist,2);
+//            gy -= dy / std::pow(sqdist,2);
+//        }
+//        gradJ[i  ] = 2.0 * (gx - x[i]  * std::pow(r_x1,2) +
+//                          (1.0 - x[i]) * std::pow(r_x2,2));
+//        gradJ[i+N] = 2.0 * (gy - y[i]  * std::pow(r_y1,2) +
+//                          (1.0 - y[i]) * std::pow(r_y2,2));
+//    }
+//
+//    J /= NN;
+//    std::transform(gradJ.begin(), gradJ.end(), gradJ.begin(),
+//                                    [=](double x){ return x/NN; });
+//}
+//
+///**
+// * Function scales a coordinate from [0..1] range to specified size.
+// */
+//inline index_t ScaleCoord(double v, index_t size) {
+//    index_t i = static_cast<index_t>(std::floor(v * size));
+//    i = std::min(std::max(i, index_t(0)), size - 1);
+//    return i;
+//}
 
-    const double EPS = std::sqrt(std::numeric_limits<double>::epsilon());
-
-    J = 0.0;
-    gradJ.resize(2*N);
-    std::fill(gradJ.begin(), gradJ.end(), 0.0);
-
-    for (int i = 0; i < N; ++i) {
-        // Reciprocal distances to subdomain borders.
-        const double r_x1 = 1.0 / (std::pow(      x[i],2) + EPS);
-        const double r_x2 = 1.0 / (std::pow(1.0 - x[i],2) + EPS);
-        const double r_y1 = 1.0 / (std::pow(      y[i],2) + EPS);
-        const double r_y2 = 1.0 / (std::pow(1.0 - y[i],2) + EPS);
-
-        J += (r_x1 + r_x2 +
-              r_y1 + r_y2);
-
-        double gx = 0.0, gy = 0.0;
-        for (int j = 0; j < N; ++j) {
-            double dx = x[i] - x[j];
-            double dy = y[i] - y[j];
-            double sqdist = dx*dx + dy*dy + EPS;
-            J  += 1.0 / sqdist;
-            gx -= dx / std::pow(sqdist,2);
-            gy -= dy / std::pow(sqdist,2);
-        }
-        gradJ[i  ] = 2.0 * (gx - x[i]  * std::pow(r_x1,2) +
-                          (1.0 - x[i]) * std::pow(r_x2,2));
-        gradJ[i+N] = 2.0 * (gy - y[i]  * std::pow(r_y1,2) +
-                          (1.0 - y[i]) * std::pow(r_y2,2));
-    }
-
-    J /= NN;
-    std::transform(gradJ.begin(), gradJ.end(), gradJ.begin(),
-                                    [=](double x){ return x/NN; });
-}
-
-/**
- * Function scales a coordinate from [0..1] range to specified size.
- */
-inline index_t ScaleCoord(double v, index_t size) {
-    index_t i = static_cast<index_t>(std::floor(v * size));
-    i = std::min(std::max(i, index_t(0)), size - 1);
-    return i;
-}
-
-} // anonymous namespace
+}   // anonymous namespace
 
 /**
  * Generates initial space distribution of sensor points.
@@ -119,50 +120,50 @@ void InitialGuess(const Configuration & conf,
     std::generate(y.begin(), y.end(), [&](){ return distrib(gen); });
 }
 
-/**
- * Minimizes the objective function by gradient descent.
- */
-void OptimizePointLocations(double_array_t & x, double_array_t & y)
-{
-    const int N = static_cast<int>(x.size());   // short-hand alias
-    assert_true(x.size() == y.size());
-
-    const double DOWNSCALE = 0.1;
-    const double INITIAL_STEP = 0.1;
-    const double TOL = std::numeric_limits<double>::epsilon() * std::log(N);
-
-    double J = 0.0, J_new = 0.0;    // values of objective function
-    double step = INITIAL_STEP;     // step in gradient descent
-
-    double_array_t x_new(N), y_new(N);           // sensors' coordinates
-    double_array_t gradJ(2*N), gradJ_new(2*N);   // gradients of J
-
-    EvaluateObjective(J, gradJ, x, y);
-    for (bool proceed = true; proceed && (step > TINY);) {
-        bool is_inside = true;
-        for (int k = 0; (k < N) && is_inside; ++k) {
-            x_new[k] = x[k] - step * gradJ[k  ];
-            y_new[k] = y[k] - step * gradJ[k+N];
-            is_inside = ((0.0 <= x_new[k]) && (x_new[k] <= 1.0) &&
-                         (0.0 <= y_new[k]) && (y_new[k] <= 1.0));
-        }
-        if (!is_inside) {
-            step *= DOWNSCALE;
-            continue;
-        }
-        EvaluateObjective(J_new, gradJ_new, x_new, y_new);
-        if (J < J_new) {
-            step *= DOWNSCALE;
-            continue;
-        }
-        proceed = (J - J_new > J * TOL);
-        x = x_new;
-        y = y_new;
-        J = J_new;
-        gradJ = gradJ_new;
-        step *= 2.0;
-    }
-}
+///**
+// * Minimizes the objective function by gradient descent.
+// */
+//void OptimizePointLocations(double_array_t & x, double_array_t & y)
+//{
+//    const int N = static_cast<int>(x.size());   // short-hand alias
+//    assert_true(x.size() == y.size());
+//
+//    const double DOWNSCALE = 0.1;
+//    const double INITIAL_STEP = 0.1;
+//    const double TOL = std::numeric_limits<double>::epsilon() * std::log(N);
+//
+//    double J = 0.0, J_new = 0.0;    // values of objective function
+//    double step = INITIAL_STEP;     // step in gradient descent
+//
+//    double_array_t x_new(N), y_new(N);           // sensors' coordinates
+//    double_array_t gradJ(2*N), gradJ_new(2*N);   // gradients of J
+//
+//    EvaluateObjective(J, gradJ, x, y);
+//    for (bool proceed = true; proceed && (step > TINY);) {
+//        bool is_inside = true;
+//        for (int k = 0; (k < N) && is_inside; ++k) {
+//            x_new[k] = x[k] - step * gradJ[k  ];
+//            y_new[k] = y[k] - step * gradJ[k+N];
+//            is_inside = ((0.0 <= x_new[k]) && (x_new[k] <= 1.0) &&
+//                         (0.0 <= y_new[k]) && (y_new[k] <= 1.0));
+//        }
+//        if (!is_inside) {
+//            step *= DOWNSCALE;
+//            continue;
+//        }
+//        EvaluateObjective(J_new, gradJ_new, x_new, y_new);
+//        if (J < J_new) {
+//            step *= DOWNSCALE;
+//            continue;
+//        }
+//        proceed = (J - J_new > J * TOL);
+//        x = x_new;
+//        y = y_new;
+//        J = J_new;
+//        gradJ = gradJ_new;
+//        step *= 2.0;
+//    }
+//}
 
 /**
  * Function implements a special scenario of Amdados application,
@@ -183,6 +184,22 @@ void ScenarioSensors(const std::string & config_file)
     Configuration conf;
     conf.ReadConfigFile(config_file.c_str());
 
+#if 1
+
+    point_array_t sensors;
+    SensorsGenerator().MakeSensors(conf, sensors);
+
+    // Open file manager and the output file for writing, save sensor locations.
+    std::string filename = MakeFileName(conf, "sensors");
+    FileIOManager & manager = FileIOManager::getInstance();
+    Entry e = manager.createEntry(filename, Mode::Text);
+    auto out = manager.openOutputStream(e);
+    for (size_t k = 0; k < sensors.size(); ++k) {
+        out << sensors[k].x << " " << sensors[k].y << "\n";
+    }
+    manager.close(out);
+
+#else
     // Define useful constants.
     const point2d_t GridSize = GetGridSize(conf);
     const double fraction =
@@ -253,6 +270,7 @@ void ScenarioSensors(const std::string & config_file)
         }
         manager.close(out);
     }
+#endif
 }
 
 /**
