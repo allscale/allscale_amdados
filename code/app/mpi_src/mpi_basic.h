@@ -68,6 +68,27 @@ inline long base_sub2ind(long x, long y, long nx, long ny)
 }
 
 //-----------------------------------------------------------------------------
+// Function maps a subdomain local coordinates to global ones.
+// \param  query_point     point in question local to subdomain.
+// \param  subdomain_pos   position of the subdomain inside a grid structure.
+// \param  subdomain_size  size of the subdomain.
+//-----------------------------------------------------------------------------
+inline point2d_t Sub2Glo(const point2d_t & query_point,
+                         const point2d_t & subdomain_pos,
+                         const size2d_t  & subdomain_size)
+{
+    const auto x = query_point.x;
+    const auto y = query_point.y;
+#ifndef NDEBUG
+    if (!((static_cast<size_t>(x) < static_cast<size_t>(subdomain_size.x)) &&
+          (static_cast<size_t>(y) < static_cast<size_t>(subdomain_size.y))))
+        assert_true(0);
+#endif
+    return point2d_t(x + subdomain_pos.x * subdomain_size.x,
+                     y + subdomain_pos.y * subdomain_size.y);
+}
+
+//-----------------------------------------------------------------------------
 // Function returns point's coordinates (x,y) on the grid given flat index.
 // N O T E: here Y is the fastest coordinate.
 //-----------------------------------------------------------------------------

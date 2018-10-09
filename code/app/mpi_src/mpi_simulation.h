@@ -115,7 +115,7 @@ void ScenarioSensors(const Configuration & conf)
     std::fstream file(filename, std::ios::trunc | std::ios::out);
     assert_true(file.good()) << "failed to open file: " << filename;
     point_array_t sensors;
-    SensorsGenerator().Generate(conf, sensors);
+    SensorsGenerator().MakeSensors(conf, sensors);
     for (size_t k = 0; k < sensors.size(); ++k) {
         file << sensors[k].x << " " << sensors[k].y << std::endl;
     }
@@ -171,12 +171,13 @@ void InitDependentParams(Configuration & conf)
                            conf.asDouble("integration_nsteps");
     const double max_vx = conf.asDouble("flow_model_max_vx");
     const double max_vy = conf.asDouble("flow_model_max_vy");
-    // why does the time step depend on the number of subdomains??
+    // This time step is defined according to stability criteria.
 //    const double dt = std::min(dt_base,
 //                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
 //                                  1.0/(std::fabs(max_vx)/dx +
 //                                       std::fabs(max_vy)/dy + TINY) ));
-    const double dt = dt_base;
+std::cout << "A T T E N T I O N: hard-coded dt" << std::endl;
+const double dt = dt_base;      // XXX
     assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(

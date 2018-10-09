@@ -20,6 +20,7 @@
 #include "amdados/app/geometry.h"
 #include "amdados/app/matrix.h"
 #include "amdados/app/debugging.h"
+#include "amdados/app/sensors_generator.h"
 
 namespace amdados {
 
@@ -50,50 +51,69 @@ void GenerateSensorData(const Configuration   & conf,
 {
 	// Define useful constants.
 	const point2d_t GridSize = GetGridSize(conf);
-	const double fraction =
-			Bound(conf.asDouble("sensor_fraction"), 0.001, 0.75);
+
+//	const double fraction =
+//			Bound(conf.asDouble("sensor_fraction"), 0.001, 0.75);
 
 	const size2d_t finest_layer_size(conf.asUInt("subdomain_x"),
 									 conf.asUInt("subdomain_y"));
 
 	// --- initialize sensor positions ---
 
-	// Function scales a coordinate from [0..1] range to specified size.
-	auto ScaleCoord = [](double v, index_t size) -> index_t {
-		index_t i = static_cast<index_t>(std::floor(v * size));
-		i = std::min(std::max(i, index_t(0)), size - 1);
-		return i;
-	};
-
-	// Global (whole domain) sizes.
-	const auto Nx = conf.asInt("subdomain_x") * GridSize.x;
-	const auto Ny = conf.asInt("subdomain_y") * GridSize.y;
-	const auto problem_size = Nx * Ny;
-
-	// Generate pseudo-random sensor locations.
-	const int Nobs = std::max(Round(fraction * problem_size), 1);
-	std::cout << "\tfraction of sensor points = " << fraction;
-	std::cout << ", #observations = " << Nobs << std::endl;
-	double_array_t x(Nobs), y(Nobs);
-	InitialGuess(conf, x, y, point2d_t(0,0));
-	OptimizePointLocations(x, y);
+//	// Function scales a coordinate from [0..1] range to specified size.
+//	auto ScaleCoord = [](double v, index_t size) -> index_t {
+//		index_t i = static_cast<index_t>(std::floor(v * size));
+//		i = std::min(std::max(i, index_t(0)), size - 1);
+//		return i;
+//	};
+//
+//	// Global (whole domain) sizes.
+//	const auto Nx = conf.asInt("subdomain_x") * GridSize.x;
+//	const auto Ny = conf.asInt("subdomain_y") * GridSize.y;
+//	const auto problem_size = Nx * Ny;
+//
+//	// Generate pseudo-random sensor locations.
+//	const int Nobs = std::max(Round(fraction * problem_size), 1);
+//	std::cout << "\tfraction of sensor points = " << fraction;
+//	std::cout << ", #observations = " << Nobs << std::endl;
+//	double_array_t x(Nobs), y(Nobs);
+//	InitialGuess(conf, x, y, point2d_t(0,0));
+//	OptimizePointLocations(x, y);
 
 	// temporary sensor location storage
-	std::map<point2d_t, std::vector<point2d_t>> locations;
+	std::map< point2d_t, std::vector<point2d_t> > locations;
 
-	// Save (scaled) sensor locations to temporary storage.
-	for (int k = 0; k < Nobs; ++k) {
-		auto xk = ScaleCoord(x[k], Nx);
-		auto yk = ScaleCoord(y[k], Ny);
+//	// Save (scaled) sensor locations to temporary storage.
+//	for (int k = 0; k < Nobs; ++k) {
+//		auto xk = ScaleCoord(x[k], Nx);
+//		auto yk = ScaleCoord(y[k], Ny);
+//		// insert sensor position
+//		point2d_t pt{xk,yk};
+//		point2d_t idx = allscale::utils::elementwiseDivision(
+//													pt, finest_layer_size);
+//		assert_true((0 <= idx.x) && (idx.x < GridSize.x));
+//		assert_true((0 <= idx.y) && (idx.y < GridSize.y));
+//
+//		locations[idx].push_back(pt % finest_layer_size);
+//	}
+
+	point_array_t sensor_positions;
+	SensorsGenerator().MakeSensors(conf, sensor_positions);
+
+    // Save sensor locations to temporary storage.
+	for (size_t k = 0; k < sensor_positions.size(); ++k) {
+		auto x = sensor_positions[k].x;
+		auto y = sensor_positions[k].y;
 		// insert sensor position
-		point2d_t pt{xk,yk};
-		point2d_t idx = allscale::utils::elementwiseDivision(
-													pt, finest_layer_size);
+		point2d_t pt{x,y};
+		point2d_t idx =
+		        allscale::utils::elementwiseDivision(pt, finest_layer_size);
 		assert_true((0 <= idx.x) && (idx.x < GridSize.x));
 		assert_true((0 <= idx.y) && (idx.y < GridSize.y));
-
 		locations[idx].push_back(pt % finest_layer_size);
 	}
+
+	// --- initialize observations ---
 
 	const index_t Nt = static_cast<index_t>(conf.asUInt("Nt"));
 
