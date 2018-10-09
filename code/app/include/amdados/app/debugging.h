@@ -40,6 +40,9 @@
 //=============================================================================
 class MyLogger
 {
+private:
+	// required for compatibility with the AllScale compiler
+	MyLogger() : MyLogger(MY_LOGGING_INFO) {};
 public:
     enum LoggingType { MY_LOGGING_INFO, MY_LOGGING_WARNING, MY_LOGGING_ERROR };
 
@@ -87,6 +90,10 @@ private:
 //=============================================================================
 class MyLogger
 {
+private:
+	// required for compatibility with the AllScale compiler
+	MyLogger() = default;
+
 public:
     enum LoggingType { MY_LOGGING_INFO, MY_LOGGING_WARNING, MY_LOGGING_ERROR };
     explicit MyLogger(LoggingType) {}
