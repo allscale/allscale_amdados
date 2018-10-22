@@ -26,6 +26,10 @@ struct Point2D
         return ((p.x == x) && (p.y == y));
     }
 
+	bool operator<(const Point2D & p) const {
+		return (x < p.x) || (x == p.x && y < p.y);
+	}
+
     Point2D neighbour(Directions dir) const {
         switch(dir) {
             case Left:  return Point2D(x - 1, y);
@@ -41,6 +45,10 @@ struct Point2D
     Point2D right() const { return Point2D(x + 1, y); }
     Point2D down()  const { return Point2D(x, y - 1); }
     Point2D up()    const { return Point2D(x, y + 1); }
+
+	friend std::ostream & operator<<(std::ostream & out, const Point2D& p) {
+		return out << "P(" << p.x << "," << p.y << ")";
+	}
 };
 
 typedef Point2D point2d_t;

@@ -55,6 +55,10 @@ bool gTestBoundExchange = false;  // 0/1: testing boundary exchange mechanism
 namespace amdados {
 
 void TestExchangeCorrectness(SubDomain * sd, long timestamp);
+void InitDependentParams(Configuration & conf);
+MpiGrid InitGrid(const Configuration& conf);
+void GenerateSensorData(const Configuration& conf, MpiGrid& grid);
+void RunSimulation(const Configuration & conf, MpiGrid& grid);
 
 //-----------------------------------------------------------------------------
 // Function parses command-line options. Returns 'true' when the help message
@@ -123,6 +127,72 @@ void ScenarioSensors(const Configuration & conf)
 }
 
 //-----------------------------------------------------------------------------
+// Function replicates the ScenarioBenchmark functionality of the Allscale
+// version of this application for testing convenience.
+//-----------------------------------------------------------------------------
+void ScenarioBenchmark(Configuration conf, int problem_size)
+{
+	if(amdados::GetRank() == 0) {
+		MY_LOG(INFO) << "Running scenario 'benchmark' ...";
+	}
+
+	// --- load configuration ---
+
+	// over-ride problem size
+	conf.SetInt("num_subdomains_x", problem_size);
+	conf.SetInt("num_subdomains_y", problem_size);
+
+	// Initialize dependent parameters
+	InitDependentParams(conf);
+	conf.PrintParameters();
+
+	// print some status info for the user
+	int steps = conf.asInt("Nt");
+	
+	if(amdados::GetRank() == 0) {
+		std::cout << "Running benchmark based on configuration file";
+		//	<< config_file;
+		std::cout << " with domain size " << problem_size << "x" << problem_size;
+		std::cout << " for " << steps << " time steps ...\n";
+	}
+
+	MpiGrid grid = InitGrid(conf);
+	
+	// --- generate sensor data ---
+
+	if(amdados::GetRank() == 0) {
+		std::cout << "Generating artificial sensory input data ...\n";
+	}
+
+	GenerateSensorData(conf, grid);
+	
+	// --- run simulation ---
+	if(amdados::GetRank() == 0) {
+		std::cout << "Running benchmark simulation ...\n";
+	}
+	auto start = std::chrono::high_resolution_clock::now();
+
+	// Run the simulation with data assimilation. Important: by this time
+	// some parameters had been initialized in InitDependentParams(..), so
+	// we can safely proceed to the main part of the simulation algorithm.
+	RunSimulation(conf, grid);
+
+	// --- summarize performance data ---
+
+	if(amdados::GetRank() == 0) {
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = end - start;
+
+		double time = std::chrono::duration_cast<std::chrono::milliseconds>(
+			duration).count() / 1000.0;
+		std::cout << "Simulation took " << time << "s\n";
+	
+		double throughput = (problem_size * problem_size * steps) / time;
+		std::cout << "Throughput: " << throughput << " sub-domains/s\n";
+	}
+}
+
+//-----------------------------------------------------------------------------
 // Function initializes dependent parameters given the primary ones
 // specified by user.
 //-----------------------------------------------------------------------------
@@ -169,15 +239,17 @@ void InitDependentParams(Configuration & conf)
     // Deduce the optimal time step from the stability criteria.
     const double dt_base = conf.asDouble("integration_period") /
                            conf.asDouble("integration_nsteps");
-    const double max_vx = conf.asDouble("flow_model_max_vx");
-    const double max_vy = conf.asDouble("flow_model_max_vy");
+//    const double max_vx = conf.asDouble("flow_model_max_vx");
+//    const double max_vy = conf.asDouble("flow_model_max_vy");
     // This time step is defined according to stability criteria.
 //    const double dt = std::min(dt_base,
 //                        std::min( std::min(dx*dx, dy*dy)/(2.0*D + TINY),
 //                                  1.0/(std::fabs(max_vx)/dx +
 //                                       std::fabs(max_vy)/dy + TINY) ));
-std::cout << "A T T E N T I O N: hard-coded dt" << std::endl;
-const double dt = dt_base;      // XXX
+	if(GetRank() == 0) {
+		std::cout << "A T T E N T I O N: hard-coded dt" << std::endl;
+	}
+	const double dt = dt_base;      // XXX
     assert_true(dt > TINY);
     conf.SetDouble("dt", dt);
     conf.SetInt("Nt", static_cast<int>(
@@ -497,32 +569,106 @@ void SubdomainRoutineKalman(const Configuration & conf, SubDomain * sd,
     ValidateField(sd->m_next_field);
 }
 
+MpiGrid InitGrid(const Configuration& conf) {
+
+	// Initialize grid and create subdomains attached to this process.
+	MpiGrid grid(conf);
+	grid.forAll([&grid, &conf](point2d_t pos, int rank) {
+		if(rank == grid.myRank()) {
+			grid.setSubdomain(pos, new SubDomain(conf, grid, rank, pos));
+		}
+	});
+
+	return grid;
+}
+
+void GenerateSensorData(const Configuration& conf, MpiGrid& grid) {
+	// Define useful constants.
+	const auto& Sx = conf.asInt("subdomain_x");
+	const auto& Sy = conf.asInt("subdomain_y");
+
+	// --- initialize sensors ---
+
+	// Pre-initialize sensors of subdomains attached to this process.
+	grid.forAllLocal([&conf](SubDomain * sd) {
+		sd->StartSensorsInitialization(conf);
+	});
+    
+	std::map< point2d_t, std::vector<point2d_t> > locations;
+	point_array_t sensor_positions;
+	SensorsGenerator().MakeSensors(conf, sensor_positions);
+	// Save sensor locations to temporary storage.
+	for(size_t k = 0; k < sensor_positions.size(); ++k) {
+		auto x = sensor_positions[k].x;
+		auto y = sensor_positions[k].y;
+		// insert sensor position
+		point2d_t idx{ x/Sx, y/Sy };
+		point2d_t pt{ x%Sx, y%Sy };
+		locations[idx].push_back(pt);
+	}
+
+	grid.forAllLocal([&](SubDomain * sd) {
+
+		// Clear the data structures.
+		sd->m_sensors.clear();
+
+		// Copy sensor positions from temporary to simulation storage.
+		if(locations.find(sd->m_pos) != locations.end()) {
+			sd->m_sensors = locations.at(sd->m_pos);
+		}
+
+	});
+
+	// Post-initialize sensors of subdomains attached to this process.
+	grid.forAllLocal([&conf](SubDomain * sd) {
+		sd->FinalizeSensorsInitialization(conf);
+	});
+
+	// --- initialize observations ---
+	
+	// Pre-initialize observations of subdomains attached to this process.
+	grid.forAllLocal([&conf](SubDomain * sd) {
+		sd->StartObservationsInitialization(conf);
+	});
+
+	const index_t Nt = static_cast<index_t>(conf.asUInt("Nt"));
+
+	grid.forAllLocal([&](SubDomain * sd) {
+
+		// Clear the data structure.
+		sd->m_observations.Clear();
+
+		// Insert observations.
+		const auto num_observations = sd->m_sensors.size();
+		Matrix & m = sd->m_observations;
+		m.Resize(Nt, num_observations);
+
+		// Fill in observation values.
+		if(num_observations > 0) {
+			index_t t_step = Nt / num_observations;
+			for(std::size_t cnt = 0; cnt < num_observations; cnt++) {
+				m(t_step * cnt, cnt) = 1.0f;
+			}
+		}
+	});
+
+	// Post-initialize observations of subdomains attached to this process.
+	grid.forAllLocal([&conf](SubDomain * sd) {
+		sd->FinalizeObservationsInitialization(conf);
+	});
+}
+
 //-----------------------------------------------------------------------------
 // Application's main function runs simulation with data assimilation.
 //-----------------------------------------------------------------------------
-void RunSimulation(const Configuration & conf)
+void RunSimulation(const Configuration & conf, MpiGrid& grid)
 {
-    // Initialize grid and create subdomains attached to this process.
-    MpiGrid grid(conf);
-    grid.forAll([&grid, &conf](point2d_t pos, int rank) {
-        if (rank == grid.myRank()) {
-            grid.setSubdomain(pos, new SubDomain(conf, grid, rank, pos));
-        }
-    });
-
-    // Load sensor locations, sensor observations and finalize
-    // Initialization of subdomains attached to this process.
-    InputData().Load(conf, grid);
-    grid.forAllLocal([&conf](SubDomain * sd) {
-        InitialCovar(conf, sd);
-    });
-
     const long Nt = gTestBoundExchange ? 100 : conf.asInt("Nt");
     const long Nsubiter = conf.asInt("num_sub_iter");
     const long Nwrite = std::min(Nt, (long)conf.asInt("write_num_fields"));
 
     MpiOutputWriter writer(conf);
-
+	
     // Initialization is done by this line.
     MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD));
 
@@ -579,6 +725,20 @@ void RunSimulation(const Configuration & conf)
             delete sd;
         }
     });
+}
+
+void RunSimulationFromFile(const Configuration & conf) {
+	MpiGrid grid = InitGrid(conf);
+
+	// Load sensor locations, sensor observations and finalize
+	// Initialization of subdomains attached to this process.
+	InputData().Load(conf, grid);
+	grid.forAllLocal([&conf](SubDomain * sd) {
+		std::cout << "sd: " << sd->m_pos.x << ":" << sd->m_pos.y << ", x: " << sd->m_size.x << ", y: " << sd->m_size.y << "\n";
+		InitialCovar(conf, sd);
+	});
+
+	RunSimulation(conf, grid);
 }
 
 //-----------------------------------------------------------------------------
@@ -745,10 +905,21 @@ int mpi_main(int * argc, char *** argv)
 //// XXX
 //config_file = "output/tmp.conf";
 //gTestBoundExchange = true;
-
-        // Read application parameters from configuration file.
+        
+		// Read application parameters from configuration file.
         amdados::Configuration conf;
         conf.ReadConfigFile(config_file);
+
+		if(scenario.substr(0, 9) == "benchmark") {
+			MY_LOG(INFO) << "SCENARIO: benchmark.";
+			int N = 10;
+			if(scenario.size() > 9 && scenario[9] == ':') {
+				N = atoi(scenario.c_str() + 10);
+			}
+			amdados::ScenarioBenchmark(conf, N);
+			return MPI_Finalize();
+		}
+
         amdados::InitDependentParams(conf);
         conf.PrintParameters();
 
@@ -777,7 +948,7 @@ int mpi_main(int * argc, char *** argv)
         }
     	auto start = std::chrono::high_resolution_clock::now();
         // Now the main simulation.
-        amdados::RunSimulation(conf);
+        amdados::RunSimulationFromFile(conf);
         ret_val = EXIT_SUCCESS;
     	auto end = std::chrono::high_resolution_clock::now();
 
