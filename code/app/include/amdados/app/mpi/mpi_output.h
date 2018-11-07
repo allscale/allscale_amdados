@@ -20,11 +20,17 @@ MpiOutputWriter(const Configuration & conf)
     : m_file(MPI_FILE_NULL)
     , m_buffer()
     , m_base(0)
+    , m_info(MPI_INFO_NULL)
 {
+    MPI_Info_create(&m_info);
+    /* Disables ROMIO's data-sieving */
+    MPI_Info_set(m_info, "romio_ds_read", "disable");  
+    MPI_Info_set(m_info, "romio_ds_write", "disable");
+
     std::string filename = MakeFileName(conf, "field");
     if (MPI_File_open(MPI_COMM_WORLD, filename.c_str(),
                       MPI_MODE_CREATE | MPI_MODE_WRONLY,
-                      MPI_INFO_NULL, &m_file) != MPI_SUCCESS) {
+                      m_info, &m_file) != MPI_SUCCESS) {
         MY_LOG(ERROR) << "failed to open file " << filename << " for writing";
         PrintErrorAndExit(nullptr);
     }
@@ -42,6 +48,7 @@ virtual ~MpiOutputWriter()
         MY_LOG(ERROR) << "MPI_File_close() failed";
         PrintErrorAndExit(nullptr);
     }
+    MPI_Info_free(&m_info);
 }
 
 //-----------------------------------------------------------------------------
@@ -113,6 +120,7 @@ private:
     MPI_File      m_file;           ///< output file
     float_array_t m_buffer;         ///< temporary buffer
     MPI_Offset    m_base;           ///< position in the file
+    MPI_Info      m_info;			///< additional IO settings
 
 };  // class MpiOutputWriter
 
